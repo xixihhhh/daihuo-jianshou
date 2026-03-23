@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LuArrowLeft, LuUpload, LuX, LuCircleAlert, LuZap, LuUser, LuUserX, LuBox, LuLayoutGrid, LuEye, LuVideo, LuBookmark } from "react-icons/lu";
 import { useCharacterStore } from "@/lib/stores/project-store";
 import { useTemplateStore } from "@/lib/stores/template-store";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,11 @@ const styleOptions = [
 
 export default function NewProjectPage() {
   const router = useRouter();
+
+  // 检查 LLM API 配置状态
+  const { llm, providers } = useSettingsStore();
+  const isLLMConfigured = llm.apiKey.length > 0;
+  const hasProvider = Object.values(providers).some((p: { enabled: boolean; apiKey: string }) => p.enabled && p.apiKey.length > 0);
 
   // 表单状态
   const [productName, setProductName] = useState("");
@@ -269,10 +275,27 @@ export default function NewProjectPage() {
           </p>
         </div>
 
+        {/* LLM 未配置警告 */}
+        {!isLLMConfigured && (
+          <Link href="/settings">
+            <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 cursor-pointer hover:bg-amber-100 transition-colors">
+              <LuCircleAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">请先配置 LLM 服务</p>
+                <p className="text-xs text-amber-700 mt-0.5">脚本生成需要 LLM（如 GPT-4o），请先在设置中配置 API Key。<span className="underline">前往设置 →</span></p>
+              </div>
+            </div>
+          </Link>
+        )}
+
         <div className="space-y-6">
           {/* 商品图片上传区域 */}
           <Card className="glass-card">
             <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
+                <span className="text-sm font-semibold">上传商品图片</span>
+              </div>
               <div className="flex items-center justify-between mb-4">
                 <Label className="text-sm font-medium">
                   商品图片
@@ -357,6 +380,10 @@ export default function NewProjectPage() {
           {/* 商品信息表单 */}
           <Card className="glass-card">
             <CardContent className="p-5 space-y-5">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
+                <span className="text-sm font-semibold">填写商品信息</span>
+              </div>
               {/* 商品名称 */}
               <div className="space-y-2">
                 <Label htmlFor="productName" className="text-sm font-medium">
@@ -496,9 +523,15 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          {/* 目标时长 */}
+          {/* 视频配置（目标时长 + 视频模式） */}
           <Card className="glass-card">
             <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
+                <span className="text-sm font-semibold">选择视频配置</span>
+              </div>
+
+              {/* 目标时长 */}
               <Label className="text-sm font-medium mb-3 block">目标时长</Label>
               <div className="grid grid-cols-3 gap-3">
                 {durationOptions.map((opt) => (
@@ -521,12 +554,11 @@ export default function NewProjectPage() {
                   </button>
                 ))}
               </div>
-            </CardContent>
-          </Card>
 
-          {/* 视频模式 */}
-          <Card className="glass-card">
-            <CardContent className="p-5">
+              {/* 分隔线 */}
+              <div className="my-5 border-t border-border/40" />
+
+              {/* 视频模式 */}
               <Label className="text-sm font-medium mb-3 block">视频模式</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
@@ -626,6 +658,10 @@ export default function NewProjectPage() {
           {/* 脚本风格 */}
           <Card className="glass-card">
             <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">4</span>
+                <span className="text-sm font-semibold">选择脚本风格</span>
+              </div>
               <Label className="text-sm font-medium mb-3 block">脚本风格</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {styleOptions.map((opt) => (
@@ -744,7 +780,7 @@ export default function NewProjectPage() {
 
             <Button
               onClick={handleSubmit}
-              disabled={!isValid || isSubmitting}
+              disabled={!isValid || isSubmitting || !isLLMConfigured}
               className="w-full h-12 brand-gradient text-white font-semibold text-base shadow-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
@@ -764,7 +800,11 @@ export default function NewProjectPage() {
             </Button>
             {!isSubmitting && (
               <p className="text-xs text-muted-foreground text-center mt-3">
-                AI 将分析商品图片和卖点，生成多套专业带货脚本供你选择
+                {!isLLMConfigured
+                  ? "请先在设置中配置 LLM API Key"
+                  : !isValid
+                    ? "请上传至少一张商品图并填写商品名称"
+                    : "AI 将分析商品图片和卖点，生成多套专业带货脚本供你选择"}
               </p>
             )}
           </div>

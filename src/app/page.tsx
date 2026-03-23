@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { LuSettings, LuPlus, LuZap, LuVideo, LuFilm, LuPackage } from "react-icons/lu";
+import { LuSettings, LuPlus, LuZap, LuVideo, LuFilm, LuPackage, LuTriangleAlert } from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // 模拟项目数据（后续接数据库）
 const mockProjects = [
@@ -36,6 +37,11 @@ const statusMap: Record<string, { label: string; color: string }> = {
 
 export default function HomePage() {
   const [projects] = useState(mockProjects);
+
+  // 检查是否已配置 API 服务
+  const { llm, providers } = useSettingsStore();
+  const isConfigured = llm.apiKey.length > 0;
+  const hasAnyProvider = Object.values(providers).some(p => p.enabled && p.apiKey.length > 0);
 
   return (
     <div className="min-h-screen grid-bg">
@@ -79,8 +85,27 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* 两个核心入口 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+        {/* 未配置 API 时的引导横幅 */}
+        {!isConfigured && (
+          <Link href="/settings">
+            <div className="mb-8 p-5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-4 cursor-pointer hover:bg-amber-100 transition-colors">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <LuTriangleAlert className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-900 text-sm">首次使用？先配置 AI 服务</h3>
+                <p className="text-xs text-amber-700 mt-1">
+                  需要配置 LLM（用于生成脚本）和至少一个 AI 平台（用于生成图片/视频）才能开始使用。
+                  <span className="underline ml-1">点击前往设置 →</span>
+                </p>
+              </div>
+            </div>
+          </Link>
+        )}
+
+        {/* 三个核心入口 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+          {/* 卡片1：新建带货视频 */}
           <Link href="/project/new">
             <Card className="card-hover glass-card cursor-pointer group h-full">
               <CardContent className="p-6">
@@ -89,9 +114,9 @@ export default function HomePage() {
                     <LuPlus className="w-[22px] h-[22px] text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">新建项目</h3>
+                    <h3 className="text-lg font-semibold mb-1">新建带货视频</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      上传商品图片，AI 分析卖点并生成多套带货脚本，逐步生成视频
+                      上传 1-5 张商品图 → AI 自动分析卖点 → 生成 3 套专业脚本 → 逐镜头生成素材 → 合成完整视频
                     </p>
                   </div>
                 </div>
@@ -104,6 +129,31 @@ export default function HomePage() {
             </Card>
           </Link>
 
+          {/* 卡片2：商品库 */}
+          <Link href="/products">
+            <Card className="card-hover glass-card cursor-pointer group h-full">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg group-hover:scale-105 transition-transform">
+                    <LuPackage className="w-[22px] h-[22px] text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-1">商品库</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      录入商品信息（名称/图片/卖点），同一商品可反复生成不同风格的视频，大促前批量出片必备
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <Badge variant="secondary" className="text-xs">录入一次</Badge>
+                  <Badge variant="secondary" className="text-xs">反复使用</Badge>
+                  <Badge variant="secondary" className="text-xs">批量出片</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* 卡片3：爆款复刻 */}
           <Link href="/project/clone">
             <Card className="card-hover glass-card cursor-pointer group h-full">
               <CardContent className="p-6">
@@ -114,7 +164,7 @@ export default function HomePage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-1">爆款复刻</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      输入爆款视频链接，AI 提取脚本逻辑，用你的商品重新生成同款视频
+                      粘贴抖音/快手/小红书爆款视频链接 → AI 自动拆解脚本逻辑和分镜结构 → 用你的商品替换重新生成同款视频
                     </p>
                   </div>
                 </div>
@@ -126,6 +176,19 @@ export default function HomePage() {
               </CardContent>
             </Card>
           </Link>
+        </div>
+
+        {/* 快速了解：使用流程步骤条 */}
+        <div className="mb-10 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">1</span>上传商品图</span>
+          <span className="text-border">→</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">2</span>AI 生成脚本</span>
+          <span className="text-border">→</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">3</span>生成素材</span>
+          <span className="text-border">→</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">4</span>合成视频</span>
+          <span className="text-border">→</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">5</span>导出发布</span>
         </div>
 
         {/* 项目列表 */}

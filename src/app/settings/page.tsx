@@ -27,6 +27,7 @@ const AI_PROVIDERS = [
     key: "atlas-cloud",
     name: "Atlas Cloud",
     description: "高质量图像和视频生成平台，支持多种 AI 模型",
+    tip: "推荐首选，模型最全最便宜",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -40,6 +41,7 @@ const AI_PROVIDERS = [
     key: "fal-ai",
     name: "fal.ai",
     description: "快速推理平台，支持 Flux、SDXL 等主流图像生成模型",
+    tip: "支持 Kling 3.0、Veo 3 等最新模型",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -51,6 +53,7 @@ const AI_PROVIDERS = [
     key: "volcengine",
     name: "火山引擎",
     description: "字节跳动旗下云服务，提供豆包大模型和视频生成能力",
+    tip: "字节系模型 Seedance/Seedream，中文优化好",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
@@ -62,6 +65,7 @@ const AI_PROVIDERS = [
     key: "alibaba",
     name: "阿里百炼",
     description: "阿里云大模型服务平台，支持通义系列模型和图像生成",
+    tip: "万相系列，商品图生视频效果佳",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -75,6 +79,7 @@ const AI_PROVIDERS = [
     key: "siliconflow",
     name: "硅基流动",
     description: "国产 AI 推理平台，提供高性价比的模型推理服务",
+    tip: "国产高性价比推理平台",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -184,6 +189,27 @@ export default function SettingsPage() {
   // 保存时的提示状态
   const [saved, setSaved] = useState(false);
 
+  // LLM 连接测试状态
+  const [llmTestStatus, setLlmTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+
+  // 测试 LLM 连接
+  const testLLMConnection = async () => {
+    setLlmTestStatus("testing");
+    try {
+      const res = await fetch(llm.baseUrl + "/models", {
+        headers: { Authorization: `Bearer ${llm.apiKey}` },
+      });
+      setLlmTestStatus(res.ok ? "success" : "error");
+    } catch {
+      setLlmTestStatus("error");
+    }
+    setTimeout(() => setLlmTestStatus("idle"), 3000);
+  };
+
+  // 计算 AI 平台配置状态
+  const hasAnyProvider = Object.values(providers).some(p => p.enabled && p.apiKey);
+  const enabledCount = Object.values(providers).filter(p => p.enabled && p.apiKey).length;
+
   // 处理保存（zustand persist 会自动保存，这里主要做 UI 反馈）
   const handleSave = () => {
     setSaved(true);
@@ -221,7 +247,7 @@ export default function SettingsPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight">设置</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            配置 AI 平台密钥和 LLM 参数
+            配置 AI 服务后即可开始生成带货视频。需要配置 LLM（生成脚本）+ 至少一个 AI 平台（生成图片/视频）。
           </p>
         </div>
 
@@ -293,6 +319,7 @@ export default function SettingsPage() {
                             <p className="text-xs text-muted-foreground leading-relaxed">
                               {platform.description}
                             </p>
+                            <p className="text-[11px] text-muted-foreground/70 mt-0.5">{platform.tip}</p>
                           </div>
                         </div>
 
@@ -344,6 +371,31 @@ export default function SettingsPage() {
                       </svg>
                     </div>
                     <h3 className="font-semibold text-sm">LLM Provider</h3>
+                  </div>
+
+                  {/* 快捷预设 */}
+                  <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
+                    <p className="text-xs text-muted-foreground mb-2">快捷预设（点击自动填入 baseUrl 和模型，还需填写 API Key）：</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Atlas Cloud", baseUrl: "https://api.atlascloud.ai/v1", model: "claude-sonnet-4-20250514", tip: "推荐！LLM+生图生视频共用一个 Key" },
+                        { label: "DeepSeek", baseUrl: "https://api.deepseek.com", model: "deepseek-v3.2", tip: "V3.2 推理+对话统一模型" },
+                        { label: "Kimi", baseUrl: "https://api.moonshot.cn/v1", model: "kimi-k2.5", tip: "K2.5 支持 Agent Swarm" },
+                        { label: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-5-turbo", tip: "GLM-5 旗舰级" },
+                        { label: "MiniMax", baseUrl: "https://api.minimax.chat/v1", model: "MiniMax-M2.7", tip: "M2.7 兼容 OpenAI 协议" },
+                        { label: "豆包", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-seed-2.0-pro", tip: "Seed 2.0 对标 GPT-5.2" },
+                        { label: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-5.4", tip: "" },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          onClick={() => setLLM({ ...llm, baseUrl: preset.baseUrl, model: preset.model, visionModel: preset.model })}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs border border-border/50 bg-background hover:border-primary/40 hover:text-primary transition-colors"
+                        >
+                          {preset.label}
+                          {preset.tip && <span className="text-[10px] text-muted-foreground/70">({preset.tip})</span>}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="grid gap-4">
@@ -405,6 +457,31 @@ export default function SettingsPage() {
                           className="font-mono text-xs"
                         />
                       </div>
+                    </div>
+
+                    {/* 测试连接按钮 */}
+                    <div className="pt-3 mt-3 border-t border-border/50">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={testLLMConnection}
+                        disabled={!llm.apiKey || !llm.baseUrl || llmTestStatus === "testing"}
+                        className={`text-xs ${
+                          llmTestStatus === "success"
+                            ? "text-emerald-600"
+                            : llmTestStatus === "error"
+                            ? "text-destructive"
+                            : ""
+                        }`}
+                      >
+                        {llmTestStatus === "testing" ? "测试中..."
+                         : llmTestStatus === "success" ? "连接成功 ✓"
+                         : llmTestStatus === "error" ? "连接失败 ✗"
+                         : "测试连接"}
+                      </Button>
+                      {!llm.apiKey && (
+                        <span className="text-xs text-muted-foreground ml-2">请先填写 API Key</span>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -486,24 +563,36 @@ export default function SettingsPage() {
         </Tabs>
 
         {/* 底部保存按钮 */}
-        <div className="mt-8 flex items-center justify-end gap-3">
-          {saved && (
-            <span className="text-sm text-emerald-400 animate-in fade-in slide-in-from-right-2">
-              设置已保存
-            </span>
-          )}
-          <Button
-            onClick={handleSave}
-            className="brand-gradient text-white px-6"
-            size="lg"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-            保存设置
-          </Button>
+        <div className="mt-8 flex items-center justify-between gap-3">
+          {/* 配置状态摘要 */}
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p className={llm.apiKey ? "text-emerald-600" : "text-amber-600"}>
+              {llm.apiKey ? "✓ LLM 已配置" : "⚠ LLM 未配置（脚本生成需要）"}
+            </p>
+            <p className={hasAnyProvider ? "text-emerald-600" : "text-amber-600"}>
+              {hasAnyProvider ? `✓ ${enabledCount} 个 AI 平台已启用` : "⚠ 无 AI 平台启用（素材生成需要）"}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {saved && (
+              <span className="text-sm text-emerald-400 animate-in fade-in slide-in-from-right-2">
+                设置已保存
+              </span>
+            )}
+            <Button
+              onClick={handleSave}
+              className="brand-gradient text-white px-6"
+              size="lg"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              保存设置
+            </Button>
+          </div>
         </div>
       </main>
     </div>
