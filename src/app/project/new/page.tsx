@@ -159,16 +159,8 @@ export default function NewProjectPage() {
     setError(null);
 
     try {
-      // 第1步：上传图片
-      setProgress({ step: "uploading", percent: 15, message: "正在上传商品图片..." });
-      const formData = new FormData();
-      images.forEach((img) => formData.append("files", img.file));
-      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!uploadRes.ok) throw new Error("图片上传失败，请检查网络后重试");
-      const { paths } = await uploadRes.json();
-
-      // 第2步：创建项目
-      setProgress({ step: "creating", percent: 35, message: "正在创建项目..." });
+      // 第1步：创建项目（先拿到 projectId）
+      setProgress({ step: "creating", percent: 15, message: "正在创建项目..." });
       const projectRes = await fetch("/api/project", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,11 +169,30 @@ export default function NewProjectPage() {
           productName,
           productCategory: category,
           productDescription: sellingPoints,
-          productImages: paths,
+          productImages: [],
         }),
       });
       if (!projectRes.ok) throw new Error("项目创建失败，请重试");
       const project = await projectRes.json();
+
+      // 第2步：上传图片（携带 projectId）
+      setProgress({ step: "uploading", percent: 35, message: "正在上传商品图片..." });
+      const formData = new FormData();
+      images.forEach((img) => formData.append("files", img.file));
+      formData.append("projectId", project.id);
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.error || "图片上传失败，请检查网络后重试");
+      }
+      const { paths } = await uploadRes.json();
+
+      // 第2.5步：更新项目的图片路径
+      await fetch(`/api/project/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productImages: paths }),
+      });
 
       // 第3步：生成脚本
       setProgress({ step: "generating", percent: 60, message: "AI 正在分析商品并生成脚本..." });
