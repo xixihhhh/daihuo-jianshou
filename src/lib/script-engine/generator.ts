@@ -180,6 +180,7 @@ export async function generateScript(input: ScriptInput): Promise<GeneratedScrip
         { role: "user", content: userPrompt },
       ],
       temperature: 0.8,
+      max_tokens: 16000,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
