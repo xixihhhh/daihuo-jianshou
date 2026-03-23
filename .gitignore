@@ -33,6 +33,14 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# 数据目录（数据库、上传文件、输出视频）
+/data/
+
+# Claude Code
+CLAUDE.md
+AGENTS.md
+.claude/
+
 # vercel
 .vercel
 
