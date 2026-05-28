@@ -104,7 +104,7 @@ export default function HomePage() {
         )}
 
         {/* 三个核心入口 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
           {/* 卡片1：新建带货视频 */}
           <Link href="/project/new">
             <Card className="card-hover glass-card cursor-pointer group h-full">

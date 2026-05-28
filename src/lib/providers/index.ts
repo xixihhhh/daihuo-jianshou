@@ -9,6 +9,7 @@ import { FalAIProvider } from './fal-ai'
 import { VolcEngineProvider } from './volcengine'
 import { AlibabaProvider } from './alibaba'
 import { SiliconFlowProvider } from './siliconflow'
+import { SiliconFlowDigitalHuman } from './digital-human'
 
 // ==================== Provider 注册表 ====================
 
@@ -142,3 +143,24 @@ export { FalAIProvider } from './fal-ai'
 export { VolcEngineProvider } from './volcengine'
 export { AlibabaProvider } from './alibaba'
 export { SiliconFlowProvider } from './siliconflow'
+
+// ==================== 数字人 Provider ====================
+registerProvider({
+  id: 'siliconflow-dh',
+  name: '硅基流动数字人',
+  icon: '🤖',
+  description: '基于 Wan 模型的图生视频数字人口播',
+  category: 'digital-human' as const,
+  factory: (config) => new SiliconFlowDigitalHuman(config),
+  defaultConfig: { apiEndpoint: 'https://api.siliconflow.cn/v1' },
+  supportedModes: ['image-to-video' as const],
+  models: [
+    {
+      id: 'wan-i2v-14b',
+      name: 'Wan2.1-I2V-14B-720P',
+      description: '高质量图生视频，适合数字人口播',
+      supportedModes: ['image-to-video' as const],
+      pricing: { unit: '次', price: 0.5, currency: 'CNY' },
+    },
+  ],
+})
