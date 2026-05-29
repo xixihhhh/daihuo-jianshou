@@ -47,3 +47,9 @@ AGENTS.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Android 签名（敏感文件，禁止提交）
+*.keystore
+*.jks
+signing.properties
+keystore.properties
