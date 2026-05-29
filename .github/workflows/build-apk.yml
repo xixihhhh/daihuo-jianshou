@@ -28,21 +28,10 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Build Next.js
-        run: npm run build
-        continue-on-error: true
-
-      # 创建 Capacitor 入口页面
-      - name: Create Capacitor web assets
-        run: |
-          mkdir -p public
-          cp public/index.html public/capacitor-index.html
-          echo "✅ Capacitor 入口页面就绪"
+        run: npm install --legacy-peer-deps
 
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: npx @capacitor/cli sync android
 
       - name: Build Debug APK
         working-directory: android
