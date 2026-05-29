@@ -1,1 +1,31 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>萌萌的</title></head><body><h1>Loading...</h1></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>萌萌的</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; text-align: center; padding: 20px;
+    }
+    .container { max-width: 400px; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; margin-bottom: 24px; }
+    .loader { margin: 20px auto; width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #f59e0b; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .tip { color: #64748b; font-size: 14px; margin-top: 32px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="loader"></div>
+    <h1>萌萌的</h1>
+    <p class="subtitle">AI 带货视频生成器</p>
+    <p class="tip">正在加载应用...</p>
+  </div>
+</body>
+</html>
