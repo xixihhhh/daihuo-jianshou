@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import {LuArrowLeft, LuZap, LuCheck, LuCircleX, LuImage, LuArrowRight} from "react-icons/lu";
+import {LuArrowLeft, LuZap, LuCheck, LuCircleX, LuImage, LuArrowRight, LuLoader} from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { Shot } from "@/lib/db/schema";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // 素材项
 interface AssetItem {
@@ -84,23 +85,53 @@ export default function AssetsPage() {
   const doneCount = assets.filter((a) => a.status === "done").length;
   const allDone = doneCount === assets.length;
 
-  // 模拟生成单个素材
-  const generateOne = useCallback((shotId: number) => {
+  // 读取用户配置的 LLM 信息
+  const llm = useSettingsStore((s) => s.llm);
+
+  // 调用真实生图 API
+  const generateOne = useCallback(async (shotId: number) => {
+    const asset = assets.find((a) => a.shotId === shotId);
+    if (!asset || !llm.apiKey) return;
+
     setAssets((prev) =>
       prev.map((a) => (a.shotId === shotId ? { ...a, status: "generating" as const } : a))
     );
-    // 模拟 2-4 秒延迟
-    const delay = 2000 + Math.random() * 2000;
-    setTimeout(() => {
+
+    try {
+      const baseUrl = (llm.baseUrl || "https://apihub.agnes-ai.com/v1").replace(/\/+$/, "");
+      const res = await fetch(`${baseUrl}/images/generations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${llm.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "agnes-image-2.0-flash",
+          prompt: asset.prompt || asset.description,
+          n: 1,
+          size: "1024x1024",
+        }),
+      });
+      if (!res.ok) throw new Error(`API 返回 ${res.status}`);
+      const data = await res.json();
+      const url: string = data.data?.[0]?.url || "";
+
       setAssets((prev) =>
         prev.map((a) =>
           a.shotId === shotId
-            ? { ...a, status: "done" as const, thumbnailUrl: "" }
+            ? { ...a, status: "done" as const, thumbnailUrl: url }
             : a
         )
       );
-    }, delay);
-  }, []);
+    } catch (e: any) {
+      console.error("生图失败:", e);
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.shotId === shotId ? { ...a, status: "failed" as const } : a
+        )
+      );
+    }
+  }, [assets, llm]);
 
   // 一键全部生成
   const generateAll = useCallback(() => {
@@ -244,9 +275,13 @@ export default function AssetsPage() {
                       {/* 缩略图区域 */}
                       <div className="w-24 h-16 bg-muted/30 rounded-md flex items-center justify-center border border-border/30 overflow-hidden">
                         {asset.status === "done" ? (
-                          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                            <LuCheck className="w-5 h-5 text-primary" />
-                          </div>
+                          asset.thumbnailUrl ? (
+                            <img src={asset.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                              <LuCheck className="w-5 h-5 text-primary" />
+                            </div>
+                          )
                         ) : asset.status === "generating" ? (
                           <svg className="animate-spin h-5 w-5 text-primary" viewBox="0 0 24 24" fill="none">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
