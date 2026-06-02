@@ -301,7 +301,8 @@ ${platforms.length ? `投放平台: ${platforms.join(",")}` : ""}
 
       // 使用了模板时递增使用次数
 
-      // 第4步：完成
+      // 第4步：保存脚本到 sessionStorage 并跳转
+      sessionStorage.setItem(`scripts_${project.id}`, JSON.stringify(scripts));
       setProgress({ step: "done", percent: 100, message: "脚本生成完成！正在跳转..." });
       await new Promise((r) => setTimeout(r, 800));
       router.push(`/project/${project.id}/script`);
