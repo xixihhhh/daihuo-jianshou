@@ -85,7 +85,7 @@ export default function ScriptPage() {
       const stored = sessionStorage.getItem(`scripts_${id}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        sessionStorage.removeItem(`scripts_${id}`);
+        // 不删除 sessionStorage，素材页面还需要读取
         setScripts(parsed);
         return;
       }
