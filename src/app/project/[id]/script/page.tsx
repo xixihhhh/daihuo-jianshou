@@ -21,22 +21,22 @@ const mockScripts = [
     styleType: "pain_point",
     totalDuration: 25,
     shots: [
-      { shotId: 1, type: "hook" as const, duration: 3, description: "手持手机第一人称视角，快步走进房间，画面略有晃动", camera: "手持跟拍", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "你还在用一擦就烂的纸巾？", prompt: "First person POV walking into a bright modern room, slightly shaky handheld camera, cinematic" },
-      { shotId: 2, type: "pain_point" as const, duration: 4, description: "桌上一堆廉价纸巾碎屑，手拿普通纸巾沾水后碎裂", camera: "俯拍特写", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "普通纸巾一沾水就烂，擦个嘴满脸纸屑，太尴尬了", prompt: "Close-up overhead shot of cheap tissue paper disintegrating in water on a clean white table, dramatic lighting" },
-      { shotId: 3, type: "product_reveal" as const, duration: 3, description: "德宝纸巾包装正面特写，缓慢推进", camera: "缓慢推进", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "直到我发现了德宝", prompt: "" },
-      { shotId: 4, type: "demo" as const, duration: 5, description: "手拿德宝纸巾浸入水中，拉扯展示韧性", camera: "中景固定", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "湿水都不破！自己一直在用这个！拉扯都不会烂", prompt: "Hands holding premium tissue paper submerged in clear water, pulling and stretching to show strength, bright studio lighting" },
+      { shotId: 1, type: "hook" as const, duration: 3, description: "手持手机第一人称视角，快步走进房间，画面略有晃动", camera: "手持跟拍", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "你还在用产品核心卖点？", prompt: "First person POV walking into a bright modern room, slightly shaky handheld camera, cinematic" },
+      { shotId: 2, type: "pain_point" as const, duration: 4, description: "桌上一堆廉价商品碎屑，手拿普通商品沾水后碎裂", camera: "俯拍特写", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "普通商品核心痛点，擦个嘴尴尬场景，太尴尬了", prompt: "Close-up overhead shot of cheap product paper disintegrating in water on a clean white table, dramatic lighting" },
+      { shotId: 3, type: "product_reveal" as const, duration: 3, description: "通用商品包装正面特写，缓慢推进", camera: "缓慢推进", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "惊喜发现通用品牌", prompt: "" },
+      { shotId: 4, type: "demo" as const, duration: 5, description: "手拿通用商品浸入水中，拉扯展示韧性", camera: "中景固定", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "湿水都不破！自己一直在用这个！拉扯都不会烂", prompt: "Hands holding premium product paper submerged in clear water, pulling and stretching to show strength, bright studio lighting" },
       { shotId: 5, type: "cta" as const, duration: 3, description: "商品包装+价格标签+购物车图标", camera: "固定", visualSource: "product_image" as const, transition: "direct_concat" as const, voiceover: "限时特价！赶紧去抢！", prompt: "" },
     ],
   },
   {
     id: "s2",
-    title: "办公室纸巾测评",
+    title: "商品推广演示",
     styleType: "comparison",
     totalDuration: 28,
     shots: [
-      { shotId: 1, type: "hook" as const, duration: 3, description: "办公桌上并排放着5款不同品牌的纸巾", camera: "俯拍全景", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "花了200块买了5款纸巾，就为了告诉你哪款最值", prompt: "Overhead shot of 5 different tissue paper brands arranged neatly on a modern office desk, clean aesthetic" },
-      { shotId: 2, type: "demo" as const, duration: 8, description: "逐一测试每款纸巾的湿水强度", camera: "特写对比", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "第一款，一碰水就烂...第二款也不行...这个居然还行？", prompt: "Split screen comparison of tissue papers being tested with water, some breaking apart, dramatic close-up" },
-      { shotId: 3, type: "product_reveal" as const, duration: 4, description: "德宝纸巾特写展示", camera: "推进", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "最后赢家就是它——德宝！完胜其他四款", prompt: "" },
+      { shotId: 1, type: "hook" as const, duration: 3, description: "办公桌上并排放着5款不同品牌的商品", camera: "俯拍全景", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "预算投入买了5款商品，就为了告诉你哪款最值", prompt: "Overhead shot of 5 different product paper brands arranged neatly on a modern office desk, clean aesthetic" },
+      { shotId: 2, type: "demo" as const, duration: 8, description: "逐一测试每款商品的湿水强度", camera: "特写对比", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "第一款，一碰水就烂...第二款也不行...这个居然还行？", prompt: "Split screen comparison of product papers being tested with water, some breaking apart, dramatic close-up" },
+      { shotId: 3, type: "product_reveal" as const, duration: 4, description: "通用商品特写展示", camera: "推进", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "最终胜出的是——通用品牌！脱颖而出", prompt: "" },
       { shotId: 4, type: "social_proof" as const, duration: 5, description: "展示销量数据和好评截图", camera: "固定", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "月销50万+，好评率99%，不是没有原因的", prompt: "Clean data visualization showing sales numbers and positive reviews, modern UI style, dark background" },
       { shotId: 5, type: "cta" as const, duration: 3, description: "商品展示+限时优惠信息", camera: "固定", visualSource: "product_image" as const, transition: "direct_concat" as const, voiceover: "链接在小黄车，今天下单还送湿巾！", prompt: "" },
     ],
@@ -48,9 +48,9 @@ const mockScripts = [
     totalDuration: 22,
     shots: [
       { shotId: 1, type: "hook" as const, duration: 3, description: "女生精心化好妆准备约会，镜头前自信微笑", camera: "正面中景", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "上周约会前发生了一件超尴尬的事", prompt: "Young Asian woman smiling confidently at camera after finishing makeup, warm bedroom lighting, cinematic" },
-      { shotId: 2, type: "pain_point" as const, duration: 4, description: "餐厅里擦嘴后脸上满是纸屑的尴尬特写", camera: "特写", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "用餐厅的纸巾擦了一下嘴...脸上全是纸屑碎片", prompt: "Close-up of a woman's face with tiny paper residue near lips, embarrassed expression, restaurant lighting" },
-      { shotId: 3, type: "product_reveal" as const, duration: 3, description: "从包里掏出德宝纸巾的动作", camera: "特写", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "还好我包里有德宝", prompt: "" },
-      { shotId: 4, type: "demo" as const, duration: 5, description: "用德宝纸巾优雅擦拭，纸巾完整不掉屑", camera: "中景", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "擦完妆都没花，纸巾完整不掉渣，约会继续！", prompt: "Woman elegantly using premium tissue, clean result, confident smile, warm restaurant ambiance" },
+      { shotId: 2, type: "pain_point" as const, duration: 4, description: "餐厅里擦嘴后脸上满是纸屑的尴尬特写", camera: "特写", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "用餐厅的商品擦了一下嘴...尴尬状况", prompt: "Close-up of a woman's face with tiny paper residue near lips, embarrassed expression, restaurant lighting" },
+      { shotId: 3, type: "product_reveal" as const, duration: 3, description: "轻松取出通用商品的动作", camera: "特写", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "还好我包里有通用品牌", prompt: "" },
+      { shotId: 4, type: "demo" as const, duration: 5, description: "用通用商品轻松完成，商品完整不掉屑", camera: "中景", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "效果出众，商品完整不完美呈现，继续精彩！", prompt: "Woman elegantly using premium product, clean result, confident smile, warm restaurant ambiance" },
       { shotId: 5, type: "cta" as const, duration: 2, description: "商品展示+下单引导", camera: "固定", visualSource: "product_image" as const, transition: "direct_concat" as const, voiceover: "姐妹们快囤起来！", prompt: "" },
     ],
   },
@@ -139,7 +139,7 @@ export default function ScriptPage() {
               <span className="text-lg font-bold tracking-tight">萌萌的</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">Tempo 德宝纸巾推广</span>
+            <span className="text-sm text-muted-foreground">通用品牌 通用商品推广</span>
           </div>
 
           {/* 步骤进度 */}

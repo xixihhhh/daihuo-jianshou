@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 
 // 模拟商品数据
 const mockProducts = [
-  { id: "p1", name: "德宝纸巾", category: "home", image: "" },
+  { id: "p1", name: "通用商品", category: "home", image: "" },
   { id: "p2", name: "小米手环8", category: "tech", image: "" },
   { id: "p3", name: "完美日记唇釉", category: "beauty", image: "" },
   { id: "p4", name: "三只松鼠坚果", category: "food", image: "" },

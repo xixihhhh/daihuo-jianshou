@@ -57,9 +57,9 @@ const shotTypeLabels: Record<Shot["type"], { label: string; color: string }> = {
 
 // 模拟视频片段数据
 const initialClips: VideoClipItem[] = [
-  { shotId: 1, type: "hook", duration: 3, voiceover: "你还在用一擦就烂的纸巾？", transition: "ai_start_end" },
-  { shotId: 2, type: "pain_point", duration: 4, voiceover: "普通纸巾一沾水就烂，擦个嘴满脸纸屑", transition: "ai_start_end" },
-  { shotId: 3, type: "product_reveal", duration: 3, voiceover: "直到我发现了德宝", transition: "ai_start_end" },
+  { shotId: 1, type: "hook", duration: 3, voiceover: "你还在用产品核心卖点？", transition: "ai_start_end" },
+  { shotId: 2, type: "pain_point", duration: 4, voiceover: "普通商品核心痛点，擦个嘴尴尬场景", transition: "ai_start_end" },
+  { shotId: 3, type: "product_reveal", duration: 3, voiceover: "惊喜发现通用品牌", transition: "ai_start_end" },
   { shotId: 4, type: "demo", duration: 5, voiceover: "湿水都不破！拉扯都不会烂", transition: "ai_start_end" },
   { shotId: 5, type: "cta", duration: 3, voiceover: "限时特价！赶紧去抢！", transition: "direct_concat" },
 ];
@@ -127,7 +127,7 @@ export default function VideoPage() {
               <span className="text-lg font-bold tracking-tight">萌萌的</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">Tempo 德宝纸巾推广</span>
+            <span className="text-sm text-muted-foreground">通用品牌 通用商品推广</span>
           </div>
 
           {/* 步骤进度 */}

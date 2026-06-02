@@ -24,14 +24,14 @@ interface ExportState {
 
 // ============ 模拟视频信息 ============
 const videoInfo = {
-  title: "Tempo 德宝纸巾推广",
+  title: "通用品牌 通用商品推广",
   duration: 25,
   resolution: "1080p",
   aspectRatio: "9:16",
   fileSize: "12.8 MB",
   format: "MP4",
   createdAt: "2026-03-23",
-  videoUrl: "https://example.com/videos/tempo_ad_demo.mp4",
+  videoUrl: "https://example.com/videos/product_ad_demo.mp4",
 }
 
 // ============ 平台导出配置 ============
@@ -43,9 +43,9 @@ const platformConfigs = [
 
 // ============ A/B 测试版本 ============
 const abVersions = [
-  { id: "v1", name: "版本A - 原版", hook: "你还在用一擦就烂的纸巾？", style: "痛点种草" },
-  { id: "v2", name: "版本B - 利益点", hook: "这个纸巾湿水都不破！省钱又好用", style: "利益承诺" },
-  { id: "v3", name: "版本C - 悬念", hook: "花了200块测了5款纸巾，结果...", style: "悬念提问" },
+  { id: "v1", name: "版本A - 原版", hook: "你还在用产品核心卖点？", style: "痛点种草" },
+  { id: "v2", name: "版本B - 利益点", hook: "这个商品湿水都不破！省钱又好用", style: "利益承诺" },
+  { id: "v3", name: "版本C - 悬念", hook: "预算投入深度测评商品，结果...", style: "悬念提问" },
 ]
 
 export default function ExportPage() {
@@ -164,9 +164,9 @@ export default function ExportPage() {
   const handleCopyScript = useCallback(() => {
     const scriptText = `【${videoInfo.title} - 带货脚本】
 
-钩子: "你还在用一擦就烂的纸巾？"
-痛点: "普通纸巾一沾水就烂..."
-产品: "直到我发现了德宝"
+钩子: "你还在用产品核心卖点？"
+痛点: "普通商品核心痛点..."
+产品: "惊喜发现通用品牌"
 演示: "湿水都不破！"
 CTA: "限时特价！赶紧去抢！"`
     navigator.clipboard.writeText(scriptText).then(() => {

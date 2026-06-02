@@ -24,9 +24,9 @@ interface AssetItem {
 // 模拟脚本分镜数据
 const initialAssets: AssetItem[] = [
   { shotId: 1, type: "hook", duration: 3, description: "手持手机第一人称视角，快步走进房间", prompt: "First person POV walking into a bright modern room, slightly shaky handheld camera, cinematic", visualSource: "ai_generate", status: "pending" },
-  { shotId: 2, type: "pain_point", duration: 4, description: "桌上一堆廉价纸巾碎屑，手拿普通纸巾沾水后碎裂", prompt: "Close-up overhead shot of cheap tissue paper disintegrating in water on a clean white table", visualSource: "ai_generate", status: "pending" },
-  { shotId: 3, type: "product_reveal", duration: 3, description: "德宝纸巾包装正面特写，缓慢推进", prompt: "", visualSource: "product_image", status: "done", thumbnailUrl: "" },
-  { shotId: 4, type: "demo", duration: 5, description: "手拿德宝纸巾浸入水中，拉扯展示韧性", prompt: "Hands holding premium tissue paper submerged in clear water, pulling and stretching to show strength", visualSource: "ai_generate", status: "pending" },
+  { shotId: 2, type: "pain_point", duration: 4, description: "桌上一堆廉价商品碎屑，手拿普通商品沾水后碎裂", prompt: "Close-up overhead shot of cheap product paper disintegrating in water on a clean white table", visualSource: "ai_generate", status: "pending" },
+  { shotId: 3, type: "product_reveal", duration: 3, description: "通用商品包装正面特写，缓慢推进", prompt: "", visualSource: "product_image", status: "done", thumbnailUrl: "" },
+  { shotId: 4, type: "demo", duration: 5, description: "手拿通用商品浸入水中，拉扯展示韧性", prompt: "Hands holding premium product paper submerged in clear water, pulling and stretching to show strength", visualSource: "ai_generate", status: "pending" },
   { shotId: 5, type: "cta", duration: 3, description: "商品包装+价格标签+购物车图标", prompt: "", visualSource: "product_image", status: "done", thumbnailUrl: "" },
 ];
 
@@ -98,7 +98,7 @@ export default function AssetsPage() {
               <span className="text-lg font-bold tracking-tight">萌萌的</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">Tempo 德宝纸巾推广</span>
+            <span className="text-sm text-muted-foreground">通用品牌 通用商品推广</span>
           </div>
 
           {/* 步骤进度 */}

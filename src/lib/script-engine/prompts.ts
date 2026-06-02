@@ -124,8 +124,8 @@ export const VIDEO_MODE_DIRECTIVES: Record<string, string> = {
    - demo：motion = "pan_left" 或 "pan_right"（横移展示细节）
    - cta：motion = "static"（静止，聚焦购买信息）
 4. prompt 字段描述产品周围的环境/光线/氛围，不描述人物
-   - 好的 prompt："Premium tissue box on a clean marble surface, soft studio lighting, bokeh background, product photography"
-   - 差的 prompt："A woman holding tissue paper"（不要出现人）
+   - 好的 prompt："Premium product box on a clean marble surface, soft studio lighting, bokeh background, product photography"
+   - 差的 prompt："A woman holding product paper"（不要出现人）
 5. 可使用 textOverlay 在关键帧上叠加文字（卖点、价格等）
 
 适合的商品：高客单价护肤品、食品、数码产品、家居用品等`,
