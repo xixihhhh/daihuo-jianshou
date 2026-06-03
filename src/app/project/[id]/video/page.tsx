@@ -525,8 +525,7 @@ export default function VideoPage() {
                       下一步：导出视频
                       <LuArrowRight className="w-4 h-4 ml-1" />
                     </Button>
-                  </Link>
-                </>
+                </Link>
               )}
             </div>
           </div>
