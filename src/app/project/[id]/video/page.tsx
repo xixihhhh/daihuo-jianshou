@@ -138,6 +138,7 @@ export default function VideoPage() {
 
     try {
       const baseUrl = (llm.baseUrl || "https://apihub.agnes-ai.com/v1").replace(/\/+$/, "");
+      console.log("[视频] baseUrl:", baseUrl, "apiKey:", llm.apiKey ? llm.apiKey.slice(0, 10) + '...' : '未设置');
       let completedCount = 0;
 
       // 逐个分镜生成
@@ -154,7 +155,7 @@ export default function VideoPage() {
 
         try {
           // 提交视频任务
-          const submitRes = await fetch(`${baseUrl}/v1/videos`, {
+          const submitRes = await fetch(`${baseUrl}/videos`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -182,7 +183,7 @@ export default function VideoPage() {
 
           while (retries > 0 && !videoUrl) {
             await new Promise((r) => setTimeout(r, 3000));
-            const pollRes = await fetch(`${baseUrl}/v1/videos/${taskId}`, {
+            const pollRes = await fetch(`${baseUrl}/videos/${taskId}`, {
               headers: { Authorization: `Bearer ${llm.apiKey}` },
             });
             if (!pollRes.ok) { retries--; continue; }
