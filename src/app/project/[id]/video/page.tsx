@@ -142,7 +142,7 @@ export default function VideoPage() {
       const prompt = clips.map((c) => c.voiceover).filter(Boolean).join("，");
 
       // 1. 提交视频生成任务
-      const submitRes = await fetch(`${baseUrl}/video/generations`, {
+      const submitRes = await fetch(`${baseUrl}/v1/videos`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -163,18 +163,18 @@ export default function VideoPage() {
       let retries = 300;  // 最多等10分钟
       while (retries > 0) {
         await new Promise((r) => setTimeout(r, 2000));
-        const pollRes = await fetch(`${baseUrl}/video/generations/${taskId}`, {
+        const pollRes = await fetch(`${baseUrl}/v1/videos/${taskId}`, {
           headers: { Authorization: `Bearer ${llm.apiKey}` },
         });
         if (!pollRes.ok) continue;
         const pollData = await pollRes.json();
-        const status = pollData.data?.status || pollData.status;
+        const status = pollData.status || pollData.data?.status;
         // 进度平滑递增
         setComposeProgress((prev) => Math.min(prev + 1, 90));
 
-        if (status === "completed" || status === "SUCCESS") {
-          const url = pollData.data?.data?.remixed_from_video_id
-            || pollData.data?.data?.url
+        if (status === "completed" || status === "completed") {
+          const url = pollData.remixed_from_video_id
+            || pollData.video_url
             || pollData.data?.result_url
             || `${baseUrl}/videos/${taskId}/content`;
           setVideoUrl(url);

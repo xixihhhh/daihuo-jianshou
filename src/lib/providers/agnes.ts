@@ -24,24 +24,34 @@ interface AgnesImageResponse {
   data: Array<{ url: string; b64_json?: string }>
 }
 
+/** 创建视频任务响应 */
 interface AgnesVideoSubmitResponse {
+  id: string
   task_id: string
+  object: string
+  model: string
   status: string
+  progress: number
+  created_at: number
+  seconds: string
+  size: string
 }
 
+/** 查询视频任务响应 */
 interface AgnesVideoStatusResponse {
-  task_id: string
+  id: string
+  model: string
+  object: string
   status: string
-  data?: {
-    status?: string
-    progress?: number
-    data?: {
-      remixed_from_video_id?: string
-      url?: string
-      error?: string
-    }
-    error?: string
-  }
+  progress: number
+  created_at: number
+  completed_at?: number
+  seconds: string
+  size: string
+  error?: string | null
+  remixed_from_video_id?: string
+  video_url?: string
+  usage?: { duration_seconds?: number }
 }
 
 // ==================== Provider 实现 ====================
@@ -59,7 +69,6 @@ export class AgnesProvider extends BaseProvider {
 
   /**
    * 图生图 / 文生图
-   * 支持 Image-to-Image: 通过 extra_body.image 传入参考图
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
     const body: Record<string, unknown> = {
@@ -68,7 +77,6 @@ export class AgnesProvider extends BaseProvider {
       size: options.width && options.height ? `${options.width}x${options.height}` : '1024x1024',
     }
 
-    // 图生图：传入参考图 URL
     if (options.imageUrl) {
       body.extra_body = {
         image: [options.imageUrl],
@@ -88,22 +96,38 @@ export class AgnesProvider extends BaseProvider {
   }
 
   /**
-   * 文生视频 / 图生视频
-   * Agnes Video V2.0 异步任务：提交 → 轮询 → 获取结果
+   * 文生视频 / 图生视频（异步任务）
+   * Step 1: POST /v1/videos → 获取 task_id
+   * Step 2: GET  /v1/videos/{task_id} → 轮询直到 completed
    */
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
-    // 1. 提交视频生成任务
+    // Step 1: 创建视频任务
     const submitBody: Record<string, unknown> = {
       model: options.modelId || 'agnes-video-v2.0',
       prompt: options.prompt || '视频',
-      n: 1,
+      // 默认 5 秒视频：121 帧 / 24 fps ≈ 5 秒
+      num_frames: 121,
+      frame_rate: 24,
     }
 
+    // 如果指定了时长，计算合适的参数
+    if (options.duration && options.duration > 0) {
+      const fps = 24
+      let frames = Math.round(options.duration * fps)
+      // 帧数必须 ≤ 441 且满足 8n + 1
+      frames = Math.min(frames, 441)
+      frames = Math.floor((frames - 1) / 8) * 8 + 1
+      frames = Math.max(frames, 9) // 至少 9 帧
+      submitBody.num_frames = frames
+      submitBody.frame_rate = fps
+    }
+
+    // 图生视频
     if (options.imageUrl) {
       submitBody.image = options.imageUrl
     }
 
-    const submitRes = await this.request<AgnesVideoSubmitResponse>('/video/generations', {
+    const submitRes = await this.request<AgnesVideoSubmitResponse>('/v1/videos', {
       method: 'POST',
       body: submitBody,
       timeout: 60000,
@@ -114,19 +138,16 @@ export class AgnesProvider extends BaseProvider {
       throw new ProviderError('未获取到视频任务 ID', 'NO_TASK_ID', this.name)
     }
 
-    // 2. 轮询任务状态（最长等 10 分钟）
+    // Step 2: 轮询任务状态（最长等 10 分钟）
     const taskStatus = await this.pollTaskStatus(taskId, {
       interval: 5000,
       maxAttempts: 120,
-      isTerminal: (s) => ['completed', 'failed', 'cancelled', 'SUCCESS', 'FAILED'].includes(s),
+      isTerminal: (s) => ['completed', 'failed'].includes(s),
     })
 
-    // 3. 从状态中提取视频 URL
+    // Step 3: 从结果中提取视频 URL
     const data = taskStatus.rawData as AgnesVideoStatusResponse | undefined
-    const videoUrl =
-      data?.data?.data?.remixed_from_video_id ||
-      data?.data?.data?.url ||
-      ''
+    const videoUrl = data?.remixed_from_video_id || data?.video_url || ''
 
     return {
       url: videoUrl,
@@ -136,26 +157,25 @@ export class AgnesProvider extends BaseProvider {
   }
 
   /**
-   * 查询任务状态
+   * 查询视频任务状态
    */
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
-    const res = await this.request<AgnesVideoStatusResponse>(`/video/generations/${taskId}`)
+    const res = await this.request<AgnesVideoStatusResponse>(`/v1/videos/${taskId}`)
 
-    const rawStatus = res.data?.status || res.status || 'unknown'
+    const rawStatus = res.status || 'unknown'
     let mappedStatus: TaskStatusEnum
 
     switch (rawStatus) {
       case 'completed':
-      case 'SUCCESS':
         mappedStatus = 'completed'
         break
       case 'failed':
-      case 'FAILED':
         mappedStatus = 'failed'
         break
       case 'queued':
-      case 'NOT_START':
-      case 'IN_PROGRESS':
+        mappedStatus = 'pending'
+        break
+      case 'in_progress':
         mappedStatus = 'processing'
         break
       default:
@@ -165,8 +185,8 @@ export class AgnesProvider extends BaseProvider {
     return {
       taskId,
       status: mappedStatus,
-      progress: res.data?.progress || 0,
-      error: res.data?.data?.error || undefined,
+      progress: res.progress || 0,
+      error: res.error || undefined,
       rawData: res,
     }
   }
