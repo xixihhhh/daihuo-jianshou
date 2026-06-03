@@ -116,7 +116,6 @@ export default function VideoPage() {
   const [isComposing, setIsComposing] = useState(false);
   const [composeProgress, setComposeProgress] = useState(0);
   const [composeDone, setComposeDone] = useState(false);
-  const [videoUrl, setVideoUrl] = useState("");
   const llm = useSettingsStore((s) => s.llm);
 
   const totalDuration = clips.reduce((sum, c) => sum + c.duration, 0);
@@ -130,67 +129,106 @@ export default function VideoPage() {
     );
   };
 
-  // 调用 Agnes 视频生成 API
+  // 逐分镜生成视频
   const startCompose = async () => {
     if (!llm.apiKey) return;
     setIsComposing(true);
     setComposeProgress(0);
-    setVideoUrl("");
 
     try {
       const baseUrl = (llm.baseUrl || "https://apihub.agnes-ai.com/v1").replace(/\/+$/, "");
-      const prompt = clips.map((c) => c.voiceover).filter(Boolean).join("，");
+      let completedCount = 0;
 
-      // 1. 提交视频生成任务
-      const submitRes = await fetch(`${baseUrl}/v1/videos`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${llm.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "agnes-video-v2.0",
-          prompt: prompt || "电商产品展示视频",
-          n: 1,
-        }),
-      });
-      if (!submitRes.ok) throw new Error(`提交失败 ${submitRes.status}`);
-      const submitData = await submitRes.json();
-      const taskId = submitData.task_id || submitData.id;
-      if (!taskId) throw new Error("未获取到任务ID");
+      // 逐个分镜生成
+      for (let i = 0; i < clips.length; i++) {
+        const clip = clips[i];
+        const clipPrompt = clip.voiceover || `分镜 ${i + 1}`;
 
-      // 2. 轮询查询生成结果
-      let retries = 300;  // 最多等10分钟
-      while (retries > 0) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const pollRes = await fetch(`${baseUrl}/v1/videos/${taskId}`, {
-          headers: { Authorization: `Bearer ${llm.apiKey}` },
-        });
-        if (!pollRes.ok) continue;
-        const pollData = await pollRes.json();
-        const status = pollData.status || pollData.data?.status;
-        // 进度平滑递增
-        setComposeProgress((prev) => Math.min(prev + 1, 90));
+        // 标记当前分镜为生成中
+        setClips((prev) =>
+          prev.map((c) =>
+            c.shotId === clip.shotId ? { ...c, status: "generating" as const } : c
+          )
+        );
 
-        if (status === "completed" || status === "completed") {
-          const url = pollData.remixed_from_video_id
-            || pollData.video_url
-            || pollData.data?.result_url
-            || `${baseUrl}/videos/${taskId}/content`;
-          setVideoUrl(url);
-          setComposeProgress(100);
-          setIsComposing(false);
-          setComposeDone(true);
-          return;
+        try {
+          // 提交视频任务
+          const submitRes = await fetch(`${baseUrl}/v1/videos`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${llm.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "agnes-video-v2.0",
+              prompt: clipPrompt,
+              num_frames: 121,
+              frame_rate: 24,
+            }),
+          });
+
+          if (!submitRes.ok) {
+            throw new Error(`提交失败 (${submitRes.status})`);
+          }
+
+          const submitData = await submitRes.json();
+          const taskId = submitData.task_id || submitData.id;
+          if (!taskId) throw new Error("未获取到任务ID");
+
+          // 轮询等待结果
+          let retries = 120;
+          let videoUrl = "";
+
+          while (retries > 0 && !videoUrl) {
+            await new Promise((r) => setTimeout(r, 3000));
+            const pollRes = await fetch(`${baseUrl}/v1/videos/${taskId}`, {
+              headers: { Authorization: `Bearer ${llm.apiKey}` },
+            });
+            if (!pollRes.ok) { retries--; continue; }
+
+            const pollData = await pollRes.json();
+            const status = pollData.status || "";
+
+            if (status === "completed") {
+              videoUrl = pollData.remixed_from_video_id || pollData.video_url || "";
+              // 更新当前分镜的视频 URL
+              setClips((prev) =>
+                prev.map((c) =>
+                  c.shotId === clip.shotId
+                    ? { ...c, url: videoUrl, status: "done" as const }
+                    : c
+                )
+              );
+              completedCount++;
+              setComposeProgress(Math.round((completedCount / clips.length) * 100));
+            } else if (status === "failed") {
+              throw new Error(pollData.error || "视频生成失败");
+            }
+            retries--;
+          }
+
+          if (!videoUrl) {
+            throw new Error("视频生成超时");
+          }
+        } catch (e) {
+          // 单个分镜失败，标记失败但不中断整体流程
+          console.error(`分镜 ${i + 1} 生成失败:`, e);
+          setClips((prev) =>
+            prev.map((c) =>
+              c.shotId === clip.shotId ? { ...c, status: "failed" as const } : c
+            )
+          );
+          completedCount++;
+          setComposeProgress(Math.round((completedCount / clips.length) * 100));
         }
-        if (status === "failed" || status === "FAILED") {
-          throw new Error(pollData.data?.data?.error || "视频生成失败");
-        }
-        retries--;
       }
-      throw new Error("视频生成超时，请稍后重试");
+
+      // 全部完成
+      setComposeProgress(100);
+      setIsComposing(false);
+      setComposeDone(true);
     } catch (e: any) {
-      console.error("视频生成失败:", e);
+      console.error("视频合成失败:", e);
       setIsComposing(false);
       setComposeProgress(0);
     }
@@ -482,19 +520,7 @@ export default function VideoPage() {
               </Button>
 
               {composeDone && (
-                <>
-                  {videoUrl && (
-                    <div className="mt-4 rounded-lg overflow-hidden bg-black/5">
-                      <video
-                        src={videoUrl}
-                        controls
-                        className="w-full max-h-[400px] object-contain"
-                        autoPlay
-                        playsInline
-                      />
-                    </div>
-                  )}
-                  <Link href={`/project/${id}/export`}>
+                <Link href={`/project/${id}/export`}>
                     <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
                       下一步：导出视频
                       <LuArrowRight className="w-4 h-4 ml-1" />
