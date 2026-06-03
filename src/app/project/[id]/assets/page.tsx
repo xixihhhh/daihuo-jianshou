@@ -96,22 +96,10 @@ export default function AssetsPage() {
     ? sessionStorage.getItem(`productImage_${id}`) || ""
     : "";
 
-  // 调用真实生图 API
+  // 调用真实生图 API，所有分镜都以上传的商品图为参考
   const generateOne = useCallback(async (shotId: number) => {
     const asset = assets.find((a) => a.shotId === shotId);
     if (!asset || !llm.apiKey) return;
-
-    // 对于 product_reveal 类型，直接用商品原图
-    if (asset.type === "product_reveal" && productImageBase64) {
-      setAssets((prev) =>
-        prev.map((a) =>
-          a.shotId === shotId
-            ? { ...a, status: "done" as const, thumbnailUrl: productImageBase64 }
-            : a
-        )
-      );
-      return;
-    }
 
     setAssets((prev) =>
       prev.map((a) => (a.shotId === shotId ? { ...a, status: "generating" as const } : a))
@@ -128,7 +116,7 @@ export default function AssetsPage() {
         n: 1,
         size: "1024x1024",
       };
-      // 如果有商品图，也传过去做参考
+      // 所有分镜都以上传的商品图为参考生成
       if (productImageBase64) {
         body.image = productImageBase64;
       }
