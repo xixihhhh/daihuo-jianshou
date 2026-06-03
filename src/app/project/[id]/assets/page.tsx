@@ -88,9 +88,12 @@ export default function AssetsPage() {
   // 读取用户配置的 LLM 信息
   const llm = useSettingsStore((s) => s.llm);
 
-  // 读取商品名
+  // 读取商品名和商品图
   const productName = typeof window !== "undefined"
     ? sessionStorage.getItem(`productName_${id}`) || ""
+    : "";
+  const productImageBase64 = typeof window !== "undefined"
+    ? sessionStorage.getItem(`productImage_${id}`) || ""
     : "";
 
   // 调用真实生图 API
@@ -98,27 +101,44 @@ export default function AssetsPage() {
     const asset = assets.find((a) => a.shotId === shotId);
     if (!asset || !llm.apiKey) return;
 
+    // 对于 product_reveal 类型，直接用商品原图
+    if (asset.type === "product_reveal" && productImageBase64) {
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.shotId === shotId
+            ? { ...a, status: "done" as const, thumbnailUrl: productImageBase64 }
+            : a
+        )
+      );
+      return;
+    }
+
     setAssets((prev) =>
       prev.map((a) => (a.shotId === shotId ? { ...a, status: "generating" as const } : a))
     );
 
     try {
       const baseUrl = (llm.baseUrl || "https://apihub.agnes-ai.com/v1").replace(/\/+$/, "");
-      // 生图 prompt 加上商品名，让图片和商品相关
       const imagePrompt = asset.prompt || asset.description;
       const fullPrompt = productName ? `${productName}，${imagePrompt}` : imagePrompt;
+
+      const body: any = {
+        model: "agnes-image-2.0-flash",
+        prompt: fullPrompt,
+        n: 1,
+        size: "1024x1024",
+      };
+      // 如果有商品图，也传过去做参考
+      if (productImageBase64) {
+        body.image = productImageBase64;
+      }
       const res = await fetch(`${baseUrl}/images/generations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${llm.apiKey}`,
         },
-        body: JSON.stringify({
-          model: "agnes-image-2.0-flash",
-          prompt: fullPrompt,
-          n: 1,
-          size: "1024x1024",
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`API 返回 ${res.status}`);
       const data = await res.json();

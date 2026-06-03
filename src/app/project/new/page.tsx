@@ -356,9 +356,12 @@ ${platforms.length ? `投放平台: ${platforms.join(",")}` : ""}
 
       // 使用了模板时递增使用次数
 
-      // 第4步：保存脚本和商品信息到 sessionStorage 并跳转
+      // 第4步：保存脚本、商品信息和第一张商品图到 sessionStorage
       sessionStorage.setItem(`scripts_${project.id}`, JSON.stringify(scripts));
       sessionStorage.setItem(`productName_${project.id}`, productName);
+      if (paths.length > 0) {
+        sessionStorage.setItem(`productImage_${project.id}`, paths[0]);
+      }
       setProgress({ step: "done", percent: 100, message: "脚本生成完成！正在跳转..." });
       await new Promise((r) => setTimeout(r, 800));
       router.push(`/project/${project.id}/script`);
