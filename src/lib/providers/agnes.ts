@@ -24,10 +24,11 @@ interface AgnesImageResponse {
   data: Array<{ url: string; b64_json?: string }>
 }
 
-/** 创建视频任务响应 */
+/** 创建视频任务响应（V2.0） */
 interface AgnesVideoSubmitResponse {
   id: string
-  task_id: string
+  task_id?: string
+  video_id?: string
   object: string
   model: string
   status: string
@@ -49,6 +50,7 @@ interface AgnesVideoStatusResponse {
   seconds: string
   size: string
   error?: string | null
+  video_id?: string
   remixed_from_video_id?: string
   video_url?: string
   usage?: { duration_seconds?: number }
@@ -96,33 +98,29 @@ export class AgnesProvider extends BaseProvider {
   }
 
   /**
-   * 文生视频 / 图生视频（异步任务）
-   * Step 1: POST /v1/videos → 获取 task_id
-   * Step 2: GET  /v1/videos/{task_id} → 轮询直到 completed
+   * 文生视频 / 图生视频（异步任务）— V2.0 新版 API
+   * Step 1: POST /v1/videos → 获取 task_id + video_id
+   * Step 2: GET /v1/videos/{video_id} → 轮询（新版接口，减少排队）
    */
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
     // Step 1: 创建视频任务
     const submitBody: Record<string, unknown> = {
       model: options.modelId || 'agnes-video-v2.0',
       prompt: options.prompt || '视频',
-      // 默认 5 秒视频：121 帧 / 24 fps ≈ 5 秒
       num_frames: 121,
       frame_rate: 24,
     }
 
-    // 如果指定了时长，计算合适的参数
     if (options.duration && options.duration > 0) {
       const fps = 24
       let frames = Math.round(options.duration * fps)
-      // 帧数必须 ≤ 441 且满足 8n + 1
       frames = Math.min(frames, 441)
       frames = Math.floor((frames - 1) / 8) * 8 + 1
-      frames = Math.max(frames, 9) // 至少 9 帧
+      frames = Math.max(frames, 9)
       submitBody.num_frames = frames
       submitBody.frame_rate = fps
     }
 
-    // 图生视频
     if (options.imageUrl) {
       submitBody.image = options.imageUrl
     }
@@ -133,27 +131,79 @@ export class AgnesProvider extends BaseProvider {
       timeout: 60000,
     })
 
-    const taskId = submitRes.task_id
-    if (!taskId) {
-      throw new ProviderError('未获取到视频任务 ID', 'NO_TASK_ID', this.name)
+    // 优先使用 video_id（新版），兼容 task_id（旧版）
+    const videoId = submitRes.video_id || submitRes.task_id || submitRes.id
+    if (!videoId) {
+      throw new ProviderError('未获取到视频 ID', 'NO_VIDEO_ID', this.name)
     }
 
-    // Step 2: 轮询任务状态（最长等 10 分钟）
-    const taskStatus = await this.pollTaskStatus(taskId, {
+    // Step 2: 用 video_id 轮询（减少排队）
+    const taskStatus = await this.pollVideoStatus(videoId, {
       interval: 5000,
       maxAttempts: 120,
       isTerminal: (s) => ['completed', 'failed'].includes(s),
     })
 
-    // Step 3: 从结果中提取视频 URL
     const data = taskStatus.rawData as AgnesVideoStatusResponse | undefined
     const videoUrl = data?.remixed_from_video_id || data?.video_url || ''
 
     return {
       url: videoUrl,
-      taskId,
+      taskId: videoId,
       duration: 0,
     }
+  }
+
+  /**
+   * 查询视频任务状态 — 新版 API 优先使用 video_id
+   */
+  async getTaskStatus(taskId: string): Promise<TaskStatus> {
+    const res = await this.request<AgnesVideoStatusResponse>(`/v1/videos/${taskId}`)
+
+    const rawStatus = res.status || 'unknown'
+    let mappedStatus: TaskStatusEnum
+
+    switch (rawStatus) {
+      case 'completed':
+        mappedStatus = 'completed'
+        break
+      case 'failed':
+        mappedStatus = 'failed'
+        break
+      case 'queued':
+        mappedStatus = 'pending'
+        break
+      case 'in_progress':
+        mappedStatus = 'processing'
+        break
+      default:
+        mappedStatus = 'pending'
+    }
+
+    return {
+      taskId,
+      status: mappedStatus,
+      progress: res.progress || 0,
+      error: res.error || undefined,
+      rawData: res,
+    }
+  }
+
+  /**
+   * 轮询视频状态 — 新版 API 优先使用 video_id
+   */
+  private async pollVideoStatus(
+    videoId: string,
+    opts: { interval: number; maxAttempts: number; isTerminal: (status: string) => boolean },
+  ): Promise<{ status: string; rawData: unknown }> {
+    for (let i = 0; i < opts.maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, opts.interval))
+      const res = await this.request<AgnesVideoStatusResponse>(`/v1/videos/${videoId}`)
+      if (opts.isTerminal(res.status)) {
+        return { status: res.status, rawData: res }
+      }
+    }
+    return { status: 'timeout', rawData: null }
   }
 
   /**
