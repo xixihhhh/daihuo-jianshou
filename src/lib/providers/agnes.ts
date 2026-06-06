@@ -198,7 +198,10 @@ export class AgnesProvider extends BaseProvider {
   ): Promise<{ status: string; rawData: unknown }> {
     for (let i = 0; i < opts.maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, opts.interval))
-      const res = await this.request<AgnesVideoStatusResponse>(`/v1/videos/${videoId}`)
+      // NEW: Use video_id query endpoint (no queuing)
+      const res = await this.request<AgnesVideoStatusResponse>(
+        `/agnesapi?video_id=${videoId}`,
+      )
       if (opts.isTerminal(res.status)) {
         return { status: res.status, rawData: res }
       }
