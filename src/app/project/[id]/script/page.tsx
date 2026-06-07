@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import {LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoader, LuSave, LuEdit, LuCheck, LuX, LuTrash2} from "react-icons/lu";
+import {LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoader, LuSave, LuPencil, LuCheck, LuX, LuTrash2} from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -416,7 +416,7 @@ export default function ScriptPage() {
                                     className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                                     title="编辑此分镜"
                                   >
-                                    <LuEdit className="w-4 h-4" />
+                                    <LuPencil className="w-4 h-4" />
                                   </button>
                                   <div className="w-14 h-10 bg-muted/30 rounded-md shrink-0 flex items-center justify-center border border-border/30">
                                     {shot.visualSource === "product_image" ? (
