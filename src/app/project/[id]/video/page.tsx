@@ -194,7 +194,7 @@ export default function VideoPage() {
       if (stored) productImage = stored;
     } catch {}
 
-    // 翻译prompt为英文
+    // 翻译prompt为英文，并统一为写实风格
     const translatePrompt = async (chinese: string): Promise<string> => {
       if (!llm.apiKey) return chinese;
       try {
@@ -207,7 +207,7 @@ export default function VideoPage() {
           body: JSON.stringify({
             model: llm.model || "qwen2.5-72b",
             messages: [
-              { role: "system", content: "You are a professional video production prompt translator. Translate Chinese video generation prompts into detailed English. Only output the English prompt, no explanations. Include: camera angle, lighting, scene details, subject appearance, and movement. Make it visual and cinematic." },
+              { role: "system", content: "You are a professional video production prompt translator. Translate Chinese video generation prompts into detailed English for photorealistic video generation. ONLY output the English prompt, no explanations. ALWAYS include: photorealistic, realistic lighting, professional product photography, clean composition, high quality, 4k. NEVER use fantasy, cartoon, anime, illustration, or artistic styles. Avoid human figures - focus on product and scene. Make it visual and cinematic with natural camera movement." },
               { role: "user", content: chinese }
             ],
             max_tokens: 300,
@@ -252,16 +252,18 @@ export default function VideoPage() {
         );
 
         try {
-          // 提交视频任务
+          // 提交视频任务 — 固定写实风格
           const videoBody: any = {
             model: "agnes-video-v2.0",
             prompt: clipPrompt,
             num_frames: 121,
             frame_rate: 24,
+            style: "photorealistic",
           };
-          // 如果有商品图，传递 firstFrameUrl 让 Agnes 用商品图生成视频
+          // 如果有商品图，传递 image 和 prompt 让 Agnes 用商品图主题生成写实视频
           if (productImage) {
-            videoBody.firstFrameUrl = productImage;
+            videoBody.image = productImage;
+            videoBody.prompt = `Photorealistic product video. Professional product photography style, clean studio lighting, realistic texture and material, natural shadows, commercial product presentation. No people, no cartoon, no fantasy. ${clipPrompt}`;
           }
           const submitRes = await fetch(`${videoBaseUrl}/videos`, {
             method: "POST",
