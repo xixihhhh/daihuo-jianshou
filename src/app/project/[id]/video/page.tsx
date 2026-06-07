@@ -24,6 +24,8 @@ interface VideoClipItem {
   type: Shot["type"];
   duration: number;
   voiceover: string;
+  description?: string;
+  camera?: string;
   transition: "ai_start_end" | "ai_reference" | "direct_concat" | "ffmpeg_fade";
   url?: string;
   status?: "pending" | "generating" | "done" | "failed";
@@ -88,6 +90,9 @@ function getClipsFromSessionStorage(id: string): VideoClipItem[] | null {
       type: (shot.type as VideoClipItem["type"]) || "hook",
       duration: shot.duration || 3,
       voiceover: shot.voiceover || "",
+      description: shot.description || "",
+      camera: shot.camera || "",
+      prompt: shot.prompt || "",
       transition: "ai_start_end" as const,
       status: "pending" as const,
     }));
@@ -198,7 +203,12 @@ export default function VideoPage() {
       // 逐个分镜生成
       for (let i = 0; i < clips.length; i++) {
         const clip = clips[i];
-        const clipPrompt = clip.voiceover || `分镜 ${i + 1}`;
+        // 组合 prompt：画面描述 + 镜头语言 + 配音文案
+        const clipPrompt = [
+          clip.description,
+          clip.camera,
+          clip.voiceover,
+        ].filter(Boolean).join("，");
 
         // 标记当前分镜为生成中
         setClips((prev) =>
