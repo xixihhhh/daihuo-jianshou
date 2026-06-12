@@ -17,6 +17,18 @@
 
 ---
 
+## 界面预览
+
+| 首页·项目管理 | 一键示例填充 | 分镜脚本 |
+|:---:|:---:|:---:|
+| ![首页](docs/screenshots/01-home.png) | ![新建](docs/screenshots/03-new.png) | ![脚本](docs/screenshots/04-script.png) |
+| **成片预览·下载导出** | **批量出片** | **示例作品** |
+| ![导出](docs/screenshots/05-export.png) | ![批量](docs/screenshots/06-batch.png) | ![示例](docs/screenshots/02-showcase.png) |
+
+> 示例作品「云柔加厚抽纸」：真实商品图 + 运镜 + 中文字幕 + 价格贴 + 配音，一条带货短视频全自动生成。
+
+---
+
 ## 为什么选择带货剪手？
 
 | 痛点 | 传统方式 | 带货剪手 |
