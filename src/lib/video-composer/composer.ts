@@ -107,7 +107,9 @@ export function buildComposeCommand(config: ComposeConfig): string {
       const motion = MOTIONS[clip.motion];
       if (motion) {
         inputs.push(`-loop 1 -t ${clip.duration} -i "${escapeShellPath(clip.filePath)}"`);
-        filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,${motion.getFilter(width, height, clip.duration)},setpts=PTS-STARTPTS[v${i}]`);
+        // 关键：zoompan 对每个输入帧输出 d 帧。-loop 产生多帧输入会导致帧数爆炸、视频被拉长数十倍，
+        // 因此先 trim 取首帧，再用 zoompan 的 d=duration*fps 控制总输出帧数。
+        filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,trim=end_frame=1,setpts=PTS-STARTPTS,${motion.getFilter(width, height, clip.duration)},setpts=PTS-STARTPTS[v${i}]`);
       }
     } else {
       // 视频片段

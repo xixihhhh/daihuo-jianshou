@@ -1,0 +1,145 @@
+import { NextRequest, NextResponse } from "next/server";
+import { join } from "path";
+import { existsSync } from "fs";
+import { getDb } from "@/lib/db";
+import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { composeVideo, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
+import type { Shot } from "@/lib/db/schema";
+
+/** 把 /api/files/{pid}/{file} 形式的访问路径还原为本地磁盘绝对路径 */
+function toLocalPath(fileRef: string | undefined): string | undefined {
+  if (!fileRef) return undefined;
+  const m = fileRef.match(/\/api\/files\/(.+)/);
+  if (!m) return undefined;
+  const p = join(process.cwd(), "data", "uploads", m[1]);
+  return existsSync(p) ? p : undefined;
+}
+
+/** 按镜头类型给商品原图分镜分配一个默认运镜 */
+function defaultMotion(shot: Shot): string {
+  if (shot.motion) return shot.motion;
+  switch (shot.type) {
+    case "hook":
+      return "zoom_in_slow";
+    case "product_reveal":
+      return "ken_burns";
+    case "demo":
+      return "pan_right";
+    case "cta":
+      return "static";
+    default:
+      return "ken_burns";
+  }
+}
+
+// 合成视频：读取已选脚本分镜 + 已生成素材，用 FFmpeg 合成带运镜与中文字幕的成片
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+    const db = getDb();
+
+    // 读取项目（拿商品图兜底）与已选脚本
+    const projRows = await db.select().from(projects).where(eq(projects.id, id));
+    if (projRows.length === 0) {
+      return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+    }
+    const project = projRows[0];
+    const productImages = (project.productImages ?? []) as string[];
+
+    const scriptRows = await db.select().from(scriptsTable).where(eq(scriptsTable.projectId, id));
+    const selected = scriptRows.find((s) => s.selected) ?? scriptRows[0];
+    if (!selected || !Array.isArray(selected.shots) || selected.shots.length === 0) {
+      return NextResponse.json({ error: "尚未生成脚本，无法合成" }, { status: 400 });
+    }
+    const shots = selected.shots as Shot[];
+
+    // 已生成的素材（assets 表，按 shotId 索引）
+    const assetRows = await db.select().from(assetsTable).where(eq(assetsTable.projectId, id));
+    const assetByShot = new Map<number, string>();
+    for (const a of assetRows) {
+      if (a.filePath) assetByShot.set(a.shotId, a.filePath);
+    }
+
+    // 为每个分镜构建一个 image+motion 片段（用静态素材 + 运镜，避免 AI 篡改商品）
+    const clips: ClipInput[] = [];
+    const missing: number[] = [];
+    for (const shot of shots) {
+      // 素材优先级：该分镜已生成素材 → 商品原图兜底
+      const ref = assetByShot.get(shot.shotId) ?? productImages[0];
+      const local = toLocalPath(ref);
+      if (!local) {
+        missing.push(shot.shotId);
+        continue;
+      }
+      clips.push({
+        type: "image",
+        filePath: local,
+        duration: shot.duration || 3,
+        transition: shot.transition || "ai_start_end",
+        motion: defaultMotion(shot),
+      });
+    }
+
+    if (clips.length === 0) {
+      return NextResponse.json(
+        { error: "没有可用素材，请先在素材步骤生成素材或上传商品图" },
+        { status: 400 }
+      );
+    }
+
+    // 字幕：把每个分镜的配音文案按累计时长切成时间段
+    let acc = 0;
+    const subtitleTexts = shots
+      .filter((s) => s.voiceover)
+      .map((s) => {
+        const start = acc;
+        acc += s.duration || 3;
+        return { text: s.voiceover, startTime: start, endTime: acc };
+      });
+
+    const config: ComposeConfig = {
+      projectId: id,
+      clips,
+      output: {
+        resolution: body.resolution === "720p" ? "720p" : "1080p",
+        aspectRatio: ["9:16", "16:9", "1:1"].includes(body.aspectRatio) ? body.aspectRatio : "9:16",
+      },
+      subtitle: subtitleTexts.length > 0 ? { texts: subtitleTexts, position: "bottom" } : undefined,
+    };
+
+    // 执行合成（FFmpeg）
+    const outputPath = await composeVideo(config);
+    const fileName = outputPath.split("/").pop() ?? "";
+    const publicUrl = `/api/files/../output/${id}/${fileName}`;
+
+    // 落库合成记录 + 更新项目状态
+    await db.insert(compositions).values({
+      projectId: id,
+      outputPath,
+      resolution: config.output.resolution,
+      aspectRatio: config.output.aspectRatio,
+      status: "done",
+    });
+    await db.update(projects).set({ status: "done", updatedAt: new Date() }).where(eq(projects.id, id));
+
+    return NextResponse.json({
+      success: true,
+      outputPath,
+      fileName,
+      url: publicUrl,
+      clipCount: clips.length,
+      missingShots: missing,
+    });
+  } catch (error) {
+    console.error("视频合成失败:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "视频合成失败" },
+      { status: 500 }
+    );
+  }
+}
