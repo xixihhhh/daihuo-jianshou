@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
-import { join } from "path";
+import { join, normalize, sep } from "path";
 import { existsSync } from "fs";
 
 // 静态文件服务 - 提供上传的图片/视频访问
@@ -9,7 +9,17 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
-  const filePath = join(process.cwd(), "data", "uploads", ...path);
+
+  // 上传根目录
+  const uploadsRoot = join(process.cwd(), "data", "uploads");
+  // 解码并归一化路径后再拼接，防止 ..%2f 等编码绕过造成路径穿越
+  const decodedSegments = path.map((seg) => decodeURIComponent(seg));
+  const filePath = normalize(join(uploadsRoot, ...decodedSegments));
+
+  // 校验最终路径必须仍位于上传根目录内
+  if (filePath !== uploadsRoot && !filePath.startsWith(uploadsRoot + sep)) {
+    return NextResponse.json({ error: "非法路径" }, { status: 403 });
+  }
 
   if (!existsSync(filePath)) {
     return NextResponse.json({ error: "文件不存在" }, { status: 404 });
