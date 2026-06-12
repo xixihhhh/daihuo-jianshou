@@ -126,6 +126,21 @@ export async function POST(
       }
     }
 
+    /** 探测媒体时长（秒），失败返回 0 */
+    async function probeDuration(filePath: string): Promise<number> {
+      try {
+        const { exec } = await import("child_process");
+        const { promisify } = await import("util");
+        const execAsync = promisify(exec);
+        const { stdout } = await execAsync(
+          `ffprobe -v error -show_entries format=duration -of csv=p=0 "${filePath}"`
+        );
+        return parseFloat(stdout.trim()) || 0;
+      } catch {
+        return 0;
+      }
+    }
+
     /** 为某分镜生成配音并落地为本地 mp3，返回绝对路径；失败返回 undefined（不阻断合成） */
     async function buildVoiceover(shotId: number, text: string): Promise<string | undefined> {
       if (!ttsConfig || !text) return undefined;
@@ -140,8 +155,8 @@ export async function POST(
       }
     }
 
-    // 为每个分镜构建一个 image+motion 片段（用静态素材 + 运镜，避免 AI 篡改商品）
-    const clips: ClipInput[] = [];
+    // 构建渲染分镜：跳过无素材的；有 TTS 配音时按配音实际时长卡点（字幕/贴片/画面严格对齐）
+    const rendered: { shot: Shot; clip: ClipInput; duration: number }[] = [];
     const missing: number[] = [];
     for (const shot of shots) {
       // 素材优先级：该分镜已生成素材 → 商品原图兜底
@@ -154,48 +169,50 @@ export async function POST(
       // 视频素材 vs 静态图：视频自带音轨时用模型原生语音，不再叠 TTS（避免双重声音）
       const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(local);
       const nativeAudio = isVideo ? await videoHasAudio(local) : false;
-      // 仅静态图、或无音轨的视频，才生成 TTS 配音
       const audioPath =
         shot.voiceover && !nativeAudio ? await buildVoiceover(shot.shotId, shot.voiceover) : undefined;
 
-      clips.push({
+      // 有效时长：有配音→按配音实际长度+0.4s 尾留白卡点（限 1.5~20s）；否则用脚本时长
+      let duration = shot.duration || 3;
+      if (audioPath) {
+        const ttsDur = await probeDuration(audioPath);
+        if (ttsDur > 0) duration = Math.min(Math.max(ttsDur + 0.4, 1.5), 20);
+      }
+
+      const clip: ClipInput = {
         type: isVideo ? "video" : "image",
         filePath: local,
-        duration: shot.duration || 3,
+        duration,
         transition: shot.transition || "ai_start_end",
         ...(isVideo ? { hasAudio: nativeAudio } : { motion: defaultMotion(shot) }),
         ...(audioPath && { audioPath }),
-      });
+      };
+      rendered.push({ shot, clip, duration });
     }
 
-    if (clips.length === 0) {
+    if (rendered.length === 0) {
       return NextResponse.json(
         { error: "没有可用素材，请先在素材步骤生成素材或上传商品图" },
         { status: 400 }
       );
     }
 
-    // 字幕：把每个分镜的配音文案按累计时长切成时间段
-    let acc = 0;
-    const subtitleTexts = shots
-      .filter((s) => s.voiceover)
-      .map((s) => {
-        const start = acc;
-        acc += s.duration || 3;
-        return { text: s.voiceover, startTime: start, endTime: acc };
-      });
+    const clips = rendered.map((r) => r.clip);
 
-    // 文字贴片：由分镜 textOverlay 生成；价格类自动回填商品价格
-    let acc2 = 0;
-    const overlays = shots
-      .map((s) => {
-        const start = acc2;
-        acc2 += s.duration || 3;
-        const ov = s.textOverlay;
-        if (!ov || ov.style === "subtitle" || !ov.text) return null;
-        return { text: ov.text, style: ov.style as "title" | "highlight" | "price", startTime: start, endTime: acc2 };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
+    // 字幕 + 文字贴片：按渲染分镜的有效时长累计，与画面时间轴严格对齐（修复缺素材导致的漂移 + 字幕卡配音）
+    let acc = 0;
+    const subtitleTexts: { text: string; startTime: number; endTime: number }[] = [];
+    const overlays: { text: string; style: "title" | "highlight" | "price"; startTime: number; endTime: number }[] = [];
+    for (const r of rendered) {
+      const start = acc;
+      acc += r.duration;
+      const end = acc;
+      if (r.shot.voiceover) subtitleTexts.push({ text: r.shot.voiceover, startTime: start, endTime: end });
+      const ov = r.shot.textOverlay;
+      if (ov && ov.style !== "subtitle" && ov.text) {
+        overlays.push({ text: ov.text, style: ov.style as "title" | "highlight" | "price", startTime: start, endTime: end });
+      }
+    }
 
     const config: ComposeConfig = {
       projectId: id,
