@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { LuCheck, LuCircleCheck, LuFilm, LuDownload, LuLink2, LuPlus, LuHouse, LuSmartphone, LuShuffle, LuLoaderCircle } from "react-icons/lu";
+import { LuCheck, LuCircleCheck, LuFilm, LuDownload, LuLink2, LuFileText, LuPlus, LuHouse, LuSmartphone, LuShuffle, LuLoaderCircle } from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // 平台导出配置（规划中功能，展示用）
 const platformConfigs = [
@@ -46,10 +47,40 @@ export default function ExportPage() {
   const [composition, setComposition] = useState<Composition | null>(null);
   const [scriptInfo, setScriptInfo] = useState<ScriptInfo | null>(null);
   const [fileSize, setFileSize] = useState<string>("");
+  // 发布文案
+  const { llm } = useSettingsStore();
+  const [productMeta, setProductMeta] = useState<{ productName: string; category: string; description: string } | null>(null);
+  const [publish, setPublish] = useState<{ loading: boolean; titles: string[]; hashtags: string[]; caption: string; error?: string }>({ loading: false, titles: [], hashtags: [], caption: "" });
 
   const showToast = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const copyText = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); showToast("已复制"); } catch { showToast("复制失败"); }
+  };
+
+  const generatePublish = async () => {
+    if (!llm.apiKey) { setPublish((p) => ({ ...p, error: "请先在设置配置 LLM" })); return; }
+    setPublish((p) => ({ ...p, loading: true, error: undefined }));
+    try {
+      const res = await fetch("/api/llm/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productName: productMeta?.productName || projectName,
+          category: productMeta?.category,
+          productDescription: productMeta?.description,
+          llmConfig: { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.model },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "生成失败");
+      setPublish({ loading: false, titles: data.titles ?? [], hashtags: data.hashtags ?? [], caption: data.caption ?? "" });
+    } catch (e) {
+      setPublish((p) => ({ ...p, loading: false, error: e instanceof Error ? e.message : "生成失败" }));
+    }
   };
 
   useEffect(() => {
@@ -64,7 +95,14 @@ export default function ExportPage() {
         ]);
         if (projRes.ok) {
           const proj = await projRes.json();
-          if (!cancelled) setProjectName(proj.name ?? proj.productName ?? "");
+          if (!cancelled) {
+            setProjectName(proj.name ?? proj.productName ?? "");
+            setProductMeta({
+              productName: proj.productName ?? proj.name ?? "",
+              category: proj.productCategory ?? "",
+              description: proj.productDescription ?? "",
+            });
+          }
         }
         if (compRes.ok) {
           const data = await compRes.json();
@@ -297,6 +335,60 @@ export default function ExportPage() {
             复制分享链接
           </Button>
         </div>
+
+        {/* 发布文案（AI 生成标题/话题/种草文案） */}
+        <Card className="glass-card mb-6">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <LuFileText className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold">发布文案</h3>
+              </div>
+              <Button size="sm" variant="outline" className="text-xs" disabled={publish.loading} onClick={generatePublish}>
+                {publish.loading ? "生成中..." : publish.titles.length ? "重新生成" : "AI 生成标题/话题"}
+              </Button>
+            </div>
+            {publish.error && <p className="text-xs text-destructive mb-2">{publish.error}</p>}
+            {publish.titles.length === 0 && !publish.loading && !publish.error && (
+              <p className="text-xs text-muted-foreground">一键生成吸睛标题、#话题标签和种草文案，复制即可发布。</p>
+            )}
+            {publish.titles.length > 0 && (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">标题（点击复制）</p>
+                  <div className="space-y-1.5">
+                    {publish.titles.map((t, i) => (
+                      <button key={i} onClick={() => copyText(t)} className="w-full text-left text-sm px-3 py-2 rounded-lg border border-border/50 bg-muted/10 hover:border-primary/50 transition-colors">
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {publish.hashtags.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-xs text-muted-foreground">话题标签</p>
+                      <button onClick={() => copyText(publish.hashtags.join(" "))} className="text-xs text-primary">复制全部</button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {publish.hashtags.map((h, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs">{h}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {publish.caption && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">种草文案</p>
+                    <button onClick={() => copyText(publish.caption)} className="w-full text-left text-sm px-3 py-2 rounded-lg border border-border/50 bg-muted/10 hover:border-primary/50 transition-colors">
+                      {publish.caption}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* 多平台导出（真实重编码） */}
         <Card className="glass-card mb-6">
