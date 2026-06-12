@@ -6,6 +6,42 @@ import { scripts as scriptsTable, assets as assetsTable, projects, compositions 
 import { eq } from "drizzle-orm";
 import { composeVideo, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
 import type { Shot } from "@/lib/db/schema";
+import { desc } from "drizzle-orm";
+
+// 获取该项目最新一条合成记录（导出页读取真实成片）
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(compositions)
+      .where(eq(compositions.projectId, id))
+      .orderBy(desc(compositions.createdAt))
+      .limit(1);
+    if (rows.length === 0) {
+      return NextResponse.json({ composition: null });
+    }
+    const c = rows[0];
+    const fileName = (c.outputPath ?? "").split("/").pop() ?? "";
+    return NextResponse.json({
+      composition: {
+        ...c,
+        fileName,
+        url: fileName ? `/api/output/${id}/${fileName}` : null,
+      },
+    });
+  } catch (error) {
+    console.error("获取合成记录失败:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "获取合成记录失败" },
+      { status: 500 }
+    );
+  }
+}
 
 /** 把 /api/files/{pid}/{file} 形式的访问路径还原为本地磁盘绝对路径 */
 function toLocalPath(fileRef: string | undefined): string | undefined {
