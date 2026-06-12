@@ -63,14 +63,24 @@ export default function AssetsPage() {
       setLoading(true);
       setLoadError(null);
       try {
-        const [projectRes, scriptsRes] = await Promise.all([
+        const [projectRes, scriptsRes, assetsRes] = await Promise.all([
           fetch(`/api/project/${id}`),
           fetch(`/api/project/${id}/scripts`),
+          fetch(`/api/project/${id}/assets`),
         ]);
 
         const project = projectRes.ok ? await projectRes.json() : null;
         const scripts = scriptsRes.ok ? await scriptsRes.json() : [];
+        const savedAssets = assetsRes.ok ? await assetsRes.json() : [];
         if (cancelled) return;
+
+        // 已落库素材按 shotId 索引，用于恢复"已生成"状态
+        const savedByShot = new Map<number, string>();
+        if (Array.isArray(savedAssets)) {
+          for (const a of savedAssets) {
+            if (a.filePath && a.status === "done") savedByShot.set(a.shotId, a.filePath);
+          }
+        }
 
         const imgs: string[] = project && Array.isArray(project.productImages) ? project.productImages : [];
         if (project) {
@@ -90,18 +100,22 @@ export default function AssetsPage() {
         }
 
         setAssets(
-          (selected.shots as Shot[]).map((s) => ({
-            shotId: s.shotId,
-            type: s.type,
-            duration: s.duration,
-            description: s.description,
-            prompt: s.prompt ?? "",
-            visualSource: s.visualSource,
-            // 商品原图分镜直接就绪，AI 生成分镜待生成
-            status: s.visualSource === "product_image" ? "done" : "pending",
-            // 商品原图分镜直接用第一张商品图作缩略图
-            thumbnailUrl: s.visualSource === "product_image" ? imgs[0] : undefined,
-          }))
+          (selected.shots as Shot[]).map((s) => {
+            const saved = savedByShot.get(s.shotId);
+            // 已落库素材 → 恢复为已就绪；商品原图分镜直接就绪；其余待生成
+            if (saved) {
+              return {
+                shotId: s.shotId, type: s.type, duration: s.duration, description: s.description,
+                prompt: s.prompt ?? "", visualSource: s.visualSource, status: "done" as const, thumbnailUrl: saved,
+              };
+            }
+            return {
+              shotId: s.shotId, type: s.type, duration: s.duration, description: s.description,
+              prompt: s.prompt ?? "", visualSource: s.visualSource,
+              status: s.visualSource === "product_image" ? ("done" as const) : ("pending" as const),
+              thumbnailUrl: s.visualSource === "product_image" ? imgs[0] : undefined,
+            };
+          })
         );
       } catch (e) {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : "加载失败");
@@ -154,13 +168,20 @@ export default function AssetsPage() {
       const asset = assets.find((a) => a.shotId === shotId);
       if (!asset) return;
 
-      // 商品原图分镜：直接用商品图，无需调用 AI
+      // 商品原图分镜：直接用商品图，无需调用 AI（落库供合成读取）
       if (asset.visualSource === "product_image") {
         setAssets((prev) =>
           prev.map((a) =>
             a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: productImages[0] } : a
           )
         );
+        if (productImages[0]) {
+          fetch(`/api/project/${id}/assets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shotId, type: "product_image", sourceUrl: productImages[0] }),
+          }).catch(() => {});
+        }
         return;
       }
 
@@ -195,8 +216,26 @@ export default function AssetsPage() {
         if (!res.ok) throw new Error(data.error || "生成失败");
         const url = data.imageUrls?.[0];
         if (!url) throw new Error("生成结果为空");
+        // 落库（远程图会被下载到本地），供合成读取真实 AI 素材
+        let savedUrl = url;
+        try {
+          const saveRes = await fetch(`/api/project/${id}/assets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              shotId, type: "ai_generate", sourceUrl: url,
+              prompt: asset.prompt, provider: modelTarget.provider, model: modelTarget.model,
+            }),
+          });
+          if (saveRes.ok) {
+            const saved = await saveRes.json();
+            if (saved.filePath) savedUrl = saved.filePath;
+          }
+        } catch {
+          // 落库失败不影响预览（仅合成时会回退商品图兜底）
+        }
         setAssets((prev) =>
-          prev.map((a) => (a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: url } : a))
+          prev.map((a) => (a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: savedUrl } : a))
         );
       } catch (e) {
         setAssets((prev) =>
