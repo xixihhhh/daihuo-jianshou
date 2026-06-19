@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
+import { ffprobeBin } from "@/lib/ffmpeg-path";
 import { join } from "path";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
@@ -119,7 +120,7 @@ export async function POST(
         const { promisify } = await import("util");
         const execAsync = promisify(exec);
         const { stdout } = await execAsync(
-          `ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "${filePath}"`
+          `"${ffprobeBin()}" -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "${filePath}"`
         );
         return stdout.trim().length > 0;
       } catch {
@@ -134,7 +135,7 @@ export async function POST(
         const { promisify } = await import("util");
         const execAsync = promisify(exec);
         const { stdout } = await execAsync(
-          `ffprobe -v error -show_entries format=duration -of csv=p=0 "${filePath}"`
+          `"${ffprobeBin()}" -v error -show_entries format=duration -of csv=p=0 "${filePath}"`
         );
         return parseFloat(stdout.trim()) || 0;
       } catch {

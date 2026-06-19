@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
+import { ffmpegBin } from "@/lib/ffmpeg-path";
 import { join } from "path";
 import { existsSync } from "fs";
 import { exec } from "child_process";
@@ -58,7 +59,7 @@ export async function POST(
       `[0:v]scale=${w}:${h}:force_original_aspect_ratio=decrease[fg];` +
       `[bg][fg]overlay=(W-w)/2:(H-h)/2`;
     const cmd =
-      `ffmpeg -y -i "${src}" -filter_complex "${filter}" ` +
+      `"${ffmpegBin()}" -y -i "${src}" -filter_complex "${filter}" ` +
       `-c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart ` +
       `-c:a aac -b:a 192k "${outFile}"`;
 

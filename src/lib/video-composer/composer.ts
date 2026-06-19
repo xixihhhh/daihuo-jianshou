@@ -1,5 +1,6 @@
 import { join } from "path";
 import { getDataDir } from "@/lib/paths";
+import { ffmpegBin } from "@/lib/ffmpeg-path";
 import { mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { TRANSITIONS, type TransitionMode } from "./transitions";
@@ -253,7 +254,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
   const inputStr = inputs.join(" ");
   const filterStr = filterParts.join(";\n");
 
-  let cmd = `ffmpeg -y ${inputStr} -filter_complex "${filterStr}" -map "[${currentVideoStream}]"`;
+  let cmd = `"${ffmpegBin()}" -y ${inputStr} -filter_complex "${filterStr}" -map "[${currentVideoStream}]"`;
 
   // 映射音频输出
   if (currentAudioStream) {
