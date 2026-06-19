@@ -20,7 +20,6 @@ const shotTypeLabels: Record<Shot["type"], { label: string; color: string }> = {
 
 export default function ShowcasePage() {
   const sc = exampleShowcase;
-  let acc = 0;
 
   return (
     <div className="min-h-screen grid-bg">
@@ -89,15 +88,16 @@ export default function ShowcasePage() {
             <h2 className="text-base font-semibold mb-4">分镜脚本</h2>
             <div className="space-y-3">
               {sc.shots.map((shot, idx) => {
-                const start = acc;
-                acc += shot.duration;
+                // 纯计算累计时间，避免渲染期改写外层变量
+                const start = sc.shots.slice(0, idx).reduce((s, sh) => s + sh.duration, 0);
+                const end = start + shot.duration;
                 const t = shotTypeLabels[shot.type];
                 return (
                   <div key={shot.shotId} className="rounded-lg border border-border/50 bg-muted/10 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-mono text-muted-foreground">{String(idx + 1).padStart(2, "0")}</span>
                       <Badge className={`${t.color} border-0 text-[10px]`}>{t.label}</Badge>
-                      <Badge variant="outline" className="text-[10px] font-mono">{start}-{acc}s</Badge>
+                      <Badge variant="outline" className="text-[10px] font-mono">{start}-{end}s</Badge>
                       <span className="text-xs text-muted-foreground ml-auto">{shot.camera}</span>
                     </div>
                     <p className="text-sm mb-1">{shot.description}</p>

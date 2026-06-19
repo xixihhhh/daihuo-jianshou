@@ -1,0 +1,45 @@
+# CI 流水线：每次 push / PR 自动跑 lint + 单测 + 生产构建
+# 对应本地命令：pnpm lint / pnpm test / pnpm build（三步全绿才算通过）
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同一分支只保留最新一次运行，节省额度
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: 配置 Node 22（启用 pnpm 缓存）
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖（锁定版本，开箱即用）
+        run: pnpm install --frozen-lockfile
+
+      - name: 代码规范检查
+        run: pnpm lint
+
+      - name: 单元测试
+        run: pnpm test
+
+      - name: 生产构建
+        run: pnpm build
