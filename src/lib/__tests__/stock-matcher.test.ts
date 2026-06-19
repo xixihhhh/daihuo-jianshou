@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { broadenQuery } from "@/lib/stock-matcher";
+import { broadenQuery, shotQuery } from "@/lib/stock-matcher";
 
 describe("broadenQuery（永远有素材兜底）", () => {
   it("多词：由具体到宽泛，含末两词/末词 + 万能兜底", () => {
@@ -28,5 +28,16 @@ describe("broadenQuery（永远有素材兜底）", () => {
   it("空串：返回万能兜底", () => {
     expect(broadenQuery("")).toEqual(["abstract background", "lifestyle", "nature", "light"]);
     expect(broadenQuery("   ")).toEqual(["abstract background", "lifestyle", "nature", "light"]);
+  });
+});
+
+describe("shotQuery（拼分镜检索词）", () => {
+  it("优先 stockKeywords（空格连接）", () => {
+    expect(shotQuery({ stockKeywords: ["coffee morning", "cafe"], description: "中文描述" })).toBe("coffee morning cafe");
+  });
+  it("无 stockKeywords 时回退到描述，再回退到配音", () => {
+    expect(shotQuery({ description: "客厅茶几" })).toBe("客厅茶几");
+    expect(shotQuery({ voiceover: "你还在用" })).toBe("你还在用");
+    expect(shotQuery({})).toBe("");
   });
 });

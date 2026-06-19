@@ -31,3 +31,9 @@ export function broadenQuery(query: string): string[] {
     return true;
   });
 }
+
+/** 拼出某个分镜的素材检索词：优先英文 stockKeywords，回退到画面描述/配音 */
+export function shotQuery(shot: { stockKeywords?: string[]; description?: string; voiceover?: string }): string {
+  if (shot.stockKeywords?.length) return shot.stockKeywords.join(" ");
+  return (shot.description || shot.voiceover || "").trim();
+}
