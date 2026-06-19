@@ -16,6 +16,7 @@ import {
   getAvailableSources,
   isSourceAvailable,
 } from "@/lib/providers/stock-registry";
+import { broadenQuery } from "@/lib/stock-matcher";
 import { getDb } from "@/lib/db";
 import { assets as assetsTable } from "@/lib/db/schema";
 
@@ -128,6 +129,20 @@ export async function POST(req: NextRequest) {
   const projectId = String(body.projectId ?? "");
   if (!projectId || !SAFE_ID.test(projectId)) {
     return NextResponse.json({ error: "download=true 时需提供合法 projectId" }, { status: 400 });
+  }
+  // "永远有素材"兜底：原检索词无果时，用更宽泛的回退词重试，避免新手生僻主题导致某分镜空画面
+  if (candidates.length === 0) {
+    for (const bq of broadenQuery(query)) {
+      try {
+        candidates =
+          source === "all"
+            ? (await searchAllStock(bq, searchOpts)).candidates
+            : await searchStock(source, bq, searchOpts);
+      } catch {
+        /* 单个回退词失败则换下一个 */
+      }
+      if (candidates.length > 0) break;
+    }
   }
   if (candidates.length === 0) {
     return NextResponse.json({ error: "没有检索到可用素材，换个检索词或素材源试试", skippedSources }, { status: 404 });
