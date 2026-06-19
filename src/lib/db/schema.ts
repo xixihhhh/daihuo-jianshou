@@ -167,6 +167,8 @@ export interface Shot {
   transition: "ai_start_end" | "ai_reference" | "direct_concat" | "ffmpeg_fade";
   voiceover: string; // 配音文案
   prompt?: string; // AI 生图/生视频 prompt
+  /** 该分镜的英文素材检索词（1-3 个），用于从免费素材库自动配画面（无商品主题成片的关键） */
+  stockKeywords?: string[];
   /** 出镜人物 ID，关联 characters 表（可选） */
   characterId?: string;
   /** 运动效果，仅 product_image 类型使用 */

@@ -297,6 +297,7 @@ export const OUTPUT_FORMAT_PROMPT = `
       "transition": "direct_concat",
       "voiceover": "配音文案：口语化的播音文案，控制字数与duration匹配（约3字/秒）",
       "prompt": "英文AI生图/生视频prompt：用于生成该分镜的视觉素材",
+      "searchTerms": ["english keyword", "alt keyword"],
       "characterId": "出镜人物ID（可选，有人物出镜时填写）"
     }
   ],
@@ -319,6 +320,7 @@ export const OUTPUT_FORMAT_PROMPT = `
 - transition: "ai_start_end" | "ai_reference" | "direct_concat" | "ffmpeg_fade"
 - voiceover: 中文配音文案，字数约等于 duration x 3
 - prompt: 英文 prompt，用于 AI 图像/视频生成，描述画面主体、风格、光线、构图等
+- searchTerms: 1-3 个英文检索词，描述该分镜画面主体（用于从免费素材库自动搜画面，无商品主题成片时尤其关键），如 ["coffee morning", "cozy cafe"]
 - characterId: 如果该分镜有人物出镜，填入人物ID；无人物的分镜省略此字段
 - seo.title: 包含商品名和核心卖点的短标题
 - seo.hashtags: 3-5个相关话题标签，第一个为品类大标签

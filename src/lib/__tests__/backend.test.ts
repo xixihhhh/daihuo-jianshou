@@ -30,6 +30,11 @@ describe("buildUserPrompt", () => {
     expect(prompt.length).toBeGreaterThan(0);
   });
 
+  it("输出格式要求 LLM 产出 searchTerms（英文素材检索词）", () => {
+    const prompt = buildUserPrompt(baseInput);
+    expect(prompt).toContain("searchTerms");
+  });
+
   it("包含商品名称和品类", () => {
     const prompt = buildUserPrompt(baseInput);
     expect(prompt).toContain("氨基酸洁面乳");
@@ -308,6 +313,21 @@ describe("parseScriptResponse", () => {
   it("无法识别的 JSON 结构抛出错误", () => {
     const content = JSON.stringify({ foo: "bar" });
     expect(() => parseScriptResponse(content, "pain_point")).toThrow("无法解析");
+  });
+
+  it("把 LLM 的 searchTerms 解析为 stockKeywords（去空、trim、最多3个）", () => {
+    const content = JSON.stringify({
+      title: "t",
+      totalDuration: 6,
+      shots: [
+        { shotId: 1, type: "hook", duration: 3, description: "a", camera: "b", visualSource: "ai_generate", transition: "direct_concat", voiceover: "c",
+          searchTerms: [" coffee morning ", "cozy cafe", "", "extra", "fifth"] },
+        { shotId: 2, type: "cta", duration: 3, description: "d", camera: "e", visualSource: "ai_generate", transition: "direct_concat", voiceover: "f" },
+      ],
+    });
+    const scripts = parseScriptResponse(content, "scene");
+    expect(scripts[0].shots[0].stockKeywords).toEqual(["coffee morning", "cozy cafe", "extra"]);
+    expect(scripts[0].shots[1].stockKeywords).toBeUndefined(); // 无则不带该字段
   });
 
   it("Shot 字段缺失时自动填充默认值", () => {

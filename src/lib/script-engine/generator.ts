@@ -128,6 +128,12 @@ function validateShot(shot: Partial<Shot>, index: number): Shot {
 
   const validMotions: NonNullable<Shot["motion"]>[] = ["zoom_in_slow", "pan_left", "pan_right", "ken_burns", "static"];
 
+  // 解析 LLM 产出的英文素材检索词（字段名 searchTerms 或 stockKeywords），取前 3 个非空字符串
+  const rawTerms = (shot as Record<string, unknown>).searchTerms ?? shot.stockKeywords;
+  const stockKeywords = Array.isArray(rawTerms)
+    ? rawTerms.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim()).slice(0, 3)
+    : undefined;
+
   return {
     shotId: shot.shotId || index + 1,
     type: validTypes.includes(shot.type as Shot["type"]) ? (shot.type as Shot["type"]) : "demo",
@@ -140,6 +146,7 @@ function validateShot(shot: Partial<Shot>, index: number): Shot {
     voiceover: shot.voiceover || "",
     prompt: shot.prompt || undefined,
     // 透传 LLM 按视频模式生成的扩展字段，避免被静默丢弃
+    ...(stockKeywords?.length && { stockKeywords }),
     ...(shot.characterId && { characterId: shot.characterId }),
     ...(validMotions.includes(shot.motion as NonNullable<Shot["motion"]>) && { motion: shot.motion }),
     ...(shot.textOverlay?.text && {
