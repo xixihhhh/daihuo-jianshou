@@ -1,0 +1,60 @@
+# 发版流水线：push 形如 vX.Y.Z 的 tag 时，在 mac + windows runner 上分别打桌面安装包，
+# 并把 .dmg / .exe 上传到对应的 GitHub Release（即"别人一键下载即用"）。
+name: Release Desktop
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # 创建 Release / 上传产物需要
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false # 一个平台失败不影响另一个平台继续出包
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: 配置 Node 22（启用 pnpm 缓存）
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # 注意：这里【不】跳过 electron 二进制下载——打包需要它
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 打包桌面安装包（mac=.dmg / win=.exe）
+        run: pnpm dist
+
+      - name: 上传安装包到 Release（草稿，审核产物后再发布）
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.dmg
+            release/*.exe
+          fail_on_unmatched_files: false
+          draft: true
+          body: |
+            带货剪手桌面版 —— 双击即用，内置 ffmpeg / sqlite，无需安装 Node。
+
+            - **macOS (Apple Silicon)**：下载 `.dmg`。未签名，首次打开右键「打开」绕过 Gatekeeper。
+            - **Windows (x64)**：下载 `.exe` 安装。⚠️ Windows 版为自动构建、未经实测，欢迎反馈。
+
+            首次启动后数据存于系统用户目录（macOS：`~/Library/Application Support/带货剪手`）。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
