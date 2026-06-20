@@ -5,6 +5,7 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { generateSpeech, type TTSConfig } from "@/lib/tts";
+import { generateSpeechFree, DEFAULT_FREE_VOICE } from "@/lib/edge-tts";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -110,8 +111,13 @@ export async function POST(
       body.ttsConfig?.baseUrl && body.ttsConfig?.apiKey && body.ttsConfig?.model && body.ttsConfig?.voice
         ? body.ttsConfig
         : undefined;
+    // 免费配音兜底（微软 Edge keyless TTS，无需 Key）：未配付费 TTS 时让「一句话主题成片」也能出声
+    const freeTts = body.freeTts as { enabled?: boolean; voice?: string; rate?: string } | undefined;
+    const useFreeTts = !ttsConfig && freeTts?.enabled === true;
+    const freeVoice = freeTts?.voice || DEFAULT_FREE_VOICE;
+    const freeRate = typeof freeTts?.rate === "string" ? freeTts.rate : undefined;
     const ttsDir = join(getDataDir(), "uploads", id, "tts");
-    if (ttsConfig) await mkdir(ttsDir, { recursive: true });
+    if (ttsConfig || useFreeTts) await mkdir(ttsDir, { recursive: true });
 
     /** 探测视频文件是否带音轨（自带语音/音效的视频模型产出） */
     async function videoHasAudio(filePath: string): Promise<boolean> {
@@ -145,9 +151,12 @@ export async function POST(
 
     /** 为某分镜生成配音并落地为本地 mp3，返回绝对路径；失败返回 undefined（不阻断合成） */
     async function buildVoiceover(shotId: number, text: string): Promise<string | undefined> {
-      if (!ttsConfig || !text) return undefined;
+      if (!text || (!ttsConfig && !useFreeTts)) return undefined;
       try {
-        const audio = await generateSpeech(text, ttsConfig);
+        // 付费 TTS 优先；否则走免费 Edge keyless TTS（速度映射：speed 倍率 → SSML 带符号百分比）
+        const audio = ttsConfig
+          ? await generateSpeech(text, ttsConfig)
+          : await generateSpeechFree(text, { voice: freeVoice, rate: freeRate });
         const file = join(ttsDir, `shot-${shotId}.mp3`);
         await writeFile(file, audio);
         return file;

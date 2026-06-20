@@ -31,6 +31,8 @@ interface VideoClipItem {
 interface ComposeConfig {
   ttsEnabled: boolean;
   ttsVoice: string;
+  /** 免费 TTS 音色（未配置付费 TTS 时使用） */
+  freeVoice: string;
   bgm: string;
   subtitleSize: number;
   subtitlePosition: "bottom" | "center" | "top";
@@ -38,12 +40,13 @@ interface ComposeConfig {
   resolution: "720p" | "1080p";
 }
 
-// 配音音色选项
-const ttsVoiceOptions = [
-  { value: "female-gentle", label: "女声 - 温柔" },
-  { value: "female-energetic", label: "女声 - 活力" },
-  { value: "male-warm", label: "男声 - 温暖" },
-  { value: "male-pro", label: "男声 - 专业" },
+// 免费配音音色（微软 Edge keyless TTS，无需 Key）——与后端 FREE_TTS_VOICES 对应
+const freeVoiceOptions = [
+  { value: "zh-CN-XiaoxiaoNeural", label: "晓晓 · 温柔女声" },
+  { value: "zh-CN-XiaoyiNeural", label: "晓伊 · 活泼女声" },
+  { value: "zh-CN-YunxiNeural", label: "云希 · 阳光男声" },
+  { value: "zh-CN-YunyangNeural", label: "云扬 · 专业播报男声" },
+  { value: "zh-CN-YunjianNeural", label: "云健 · 沉稳解说男声" },
 ];
 
 // 背景音乐选项
@@ -91,6 +94,7 @@ export default function VideoPage() {
   const [config, setConfig] = useState<ComposeConfig>({
     ttsEnabled: true,
     ttsVoice: "female-gentle",
+    freeVoice: "zh-CN-XiaoxiaoNeural",
     bgm: "upbeat",
     subtitleSize: 24,
     subtitlePosition: "bottom",
@@ -107,6 +111,33 @@ export default function VideoPage() {
   // 背景音乐
   const [bgm, setBgm] = useState<{ path: string; name: string } | null>(null);
   const [bgmUploading, setBgmUploading] = useState(false);
+  // 是否已配置付费 TTS（否则配音走免费 Edge keyless TTS）
+  const paidTtsReady = Boolean(tts.enabled && tts.apiKey && tts.model && tts.voice);
+  // 免费配音试听状态
+  const [previewingVoice, setPreviewingVoice] = useState(false);
+
+  // 试听免费音色：合成一小段并播放
+  const previewFreeVoice = async () => {
+    if (previewingVoice) return;
+    setPreviewingVoice(true);
+    try {
+      const res = await fetch("/api/tts/free", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voice: config.freeVoice, text: "在家也能泡出一杯好咖啡，慢下来享受这一刻。" }),
+      });
+      if (!res.ok) throw new Error("试听失败");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play();
+    } catch {
+      /* 试听失败静默（不阻断主流程） */
+    } finally {
+      setPreviewingVoice(false);
+    }
+  };
   const uploadBgm = async (file: File) => {
     setBgmUploading(true);
     try {
@@ -204,8 +235,8 @@ export default function VideoPage() {
           resolution: config.resolution,
           aspectRatio: config.aspectRatio,
           ...(bgm?.path && { bgmPath: bgm.path }),
-          // 开启 TTS 时带上配音配置，合成会为每个分镜生成口播音轨
-          ...(tts.enabled && tts.apiKey && tts.model && tts.voice && {
+          // 开启配音时：已配付费 TTS 走付费；否则走免费 Edge keyless TTS（无需 Key），合成为每镜生成口播音轨
+          ...(config.ttsEnabled && paidTtsReady && {
             ttsConfig: {
               baseUrl: tts.baseUrl,
               apiKey: tts.apiKey,
@@ -213,6 +244,9 @@ export default function VideoPage() {
               voice: tts.voice,
               speed: tts.speed,
             },
+          }),
+          ...(config.ttsEnabled && !paidTtsReady && {
+            freeTts: { enabled: true, voice: config.freeVoice },
           }),
         }),
       });
@@ -379,7 +413,12 @@ export default function VideoPage() {
             {/* 配音设置 */}
             <Card className="glass-card">
               <CardContent className="p-4 space-y-4">
-                <Label className="text-sm font-medium">配音 (TTS)</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">配音 (TTS)</Label>
+                  {!paidTtsReady && (
+                    <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-500">免费 · 无需 Key</span>
+                  )}
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">启用自动配音</span>
                   <button
@@ -389,22 +428,36 @@ export default function VideoPage() {
                     <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${config.ttsEnabled ? "translate-x-5" : "translate-x-0.5"}`} />
                   </button>
                 </div>
-                {config.ttsEnabled && (
-                  <Select value={config.ttsVoice} onValueChange={(v) => setConfig((c) => ({ ...c, ttsVoice: v ?? c.ttsVoice }))}>
-                    <SelectTrigger className="bg-muted/30 border-border/50 text-xs">
-                      {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
-                      <SelectValue>
-                        {(value: string) => ttsVoiceOptions.find((o) => o.value === value)?.label ?? value}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ttsVoiceOptions.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {config.ttsEnabled && paidTtsReady && (
+                  <p className="text-[11px] text-muted-foreground">
+                    使用已配置的付费 TTS（音色：{tts.voice}）。如需免费配音，可在「设置」清空 TTS。
+                  </p>
+                )}
+                {config.ttsEnabled && !paidTtsReady && (
+                  <div className="space-y-2">
+                    <Select value={config.freeVoice} onValueChange={(v) => setConfig((c) => ({ ...c, freeVoice: v ?? c.freeVoice }))}>
+                      <SelectTrigger className="bg-muted/30 border-border/50 text-xs">
+                        {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                        <SelectValue>
+                          {(value: string) => freeVoiceOptions.find((o) => o.value === value)?.label ?? value}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {freeVoiceOptions.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <button
+                      onClick={previewFreeVoice}
+                      disabled={previewingVoice}
+                      className="text-[11px] text-primary hover:underline disabled:opacity-50"
+                    >
+                      {previewingVoice ? "试听中…" : "▶ 试听这个音色"}
+                    </button>
+                  </div>
                 )}
               </CardContent>
             </Card>
