@@ -14,9 +14,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ClipForge — AI Short Video Creator",
+  // 标题/描述中英双语，中文在前：国内为主、兼顾海外搜索收录
+  title: "ClipForge — AI 短视频带货创作工具 | AI Short Video Creator",
   description:
-    "Turn a product or a single sentence into a vertical short video — AI writes the script, auto-fills free stock footage, adds voiceover, and renders in one click.",
+    "一句话主题或一张商品图，一键产出抖音 / 快手 / 小红书 / TikTok 竖屏带货短视频：AI 写脚本、自动配画面、免费配音、烧字幕。Turn one sentence or a product photo into a vertical short video — AI script, free stock footage, voiceover & subtitles in one click.",
+  keywords: [
+    "AI 短视频",
+    "带货短视频",
+    "AI 视频生成",
+    "抖音",
+    "快手",
+    "小红书",
+    "TikTok",
+    "text to video",
+    "faceless video",
+    "AI video generator",
+  ],
 };
 
 export default function RootLayout({
