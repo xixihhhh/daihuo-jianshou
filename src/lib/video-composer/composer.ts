@@ -5,6 +5,7 @@ import { mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { TRANSITIONS, type TransitionMode } from "./transitions";
 import { MOTIONS, DEFAULT_MOTION } from "./motions";
+import { safeEncodeParams } from "@/lib/compose-presets";
 
 /**
  * 探测一个可用的中文字体文件路径
@@ -59,6 +60,10 @@ export interface ComposeConfig {
     aspectRatio: "9:16" | "16:9" | "1:1";
     bgmPath?: string;
     bgmVolume?: number; // 0-1
+    /** x264 编码 preset（渲染质量预设映射，缺省 medium）；只接受白名单值 */
+    videoPreset?: string;
+    /** x264 -crf 质量（缺省 18）；会被夹取到合法范围 */
+    crf?: number;
   };
   subtitle?: {
     texts: { text: string; startTime: number; endTime: number }[];
@@ -277,7 +282,9 @@ export function buildComposeCommand(config: ComposeConfig): string {
   }
 
   // 优化的编码参数
-  cmd += ` -c:v libx264 -preset medium -crf 18 -profile:v high -level:v 4.2 -pix_fmt yuv420p`;
+  // 渲染质量预设：分辨率在上方已按 preset 决定，这里用 preset 的编码速度/质量（白名单兜底防注入）
+  const enc = safeEncodeParams(config.output.videoPreset, config.output.crf);
+  cmd += ` -c:v libx264 -preset ${enc.videoPreset} -crf ${enc.crf} -profile:v high -level:v 4.2 -pix_fmt yuv420p`;
   cmd += ` -c:a aac -b:a 256k -movflags +faststart "${escapeShellPath(outputPath)}"`;
 
   return cmd;

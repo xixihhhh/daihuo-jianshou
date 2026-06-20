@@ -6,6 +6,7 @@ import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { generateSpeech, type TTSConfig } from "@/lib/tts";
 import { generateSpeechFree, DEFAULT_FREE_VOICE } from "@/lib/edge-tts";
+import { resolveRenderProfile } from "@/lib/compose-presets";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -175,9 +176,18 @@ export async function POST(
       );
     }
 
+    // 渲染质量预设（快速/标准/高清）→ 分辨率 + 编码参数；预设优先于 body.resolution
+    const profile = resolveRenderProfile(typeof body.renderPreset === "string" ? body.renderPreset : undefined);
+    const resolution: "720p" | "1080p" = body.renderPreset
+      ? profile.resolution
+      : body.resolution === "720p"
+        ? "720p"
+        : "1080p";
     const outputCfg = {
-      resolution: (body.resolution === "720p" ? "720p" : "1080p") as "720p" | "1080p",
+      resolution,
       aspectRatio: (["9:16", "16:9", "1:1"].includes(body.aspectRatio) ? body.aspectRatio : "9:16") as "9:16" | "16:9" | "1:1",
+      videoPreset: profile.videoPreset,
+      crf: profile.crf,
     };
 
     // 立即建合成记录(composing)并返回；重活(TTS+FFmpeg)后台异步跑，前端轮询 GET 获取结果

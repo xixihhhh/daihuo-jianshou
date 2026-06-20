@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/lib/i18n";
+import { RENDER_PRESETS, DEFAULT_RENDER_PRESET, type RenderPreset } from "@/lib/compose-presets";
 import { LanguageToggle } from "@/components/language-toggle";
 import {
   Select,
@@ -41,6 +42,8 @@ interface ComposeConfig {
   subtitlePosition: "bottom" | "center" | "top";
   aspectRatio: "9:16" | "16:9" | "1:1";
   resolution: "720p" | "1080p";
+  /** 渲染质量预设：快速/标准/高清（决定分辨率 + 编码速度/质量） */
+  renderPreset: RenderPreset;
 }
 
 // 免费配音音色（微软 Edge keyless TTS，无需 Key）——与后端 FREE_TTS_VOICES 对应
@@ -105,6 +108,7 @@ export default function VideoPage() {
     subtitlePosition: "bottom",
     aspectRatio: "9:16",
     resolution: "1080p",
+    renderPreset: DEFAULT_RENDER_PRESET,
   });
 
   // 合成状态
@@ -238,6 +242,7 @@ export default function VideoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           resolution: config.resolution,
+          renderPreset: config.renderPreset,
           aspectRatio: config.aspectRatio,
           ...(bgm?.path && { bgmPath: bgm.path }),
           // 开启配音时：已配付费 TTS 走付费；否则走免费 Edge keyless TTS（无需 Key），合成为每镜生成口播音轨
@@ -517,6 +522,29 @@ export default function VideoPage() {
             <Card className="glass-card">
               <CardContent className="p-4 space-y-4">
                 <Label className="text-sm font-medium">{t("canvasLabel")}</Label>
+                {/* 渲染质量预设：快速/标准/高清（选中同步分辨率） */}
+                <div className="space-y-2">
+                  <span className="text-xs text-muted-foreground">{t("renderQualityLabel")}</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["fast", "standard", "hd"] as const).map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() =>
+                          setConfig((c) => ({ ...c, renderPreset: preset, resolution: RENDER_PRESETS[preset].resolution }))
+                        }
+                        className={`flex flex-col items-center gap-0.5 rounded-md py-1.5 text-xs border transition-all ${
+                          config.renderPreset === preset
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        <span className="font-medium">{t(`renderPreset_${preset}`)}</span>
+                        <span className="text-[10px] opacity-70">{RENDER_PRESETS[preset].resolution}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">{t(`renderPresetDesc_${config.renderPreset}`)}</p>
+                </div>
                 {/* 比例 */}
                 <div className="space-y-2">
                   <span className="text-xs text-muted-foreground">{t("aspectRatioLabel")}</span>

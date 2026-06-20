@@ -259,6 +259,28 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("format=yuv420p,setsar=1,fps=30,settb=AVTB[v0]");
     expect(cmd).toContain("format=yuv420p,setsar=1,fps=30,settb=AVTB[v1]");
   });
+
+  it("渲染质量预设：使用 output 的 videoPreset/crf 编码参数", () => {
+    const cmd = buildComposeCommand({
+      ...baseConfig,
+      output: { ...baseConfig.output, videoPreset: "slow", crf: 17 },
+    });
+    expect(cmd).toContain("-preset slow -crf 17");
+  });
+
+  it("缺省编码参数回退 medium/18", () => {
+    const cmd = buildComposeCommand(baseConfig);
+    expect(cmd).toContain("-preset medium -crf 18");
+  });
+
+  it("非法 videoPreset 被白名单兜底为 medium（防注入）", () => {
+    const cmd = buildComposeCommand({
+      ...baseConfig,
+      output: { ...baseConfig.output, videoPreset: "evil; rm -rf /", crf: 20 },
+    });
+    expect(cmd).toContain("-preset medium -crf 20");
+    expect(cmd).not.toContain("rm -rf");
+  });
 });
 
 // ==================== 脚本生成器 JSON 解析测试 ====================
