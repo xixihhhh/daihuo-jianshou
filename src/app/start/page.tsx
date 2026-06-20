@@ -10,7 +10,9 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import { exampleProducts, type ExampleProduct } from "@/lib/examples";
+import { getExampleProducts, type ExampleProduct } from "@/lib/examples";
+import { useT, useLocale, useSetLocale } from "@/lib/i18n";
+import { LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
 
 type Mode = "upload" | "topic";
 interface PickedImage {
@@ -28,8 +30,15 @@ interface RecentProject {
 
 export default function StartPage() {
   const router = useRouter();
+  const t = useT("start");
+  const locale = useLocale();
+  const setLocale = useSetLocale();
   const { llm } = useSettingsStore();
   const llmReady = llm.apiKey.trim().length > 0;
+  // 示例商品跟随界面语言
+  const examples = getExampleProducts(locale);
+  // 语言切换（中文 ⇄ English）
+  const toggleLocale = () => setLocale(LOCALES[(LOCALES.indexOf(locale) + 1) % LOCALES.length]);
 
   const [mode, setMode] = useState<Mode>("upload");
   const [images, setImages] = useState<PickedImage[]>([]);
@@ -113,26 +122,26 @@ export default function StartPage() {
       body: JSON.stringify({ topic: topic.trim(), narrationStyle: "knowledge", targetDuration: 25, llmConfig: llmConfig() }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok && !data.projectId) throw new Error(data.error || "生成失败，请检查 LLM 配置");
+    if (!res.ok && !data.projectId) throw new Error(data.error || t("errTopicScript"));
     router.push(`/project/${data.projectId}/script`);
   };
 
   const startUpload = async () => {
-    setStage("创建项目…");
+    setStage(t("stageCreate"));
     const projectRes = await fetch("/api/project", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: `${productName} 推广`, productName, productCategory: "other", productDescription: sellingPoints, productImages: [] }),
+      body: JSON.stringify({ name: t("projectName", { name: productName }), productName, productCategory: "other", productDescription: sellingPoints, productImages: [] }),
     });
-    if (!projectRes.ok) throw new Error("项目创建失败，请重试");
+    if (!projectRes.ok) throw new Error(t("errProjectCreate"));
     const project = await projectRes.json();
 
-    setStage("上传商品图…");
+    setStage(t("stageUpload"));
     const fd = new FormData();
     images.forEach((i) => fd.append("files", i.file));
     fd.append("projectId", project.id);
     const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
-    if (!uploadRes.ok) throw new Error("图片上传失败，请检查网络");
+    if (!uploadRes.ok) throw new Error(t("errUpload"));
     const { paths } = await uploadRes.json();
     await fetch(`/api/project/${project.id}`, {
       method: "PATCH",
@@ -140,7 +149,7 @@ export default function StartPage() {
       body: JSON.stringify({ productImages: paths }),
     });
 
-    setStage("AI 写脚本…");
+    setStage(t("stageScript"));
     const scriptRes = await fetch("/api/llm/script", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -156,7 +165,7 @@ export default function StartPage() {
         llmConfig: llmConfig(),
       }),
     });
-    if (!scriptRes.ok) throw new Error("脚本生成失败，请检查 LLM 配置");
+    if (!scriptRes.ok) throw new Error(t("errScript"));
     router.push(`/project/${project.id}/script`);
   };
 
@@ -172,7 +181,7 @@ export default function StartPage() {
       if (mode === "topic") await startTopic();
       else await startUpload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "出错了，请重试");
+      setError(e instanceof Error ? e.message : t("errGeneric"));
       setBusy(false);
       setStage("");
     }
@@ -254,28 +263,29 @@ export default function StartPage() {
             ClipForge
           </div>
           <div className="cf-nav-r">
-            <Link href="/products" className="cf-nlink">商品库</Link>
-            <Link href="/batch" className="cf-nlink">批量</Link>
-            <Link href="/settings" className="cf-gear" aria-label="设置">
+            <button type="button" onClick={toggleLocale} className="cf-nlink" title={locale === "zh" ? "Switch to English" : "切换到中文"}>{LOCALE_LABELS[locale]}</button>
+            <Link href="/products" className="cf-nlink">{t("navProducts")}</Link>
+            <Link href="/batch" className="cf-nlink">{t("navBatch")}</Link>
+            <Link href="/settings" className="cf-gear" aria-label={t("navSettings")}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
             </Link>
           </div>
         </nav>
 
         <section className="cf-hero">
-          <div className="cf-eyebrow">AI 带货短视频工作台</div>
-          <h1 className="cf-h1">丢张商品图，<span className="hl">直接出片</span></h1>
-          <p className="cf-sub">上传商品图，或说一句话主题。AI 自动写脚本、配画面、配音，合成竖屏成片——先开跑，要用到 AI 时再配 Key。</p>
+          <div className="cf-eyebrow">{t("eyebrow")}</div>
+          <h1 className="cf-h1">{t("h1Lead")}<span className="hl">{t("h1Highlight")}</span></h1>
+          <p className="cf-sub">{t("sub")}</p>
 
           <div className="cf-card">
             <div className="cf-tabs">
               <button className={`cf-tab${mode === "upload" ? " on" : ""}`} onClick={() => setMode("upload")}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 20" /></svg>
-                上传商品图
+                {t("tabUpload")}
               </button>
               <button className={`cf-tab${mode === "topic" ? " on" : ""}`} onClick={() => setMode("topic")}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19v3" /><path d="M8 22h8" /><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /></svg>
-                一句话成片
+                {t("tabTopic")}
               </button>
             </div>
 
@@ -289,8 +299,8 @@ export default function StartPage() {
                   onDrop={(e) => { e.preventDefault(); setIsDragging(false); addFiles(e.dataTransfer.files); }}
                 >
                   <div className="cf-dic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></svg></div>
-                  <div className="cf-dt">拖入商品图，或点击上传</div>
-                  <div className="cf-ds">JPG / PNG，最多 5 张 · 没素材？下面点个示例</div>
+                  <div className="cf-dt">{t("dropTitle")}</div>
+                  <div className="cf-ds">{t("dropSub")}</div>
                   <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
                 </div>
                 {images.length > 0 && (
@@ -298,57 +308,57 @@ export default function StartPage() {
                     {images.map((i) => (
                       <div key={i.id} className="cf-thumb">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={i.url} alt="商品图" />
-                        <button onClick={(e) => { e.stopPropagation(); removeImage(i.id); }} aria-label="删除">×</button>
+                        <img src={i.url} alt={t("imgAlt")} />
+                        <button onClick={(e) => { e.stopPropagation(); removeImage(i.id); }} aria-label={t("removeAria")}>×</button>
                       </div>
                     ))}
                   </div>
                 )}
                 <div className="cf-field">
-                  <input className="cf-input" value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="商品名称（必填，如：便携榨汁杯）" />
+                  <input className="cf-input" value={productName} onChange={(e) => setProductName(e.target.value)} placeholder={t("productNamePlaceholder")} />
                 </div>
                 <div className="cf-field">
-                  <textarea className="cf-area" value={sellingPoints} onChange={(e) => setSellingPoints(e.target.value)} placeholder="核心卖点（选填）——填了脚本更精准" />
+                  <textarea className="cf-area" value={sellingPoints} onChange={(e) => setSellingPoints(e.target.value)} placeholder={t("sellingPointsPlaceholder")} />
                 </div>
               </>
             ) : (
               <div className="cf-field" style={{ marginTop: 0 }}>
-                <textarea className="cf-area" style={{ minHeight: 120 }} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="说个主题，如：3 个让租房变高级的小物 / 冬天必囤的护手霜" />
+                <textarea className="cf-area" style={{ minHeight: 120 }} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder={t("topicPlaceholder")} />
               </div>
             )}
 
             {needKey && !llmReady ? (
               <div className="cf-keybox">
-                <span>还没配 Key？脚本/画面需要先接一个 AI 平台。推荐 Atlas Cloud——一个 Key 搞定脚本+图+视频+配音。</span>
-                <Link href="/settings">去配置</Link>
+                <span>{t("keyboxText")}</span>
+                <Link href="/settings">{t("keyboxCta")}</Link>
               </div>
             ) : (
               <div className="cf-cta-row">
                 <button className="cf-cta" onClick={onStart} disabled={!canStart || busy}>
-                  {busy ? (stage || "生成中…") : "开始生成"}
+                  {busy ? (stage || t("busyDefault")) : t("ctaStart")}
                   {!busy && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
                 </button>
-                <div className="cf-reassure">还没配 Key？开始时一键接 <b>Atlas Cloud</b>——脚本 + 图 + 视频 + 配音，一个 Key 全搞定。</div>
+                <div className="cf-reassure">{t("reassureLead")}<b>Atlas Cloud</b>{t("reassureTail")}</div>
               </div>
             )}
             {error && <div className="cf-err">{error}</div>}
           </div>
 
           <div className="cf-examples">
-            没素材，先试试
-            {exampleProducts.slice(0, 3).map((ex) => (
+            {t("examplesLabel")}
+            {examples.slice(0, 3).map((ex) => (
               <span key={ex.id} className="cf-chip" onClick={() => fillExample(ex)}>{ex.name} ¥{ex.price}</span>
             ))}
           </div>
 
           {recent.length > 0 && (
             <div className="cf-recent">
-              <div className="lbl">继续未完成的项目</div>
+              <div className="lbl">{t("recentLabel")}</div>
               <div className="row">
                 {recent.map((p) => (
                   <Link key={p.id} href={`/project/${p.id}/${stepFor(p.status)}`} className="cf-pj">
                     <span className="dot" />
-                    <span className="nm">{p.name || p.productName || "未命名项目"}</span>
+                    <span className="nm">{p.name || p.productName || t("untitledProject")}</span>
                   </Link>
                 ))}
               </div>
@@ -357,7 +367,7 @@ export default function StartPage() {
         </section>
 
         <div className="cf-adv">
-          <Link href="/settings">高级设置 · 多平台 / 自定义模型 / 生成参数 ›</Link>
+          <Link href="/settings">{t("advLink")}</Link>
         </div>
       </div>
     </div>

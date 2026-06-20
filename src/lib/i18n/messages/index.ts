@@ -1,6 +1,7 @@
 import type { Locale } from "../config";
 import { common } from "./common";
 import { home } from "./home";
+import { start } from "./start";
 import { topic } from "./topic";
 import { newProject } from "./newProject";
 import { clone } from "./clone";
@@ -17,6 +18,7 @@ import { exportPage } from "./exportPage";
 const namespaces = {
   common,
   home,
+  start,
   topic,
   newProject,
   clone,
