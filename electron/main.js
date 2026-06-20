@@ -139,7 +139,7 @@ app.whenReady().then(async () => {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
-    title: "带货剪手",
+    title: "ClipForge",
     backgroundColor: "#0a0a0a",
     webPreferences: { contextIsolation: true },
   });

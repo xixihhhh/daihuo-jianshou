@@ -1,5 +1,5 @@
 {
-  "name": "daihuo-jianshou",
+  "name": "clipforge",
   "version": "0.2.0",
   "private": true,
   "license": "AGPL-3.0-only",
@@ -54,8 +54,8 @@
     ]
   },
   "build": {
-    "appId": "com.daihuojianshou.app",
-    "productName": "带货剪手",
+    "appId": "com.clipforge.app",
+    "productName": "ClipForge",
     "npmRebuild": false,
     "directories": {
       "output": "release",

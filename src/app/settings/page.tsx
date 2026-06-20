@@ -20,6 +20,14 @@ import { LuPlus, LuTrash2, LuUser, LuStar, LuUpload, LuPalette } from "react-ico
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useCharacterStore, type Character } from "@/lib/stores/project-store";
 import { useBrandStore } from "@/lib/stores/brand-store";
+import {
+  TTS_PROVIDERS,
+  OPENAI_TTS_PRESETS,
+  getTTSProviderMeta,
+  resolveTTSConfig,
+  isPaidTTSReady,
+  type TTSProvider,
+} from "@/lib/tts-presets";
 
 // 默认分辨率选项
 const resolutionOptions = [
@@ -226,7 +234,8 @@ export default function SettingsPage() {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: "这款产品真的太好用了，赶紧下单试试吧！", ttsConfig: tts }),
+        // 发解析后的完整配置（含按平台复用的 Key / 默认 baseUrl / 模型）
+        body: JSON.stringify({ text: "这款产品真的太好用了，赶紧下单试试吧！", ttsConfig: resolveTTSConfig(tts, providers) }),
       });
       if (!res.ok) throw new Error();
       const blob = await res.blob();
@@ -235,6 +244,14 @@ export default function SettingsPage() {
     } catch {
       setTtsTestStatus("error");
     }
+  };
+
+  // TTS 平台元信息 / 就绪态 / 切换平台时重置模型·音色·baseUrl 为该平台默认
+  const ttsMeta = getTTSProviderMeta(tts.provider);
+  const ttsReady = isPaidTTSReady(tts, providers);
+  const onChangeTTSProvider = (provider: TTSProvider) => {
+    const meta = getTTSProviderMeta(provider);
+    setTTS({ ...tts, provider, baseUrl: meta.baseUrl, model: meta.defaultModel, voice: meta.defaultVoice });
   };
 
   // 保存时的提示状态
@@ -334,7 +351,7 @@ export default function SettingsPage() {
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
             </div>
-            <span className="text-lg font-bold tracking-tight">带货剪手</span>
+            <span className="text-lg font-bold tracking-tight">ClipForge</span>
           </div>
           <Link href="/">
             <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
@@ -614,7 +631,7 @@ export default function SettingsPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-sm">配音 TTS</h3>
-                        <p className="text-xs text-muted-foreground">开启后合成会为每个分镜生成口播配音（OpenAI 兼容 /audio/speech）</p>
+                        <p className="text-xs text-muted-foreground">开启后合成会为每个分镜生成口播配音（支持 OpenAI 兼容 / Atlas Cloud / MiniMax / fal.ai）</p>
                       </div>
                     </div>
                     <Toggle checked={tts.enabled} onChange={(v) => setTTS({ ...tts, enabled: v })} />
@@ -622,47 +639,124 @@ export default function SettingsPage() {
 
                   {tts.enabled && (
                     <div className="space-y-4">
-                      {/* 快捷预设 */}
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">快捷预设（点击填入 baseUrl 和模型，还需填 API Key）：</p>
-                        <div className="flex flex-wrap gap-2">
-                          {[
-                            { label: "硅基流动 CosyVoice", baseUrl: "https://api.siliconflow.cn/v1", model: "FunAudioLLM/CosyVoice2-0.5B", voice: "FunAudioLLM/CosyVoice2-0.5B:alex" },
-                            { label: "OpenAI tts-1", baseUrl: "https://api.openai.com/v1", model: "tts-1", voice: "alloy" },
-                            { label: "火山方舟", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-tts", voice: "zh_female_cancan" },
-                          ].map((p) => (
-                            <button
-                              key={p.label}
-                              onClick={() => setTTS({ ...tts, baseUrl: p.baseUrl, model: p.model, voice: p.voice })}
-                              className="px-2.5 h-7 rounded-md border border-border/60 bg-muted/20 text-xs hover:border-primary/50 hover:text-primary transition-colors"
-                            >
-                              {p.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                      {/* 配音平台选择 */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">API 地址（baseUrl）</Label>
-                        <Input value={tts.baseUrl} onChange={(e) => setTTS({ ...tts, baseUrl: e.target.value })} placeholder="https://api.siliconflow.cn/v1" className="font-mono text-xs" />
+                        <Label className="text-xs text-muted-foreground">配音平台</Label>
+                        <Select value={tts.provider ?? "openai"} onValueChange={(v) => onChangeTTSProvider((v ?? "openai") as TTSProvider)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {(value: string) => TTS_PROVIDERS.find((p) => p.value === value)?.label ?? "OpenAI 兼容"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TTS_PROVIDERS.map((p) => (
+                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {ttsMeta.hint && <p className="text-[11px] text-muted-foreground/80">{ttsMeta.hint}</p>}
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">API Key</Label>
-                        <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder="输入 TTS API Key" />
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">模型</Label>
-                          <Input value={tts.model} onChange={(e) => setTTS({ ...tts, model: e.target.value })} placeholder="tts-1" className="font-mono text-xs" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">音色 voice</Label>
-                          <Input value={tts.voice} onChange={(e) => setTTS({ ...tts, voice: e.target.value })} placeholder="alloy" className="font-mono text-xs" />
-                        </div>
-                      </div>
+
+                      {ttsMeta.value === "openai" ? (
+                        <>
+                          {/* OpenAI 兼容：快捷预设 + baseUrl + Key + 自由模型/音色 */}
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-2">快捷预设（点击填入 baseUrl 和模型，还需填 API Key）：</p>
+                            <div className="flex flex-wrap gap-2">
+                              {OPENAI_TTS_PRESETS.map((p) => (
+                                <button
+                                  key={p.label}
+                                  onClick={() => setTTS({ ...tts, baseUrl: p.baseUrl, model: p.model, voice: p.voice })}
+                                  className="px-2.5 h-7 rounded-md border border-border/60 bg-muted/20 text-xs hover:border-primary/50 hover:text-primary transition-colors"
+                                >
+                                  {p.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">API 地址（baseUrl）</Label>
+                            <Input value={tts.baseUrl} onChange={(e) => setTTS({ ...tts, baseUrl: e.target.value })} placeholder="https://api.siliconflow.cn/v1" className="font-mono text-xs" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">API Key</Label>
+                            <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder="输入 TTS API Key" />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">模型</Label>
+                              <Input value={tts.model} onChange={(e) => setTTS({ ...tts, model: e.target.value })} placeholder="tts-1" className="font-mono text-xs" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">音色 voice</Label>
+                              <Input value={tts.voice} onChange={(e) => setTTS({ ...tts, voice: e.target.value })} placeholder="alloy" className="font-mono text-xs" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Atlas / MiniMax / fal：Key（复用或自填）+ 可选 GroupId/baseUrl + 模型/音色下拉 */}
+                          {ttsMeta.keySource === "tts" ? (
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">API Key</Label>
+                              <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder="输入 API Key" />
+                            </div>
+                          ) : (
+                            <div className="text-xs rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                              {providers[ttsMeta.keySource]?.apiKey ? (
+                                <span className="text-emerald-500">✓ 已复用「AI 平台」里该平台的 API Key</span>
+                              ) : (
+                                <span className="text-amber-500">⚠ 请先到上方「AI 平台」标签页填好该平台的 API Key</span>
+                              )}
+                            </div>
+                          )}
+                          {ttsMeta.editableBaseUrl && (
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">API 地址（baseUrl）</Label>
+                              <Input value={tts.baseUrl} onChange={(e) => setTTS({ ...tts, baseUrl: e.target.value })} placeholder={ttsMeta.baseUrl} className="font-mono text-xs" />
+                            </div>
+                          )}
+                          {ttsMeta.needsGroupId && (
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">GroupId（海螺国内端点必填，国际版可空）</Label>
+                              <Input value={tts.groupId ?? ""} onChange={(e) => setTTS({ ...tts, groupId: e.target.value })} placeholder="海螺控制台的 GroupId" className="font-mono text-xs" />
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {ttsMeta.models.length > 0 && (
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">模型</Label>
+                                <Select value={tts.model || ttsMeta.defaultModel} onValueChange={(v) => setTTS({ ...tts, model: v ?? ttsMeta.defaultModel })}>
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue>{(value: string) => ttsMeta.models.find((o) => o.value === value)?.label ?? value}</SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {ttsMeta.models.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">音色 voice</Label>
+                              <Select value={tts.voice || ttsMeta.defaultVoice} onValueChange={(v) => setTTS({ ...tts, voice: v ?? ttsMeta.defaultVoice })}>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue>{(value: string) => ttsMeta.voices.find((o) => o.value === value)?.label ?? value}</SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ttsMeta.voices.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* 试听 */}
                       <div className="pt-3 mt-1 border-t border-border/50">
-                        <Button variant="outline" size="sm" onClick={testTTS} disabled={!tts.apiKey || !tts.baseUrl || !tts.model || !tts.voice || ttsTestStatus === "testing"} className={`text-xs ${ttsTestStatus === "error" ? "text-destructive" : ""}`}>
+                        <Button variant="outline" size="sm" onClick={testTTS} disabled={!ttsReady || ttsTestStatus === "testing"} className={`text-xs ${ttsTestStatus === "error" ? "text-destructive" : ""}`}>
                           {ttsTestStatus === "testing" ? "合成中..." : ttsTestStatus === "error" ? "试听失败 ✗" : "🔊 试听音色"}
                         </Button>
+                        {!ttsReady && <span className="ml-2 text-[11px] text-muted-foreground">填好 Key 后可试听</span>}
                       </div>
                     </div>
                   )}

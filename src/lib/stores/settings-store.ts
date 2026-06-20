@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/config";
+import { DEFAULT_TTS_PROVIDER, type TTSProvider } from "@/lib/tts-presets";
 
 // AI Provider 配置
 export interface ProviderSetting {
@@ -17,14 +19,18 @@ export interface LLMSetting {
   visionModel?: string; // 视觉分析模型
 }
 
-// TTS 配音配置（OpenAI 兼容 /audio/speech）
+// TTS 配音配置（多平台：OpenAI 兼容 / Atlas / MiniMax / fal.ai）
 export interface TTSSetting {
   enabled: boolean;
+  /** 平台，缺省 "openai"（旧配置无此字段时按 openai 处理） */
+  provider?: TTSProvider;
   baseUrl: string;
   apiKey: string;
   model: string;
   voice: string;
   speed?: number;
+  /** MiniMax 国内端点的 GroupId（可选） */
+  groupId?: string;
 }
 
 interface SettingsState {
@@ -42,8 +48,11 @@ interface SettingsState {
   defaultResolution: "720p" | "1080p";
   // 默认画面比例
   defaultAspectRatio: "9:16" | "16:9" | "1:1";
+  // 界面语言（中文默认，可切 English）
+  locale: Locale;
 
   // Actions
+  setLocale: (locale: Locale) => void;
   setProvider: (name: string, setting: ProviderSetting) => void;
   setLLM: (llm: LLMSetting) => void;
   setTTS: (tts: TTSSetting) => void;
@@ -73,6 +82,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
       tts: {
         enabled: false,
+        provider: DEFAULT_TTS_PROVIDER,
         baseUrl: "",
         apiKey: "",
         model: "",
@@ -83,7 +93,9 @@ export const useSettingsStore = create<SettingsState>()(
       defaultVideoModel: "",
       defaultResolution: "1080p",
       defaultAspectRatio: "9:16",
+      locale: DEFAULT_LOCALE,
 
+      setLocale: (locale) => set({ locale }),
       setProvider: (name, setting) =>
         set((state) => ({
           providers: { ...state.providers, [name]: setting },

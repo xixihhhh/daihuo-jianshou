@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { LuArrowLeft, LuPlay, LuChevronDown, LuArrowRight, LuLoaderCircle } from "react-icons/lu";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { resolveTTSConfig, isPaidTTSReady, getTTSProviderMeta } from "@/lib/tts-presets";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ interface DbShot {
 
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>();
-  const { defaultResolution, defaultAspectRatio, tts } = useSettingsStore();
+  const { defaultResolution, defaultAspectRatio, tts, providers } = useSettingsStore();
   const [clips, setClips] = useState<VideoClipItem[]>([]);
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -112,7 +113,7 @@ export default function VideoPage() {
   const [bgm, setBgm] = useState<{ path: string; name: string } | null>(null);
   const [bgmUploading, setBgmUploading] = useState(false);
   // 是否已配置付费 TTS（否则配音走免费 Edge keyless TTS）
-  const paidTtsReady = Boolean(tts.enabled && tts.apiKey && tts.model && tts.voice);
+  const paidTtsReady = isPaidTTSReady(tts, providers);
   // 免费配音试听状态
   const [previewingVoice, setPreviewingVoice] = useState(false);
 
@@ -237,13 +238,8 @@ export default function VideoPage() {
           ...(bgm?.path && { bgmPath: bgm.path }),
           // 开启配音时：已配付费 TTS 走付费；否则走免费 Edge keyless TTS（无需 Key），合成为每镜生成口播音轨
           ...(config.ttsEnabled && paidTtsReady && {
-            ttsConfig: {
-              baseUrl: tts.baseUrl,
-              apiKey: tts.apiKey,
-              model: tts.model,
-              voice: tts.voice,
-              speed: tts.speed,
-            },
+            // 解析后的完整配置（含平台、复用的 Key、默认 baseUrl/模型/音色、可选 GroupId）
+            ttsConfig: resolveTTSConfig(tts, providers),
           }),
           ...(config.ttsEnabled && !paidTtsReady && {
             freeTts: { enabled: true, voice: config.freeVoice },
@@ -305,7 +301,7 @@ export default function VideoPage() {
                   <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                 </svg>
               </div>
-              <span className="text-lg font-bold tracking-tight">带货剪手</span>
+              <span className="text-lg font-bold tracking-tight">ClipForge</span>
             </Link>
             <span className="text-muted-foreground">/</span>
             <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
@@ -430,7 +426,7 @@ export default function VideoPage() {
                 </div>
                 {config.ttsEnabled && paidTtsReady && (
                   <p className="text-[11px] text-muted-foreground">
-                    使用已配置的付费 TTS（音色：{tts.voice}）。如需免费配音，可在「设置」清空 TTS。
+                    使用已配置的付费 TTS（{getTTSProviderMeta(tts.provider).label}）。如需免费配音，可在「设置」关闭 TTS。
                   </p>
                 )}
                 {config.ttsEnabled && !paidTtsReady && (

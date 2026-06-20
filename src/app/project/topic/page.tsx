@@ -117,7 +117,7 @@ export default function TopicProjectPage() {
                   <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                 </svg>
               </div>
-              <span className="text-sm font-semibold tracking-tight">带货剪手</span>
+              <span className="text-sm font-semibold tracking-tight">ClipForge</span>
             </div>
           </div>
         </div>

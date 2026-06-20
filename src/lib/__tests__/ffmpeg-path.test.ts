@@ -21,8 +21,8 @@ describe("ffmpeg/ffprobe 二进制路径解析", () => {
   });
 
   it("注入绝对路径时返回该路径（Electron 随包二进制）", () => {
-    process.env.FFMPEG_PATH = "/Apps/带货剪手.app/Contents/Resources/ffmpeg";
-    process.env.FFPROBE_PATH = "/Apps/带货剪手.app/Contents/Resources/ffprobe";
+    process.env.FFMPEG_PATH = "/Apps/ClipForge.app/Contents/Resources/ffmpeg";
+    process.env.FFPROBE_PATH = "/Apps/ClipForge.app/Contents/Resources/ffprobe";
     expect(ffmpegBin()).toContain("ffmpeg");
     expect(ffprobeBin()).toContain("ffprobe");
   });

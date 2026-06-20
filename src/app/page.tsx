@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { exampleShowcase } from "@/lib/examples";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 
 // 首页项目列表项（来自 GET /api/project，updatedAt 经 JSON 序列化为字符串）
 interface ProjectItem {
@@ -18,16 +20,19 @@ interface ProjectItem {
   updatedAt: string | null;
 }
 
-const statusMap: Record<string, { label: string; color: string }> = {
-  draft: { label: "草稿", color: "bg-zinc-500/20 text-zinc-400" },
-  scripting: { label: "脚本中", color: "bg-blue-500/20 text-blue-400" },
-  assets: { label: "素材中", color: "bg-purple-500/20 text-purple-400" },
-  video: { label: "生成中", color: "bg-amber-500/20 text-amber-400" },
-  composing: { label: "合成中", color: "bg-cyan-500/20 text-cyan-400" },
-  done: { label: "已完成", color: "bg-emerald-500/20 text-emerald-400" },
+// 状态 → 颜色 + common 命名空间的词条 key（标签按语言取）
+const statusMeta: Record<string, { key: string; color: string }> = {
+  draft: { key: "statusDraft", color: "bg-zinc-500/20 text-zinc-400" },
+  scripting: { key: "statusScripting", color: "bg-blue-500/20 text-blue-400" },
+  assets: { key: "statusAssets", color: "bg-purple-500/20 text-purple-400" },
+  video: { key: "statusVideo", color: "bg-amber-500/20 text-amber-400" },
+  composing: { key: "statusComposing", color: "bg-cyan-500/20 text-cyan-400" },
+  done: { key: "statusDone", color: "bg-emerald-500/20 text-emerald-400" },
 };
 
 export default function HomePage() {
+  const t = useT("home");
+  const tc = useT("common");
   // 拉取真实项目列表（修复 issue #3：旧版写死 mock，用户创建后回首页永远找不到自己的项目）
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -67,19 +72,20 @@ export default function HomePage() {
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
             </div>
-            <span className="text-lg font-bold tracking-tight">带货剪手</span>
+            <span className="text-lg font-bold tracking-tight">ClipForge</span>
           </div>
           <div className="flex items-center gap-1">
+            <LanguageToggle />
             <Link href="/products">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                 <LuPackage className="w-4 h-4" />
-                <span className="ml-1.5">商品库</span>
+                <span className="ml-1.5">{tc("products")}</span>
               </Button>
             </Link>
             <Link href="/settings">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                 <LuSettings className="w-4 h-4" />
-                <span className="ml-1.5">设置</span>
+                <span className="ml-1.5">{tc("settings")}</span>
               </Button>
             </Link>
           </div>
@@ -90,10 +96,10 @@ export default function HomePage() {
         {/* Hero */}
         <div className="mb-12">
           <h1 className="text-3xl font-bold tracking-tight mb-2">
-            <span className="brand-gradient-text">AI 驱动</span>的短视频创作
+            <span className="brand-gradient-text">{t("heroTitleAccent")}</span>{t("heroTitleRest")}
           </h1>
           <p className="text-muted-foreground text-base">
-            带货上传商品图、或一句话主题成片，AI 写脚本、自动配画面，一键产出竖屏短视频
+            {t("heroSubtitle")}
           </p>
         </div>
 
@@ -105,10 +111,10 @@ export default function HomePage() {
                 <LuTriangleAlert className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-amber-900 text-sm">首次使用？先配置 AI 服务</h3>
+                <h3 className="font-semibold text-amber-900 text-sm">{t("setupBannerTitle")}</h3>
                 <p className="text-xs text-amber-700 mt-1">
-                  需要配置 LLM（用于生成脚本）和至少一个 AI 平台（用于生成图片/视频）才能开始使用。
-                  <span className="underline ml-1">点击前往设置 →</span>
+                  {t("setupBannerDesc")}
+                  <span className="underline ml-1">{t("setupBannerCta")}</span>
                 </p>
               </div>
             </div>
@@ -126,16 +132,16 @@ export default function HomePage() {
                     <LuSparkles className="w-[22px] h-[22px] text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">一句话主题成片</h3>
+                    <h3 className="text-lg font-semibold mb-1">{t("cardTopicTitle")}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      无需商品，输入一句话主题 → AI 写旁白脚本 → 从免费素材库自动配齐画面 → 一键合成竖屏短视频
+                      {t("cardTopicDesc")}
                     </p>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Badge variant="secondary" className="text-xs">零门槛</Badge>
-                  <Badge variant="secondary" className="text-xs">免费素材</Badge>
-                  <Badge variant="secondary" className="text-xs">任意主题</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardTopicTag1")}</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardTopicTag2")}</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardTopicTag3")}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -150,16 +156,16 @@ export default function HomePage() {
                     <LuPlus className="w-[22px] h-[22px] text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">新建带货视频</h3>
+                    <h3 className="text-lg font-semibold mb-1">{t("cardNewTitle")}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      上传 1-5 张商品图 → AI 自动分析卖点 → 生成 3 套专业脚本 → 逐镜头生成素材 → 合成完整视频
+                      {t("cardNewDesc")}
                     </p>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Badge variant="secondary" className="text-xs">AI 脚本</Badge>
-                  <Badge variant="secondary" className="text-xs">分镜生图</Badge>
-                  <Badge variant="secondary" className="text-xs">AI 生视频</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardNewTag1")}</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardNewTag2")}</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardNewTag3")}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -174,16 +180,16 @@ export default function HomePage() {
                     <LuPackage className="w-[22px] h-[22px] text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">商品库</h3>
+                    <h3 className="text-lg font-semibold mb-1">{t("cardProductsTitle")}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      录入商品信息（名称/图片/卖点），同一商品可反复生成不同风格的视频，大促前批量出片必备
+                      {t("cardProductsDesc")}
                     </p>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Badge variant="secondary" className="text-xs">录入一次</Badge>
-                  <Badge variant="secondary" className="text-xs">反复使用</Badge>
-                  <Badge variant="secondary" className="text-xs">批量出片</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardProductsTag1")}</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardProductsTag2")}</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardProductsTag3")}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -198,16 +204,16 @@ export default function HomePage() {
                     <LuZap className="w-[22px] h-[22px] text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">爆款复刻</h3>
+                    <h3 className="text-lg font-semibold mb-1">{t("cardCloneTitle")}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      粘贴抖音/快手/小红书爆款视频链接 → AI 自动拆解脚本逻辑和分镜结构 → 用你的商品替换重新生成同款视频
+                      {t("cardCloneDesc")}
                     </p>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Badge variant="secondary" className="text-xs">智能提取</Badge>
-                  <Badge variant="secondary" className="text-xs">脚本复刻</Badge>
-                  <Badge variant="secondary" className="text-xs">一键换品</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardCloneTag1")}</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardCloneTag2")}</Badge>
+                  <Badge variant="secondary" className="text-xs">{t("cardCloneTag3")}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -216,29 +222,29 @@ export default function HomePage() {
 
         {/* 快速了解：使用流程步骤条 */}
         <div className="mb-10 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">1</span>上传商品图</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">1</span>{t("flowStep1")}</span>
           <span className="text-border">→</span>
-          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">2</span>AI 生成脚本</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">2</span>{t("flowStep2")}</span>
           <span className="text-border">→</span>
-          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">3</span>生成素材</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">3</span>{t("flowStep3")}</span>
           <span className="text-border">→</span>
-          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">4</span>合成视频</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">4</span>{t("flowStep4")}</span>
           <span className="text-border">→</span>
-          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">5</span>导出发布</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">5</span>{t("flowStep5")}</span>
         </div>
 
         {/* 项目列表 */}
         <div>
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-semibold">我的项目</h2>
-            <span className="text-sm text-muted-foreground">{projects.length} 个项目</span>
+            <h2 className="text-lg font-semibold">{t("myProjects")}</h2>
+            <span className="text-sm text-muted-foreground">{t("projectCount", { n: projects.length })}</span>
           </div>
 
           {loadingProjects ? (
             <Card className="glass-card">
               <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                 <LuLoaderCircle className="w-7 h-7 text-muted-foreground animate-spin mb-3" />
-                <p className="text-muted-foreground text-sm">正在加载项目...</p>
+                <p className="text-muted-foreground text-sm">{t("loadingProjects")}</p>
               </CardContent>
             </Card>
           ) : projects.length === 0 ? (
@@ -247,18 +253,18 @@ export default function HomePage() {
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
                   <LuVideo className="w-7 h-7 text-muted-foreground" />
                 </div>
-                <p className="text-muted-foreground mb-4">还没有项目，开始创建你的第一个带货视频吧</p>
+                <p className="text-muted-foreground mb-4">{t("emptyProjects")}</p>
                 <Link href="/project/new">
-                  <Button className="brand-gradient text-white">创建项目</Button>
+                  <Button className="brand-gradient text-white">{t("createProject")}</Button>
                 </Link>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {projects.map((project) => {
-                const status = statusMap[project.status] ?? statusMap.draft;
+                const status = statusMeta[project.status] ?? statusMeta.draft;
                 const dateStr = project.updatedAt
-                  ? new Date(project.updatedAt).toLocaleDateString("zh-CN")
+                  ? new Date(project.updatedAt).toLocaleDateString()
                   : "";
                 return (
                   <Link key={project.id} href={`/project/${project.id}/script`}>
@@ -270,7 +276,7 @@ export default function HomePage() {
                           </div>
                           <div className="absolute top-2 right-2">
                             <Badge className={`${status.color} border-0 text-xs`}>
-                              {status.label}
+                              {tc(status.key)}
                             </Badge>
                           </div>
                         </div>
@@ -279,7 +285,7 @@ export default function HomePage() {
                             {project.name}
                           </h3>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {project.productName || "未命名商品"}{dateStr ? ` · ${dateStr}` : ""}
+                            {project.productName || t("unnamedProduct")}{dateStr ? ` · ${dateStr}` : ""}
                           </p>
                         </div>
                       </CardContent>
@@ -295,10 +301,10 @@ export default function HomePage() {
         <div className="mt-10">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">示例作品</h2>
-              <Badge variant="secondary" className="text-[10px]">示例</Badge>
+              <h2 className="text-lg font-semibold">{t("examplesTitle")}</h2>
+              <Badge variant="secondary" className="text-[10px]">{t("exampleBadge")}</Badge>
             </div>
-            <span className="text-sm text-muted-foreground">看看能做出什么</span>
+            <span className="text-sm text-muted-foreground">{t("examplesHint")}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Link href="/examples/showcase">
@@ -308,7 +314,7 @@ export default function HomePage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={exampleShowcase.cover} alt={exampleShowcase.title} className="h-full w-full object-cover" />
                     <div className="absolute top-2 left-2">
-                      <Badge className="bg-black/60 text-white border-0 text-xs">示例</Badge>
+                      <Badge className="bg-black/60 text-white border-0 text-xs">{t("exampleBadge")}</Badge>
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/30">
@@ -321,7 +327,7 @@ export default function HomePage() {
                       {exampleShowcase.title}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {exampleShowcase.styleLabel} · {exampleShowcase.shots.length} 个镜头 · {exampleShowcase.totalDuration}s
+                      {t("showcaseSubtitle", { style: exampleShowcase.styleLabel, shots: exampleShowcase.shots.length, duration: exampleShowcase.totalDuration })}
                     </p>
                   </div>
                 </CardContent>

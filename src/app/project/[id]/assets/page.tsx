@@ -401,7 +401,7 @@ export default function AssetsPage() {
                   <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                 </svg>
               </div>
-              <span className="text-lg font-bold tracking-tight">带货剪手</span>
+              <span className="text-lg font-bold tracking-tight">ClipForge</span>
             </Link>
             <span className="text-muted-foreground">/</span>
             <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>

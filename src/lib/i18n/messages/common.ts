@@ -1,0 +1,48 @@
+import type { NamespaceMessages } from "../config";
+
+// common 命名空间：跨页面共享的导航/按钮/状态文案
+export const common: NamespaceMessages = {
+  zh: {
+    back: "返回",
+    settings: "设置",
+    products: "商品库",
+    cancel: "取消",
+    confirm: "确定",
+    delete: "删除",
+    upload: "上传",
+    download: "下载",
+    save: "保存",
+    edit: "编辑",
+    retry: "重试",
+    loading: "加载中...",
+    generating: "生成中...",
+    // 项目状态
+    statusDraft: "草稿",
+    statusScripting: "脚本中",
+    statusAssets: "素材中",
+    statusVideo: "生成中",
+    statusComposing: "合成中",
+    statusDone: "已完成",
+  },
+  en: {
+    back: "Back",
+    settings: "Settings",
+    products: "Products",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    delete: "Delete",
+    upload: "Upload",
+    download: "Download",
+    save: "Save",
+    edit: "Edit",
+    retry: "Retry",
+    loading: "Loading...",
+    generating: "Generating...",
+    statusDraft: "Draft",
+    statusScripting: "Scripting",
+    statusAssets: "Assets",
+    statusVideo: "Rendering",
+    statusComposing: "Composing",
+    statusDone: "Done",
+  },
+};

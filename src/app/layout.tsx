@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "带货剪手 - 电商带货短视频 AI 生成",
-  description: "上传商品图，AI 生成脚本，一键生成带货短视频",
+  title: "ClipForge — AI Short Video Creator",
+  description:
+    "Turn a product or a single sentence into a vertical short video — AI writes the script, auto-fills free stock footage, adds voiceover, and renders in one click.",
 };
 
 export default function RootLayout({

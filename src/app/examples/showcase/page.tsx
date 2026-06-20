@@ -51,7 +51,7 @@ export default function ShowcasePage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight mb-2">{sc.title}</h1>
           <p className="text-sm text-muted-foreground">
-            这是一个用「带货剪手」完整生成的示例：{sc.styleLabel} · {sc.shots.length} 个镜头 · {sc.totalDuration}s · {sc.resolution} {sc.aspectRatio}。
+            这是一个用「ClipForge」完整生成的示例：{sc.styleLabel} · {sc.shots.length} 个镜头 · {sc.totalDuration}s · {sc.resolution} {sc.aspectRatio}。
             下方是成片预览和分镜脚本，你可以照着做一个自己的。
           </p>
         </div>
