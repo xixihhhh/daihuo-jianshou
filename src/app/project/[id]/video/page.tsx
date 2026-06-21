@@ -91,11 +91,23 @@ interface DbShot {
   transition: VideoClipItem["transition"];
 }
 
+// 分镜素材（仅取缩略图所需字段）
+interface DbAsset {
+  shotId: number;
+  filePath: string | null;
+  status: string;
+}
+
+// 判断素材是图还是视频（视频用 <video> 当封面，图用 <img>）
+const isVideoPath = (p: string) => /\.(mp4|webm|mov|m4v)(\?|$)/i.test(p);
+
 export default function VideoPage() {
   const t = useT("video");
   const { id } = useParams<{ id: string }>();
   const { defaultResolution, defaultAspectRatio, tts, providers } = useSettingsStore();
   const [clips, setClips] = useState<VideoClipItem[]>([]);
+  // 分镜缩略图：shotId → 素材文件路径（在时间线里直接预览每段画面）
+  const [thumbs, setThumbs] = useState<Record<number, string>>({});
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -170,14 +182,24 @@ export default function VideoPage() {
       setLoading(true);
       setLoadError(null);
       try {
-        const [projectRes, scriptsRes] = await Promise.all([
+        const [projectRes, scriptsRes, assetsRes] = await Promise.all([
           fetch(`/api/project/${id}`),
           fetch(`/api/project/${id}/scripts`),
+          fetch(`/api/project/${id}/assets`),
         ]);
         const project = projectRes.ok ? await projectRes.json() : null;
         const scripts = scriptsRes.ok ? await scriptsRes.json() : [];
+        const assets = assetsRes.ok ? await assetsRes.json() : [];
         if (cancelled) return;
         if (project) setProjectName(project.name ?? project.productName ?? "");
+        // 收集每个分镜已生成的画面，作时间线缩略图（已完成且有文件的才算）
+        const thumbMap: Record<number, string> = {};
+        for (const a of (Array.isArray(assets) ? assets : []) as DbAsset[]) {
+          if (a && typeof a.shotId === "number" && a.filePath && a.status === "done" && thumbMap[a.shotId] == null) {
+            thumbMap[a.shotId] = a.filePath;
+          }
+        }
+        setThumbs(thumbMap);
         const selected = Array.isArray(scripts)
           ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
           : null;
@@ -360,11 +382,28 @@ export default function VideoPage() {
                     <Card className="glass-card">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-4">
-                          {/* 缩略图 */}
-                          <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 flex items-center justify-center border border-border/30">
-                            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 rounded-md flex items-center justify-center">
+                          {/* 缩略图：有已生成的画面就直接预览，否则回退占位图 */}
+                          <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 overflow-hidden border border-border/30 relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                               <LuPlay className="w-4 h-4 text-primary/60" />
                             </div>
+                            {thumbs[clip.shotId] &&
+                              (isVideoPath(thumbs[clip.shotId]) ? (
+                                <video
+                                  src={thumbs[clip.shotId]}
+                                  muted
+                                  playsInline
+                                  preload="metadata"
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                />
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={thumbs[clip.shotId]}
+                                  alt=""
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                />
+                              ))}
                           </div>
 
                           {/* 信息 */}
