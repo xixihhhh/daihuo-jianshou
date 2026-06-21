@@ -473,9 +473,16 @@ export default function ScriptPage() {
                                     </span>
                                   </div>
                                 </div>
-                                {/* 画面预览区 */}
-                                <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 flex items-center justify-center border border-border/30">
-                                  {shot.visualSource === "product_image" ? (
+                                {/* 画面预览区：商品原图分镜直接显示已上传的商品图，让小白第一眼就看到画面；AI 分镜此阶段尚未出图 */}
+                                <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 overflow-hidden flex items-center justify-center border border-border/30 relative">
+                                  {shot.visualSource === "product_image" && projectMeta?.productImages?.[0] ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={projectMeta.productImages[0]}
+                                      alt=""
+                                      className="absolute inset-0 w-full h-full object-cover"
+                                    />
+                                  ) : shot.visualSource === "product_image" ? (
                                     <span className="text-[10px] text-muted-foreground">{t("productImageShort")}</span>
                                   ) : (
                                     <LuImage className="w-4 h-4 text-muted-foreground/40" />
