@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
-import { ffprobeBin } from "@/lib/ffmpeg-path";
+import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
 import { join } from "path";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
@@ -11,6 +11,7 @@ import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { composeVideo, FADE_DURATION, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
+import { isAudibleFromVolumedetect } from "@/lib/video-composer/audio-probe";
 import type { Shot } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 
@@ -120,16 +121,22 @@ export async function POST(
     const ttsDir = join(getDataDir(), "uploads", id, "tts");
     if (ttsConfig || useFreeTts) await mkdir(ttsDir, { recursive: true });
 
-    /** 探测视频文件是否带音轨（自带语音/音效的视频模型产出） */
+    /** 探测视频文件是否带「可听见」的音轨（自带语音/音效）；仅静音/空轨不算，让免费 TTS 旁白照常生效 */
     async function videoHasAudio(filePath: string): Promise<boolean> {
       try {
         const { exec } = await import("child_process");
         const { promisify } = await import("util");
         const execAsync = promisify(exec);
+        // 1) 先看有没有音频流
         const { stdout } = await execAsync(
           `"${ffprobeBin()}" -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "${filePath}"`
         );
-        return stdout.trim().length > 0;
+        if (stdout.trim().length === 0) return false;
+        // 2) 有流再用 volumedetect 看是否真有声音（静音轨按无音频处理，避免吞掉 TTS 旁白）
+        const { stderr } = await execAsync(
+          `"${ffmpegBin()}" -i "${filePath}" -af volumedetect -f null -`
+        );
+        return isAudibleFromVolumedetect(stderr);
       } catch {
         return false;
       }
