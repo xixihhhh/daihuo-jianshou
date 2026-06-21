@@ -32,7 +32,8 @@ export const batch: NamespaceMessages = {
     taskDone: "已完成",
     taskFailed: "失败",
     // 错误/接口提示
-    errorNoLlm: "尚未配置 LLM，请先到「设置」填写 API Key",
+    errorNoLlm: "尚未配置 LLM，无法生成脚本",
+    errorNoLlmCta: "前往设置填 Key →",
     errorProjectCreate: "项目创建失败",
     errorScriptFailed: "脚本生成失败",
     errorGenerateFailed: "生成失败",
@@ -90,7 +91,8 @@ export const batch: NamespaceMessages = {
     taskDone: "Done",
     taskFailed: "Failed",
     // 错误/接口提示
-    errorNoLlm: "No LLM configured. Add your API key in Settings first.",
+    errorNoLlm: "No LLM configured — can't generate scripts.",
+    errorNoLlmCta: "Add your API key in Settings →",
     errorProjectCreate: "Failed to create project",
     errorScriptFailed: "Script generation failed",
     errorGenerateFailed: "Generation failed",

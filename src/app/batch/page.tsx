@@ -544,7 +544,12 @@ export default function BatchPage() {
           {/* 底部操作栏 */}
           <div className="pt-2 pb-10">
             {configError && (
-              <p className="text-sm text-destructive text-center mb-3">{configError}</p>
+              <p className="text-sm text-destructive text-center mb-3">
+                {configError}
+                <Link href="/settings" className="underline underline-offset-2 ml-1.5 hover:text-foreground">
+                  {t("errorNoLlmCta")}
+                </Link>
+              </p>
             )}
             <Button
               onClick={handleStartBatch}
