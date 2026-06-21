@@ -27,6 +27,17 @@ export const start: NamespaceMessages = {
     // 未配 Key 提示
     keyboxText: "还没配 Key？脚本/画面需要先接一个 AI 平台。推荐 Atlas Cloud——一个 Key 搞定脚本+图+视频+配音。",
     keyboxCta: "去配置",
+    // Atlas 一键接入（落地页内联，免跳设置）
+    atlasBadge: "一个 Key",
+    atlasTitle: "接入 Atlas Cloud，立即开跑",
+    atlasDesc: "脚本 + 图 + 视频 + 配音都用它，模型已自动选好。",
+    atlasGetKey: "没有 Key？1 分钟免费获取",
+    atlasKeyPlaceholder: "粘贴 Atlas Cloud API Key",
+    atlasConnectStart: "连接并开始",
+    atlasConnecting: "连接中…",
+    atlasUseOther: "想用别的平台（OpenAI / DeepSeek…）？前往完整设置",
+    atlasKeyInvalid: "Key 无效或无权限，请检查后重试",
+    atlasConnectFailed: "连接失败，请检查网络后重试",
     // 主按钮 + 安心文案
     ctaStart: "开始生成",
     busyDefault: "生成中…",
@@ -77,6 +88,17 @@ export const start: NamespaceMessages = {
     // 未配 Key 提示
     keyboxText: "No key yet? Scripts and visuals need an AI platform first. We recommend Atlas Cloud — one key covers script + image + video + voiceover.",
     keyboxCta: "Configure",
+    // Atlas 一键接入（落地页内联，免跳设置）
+    atlasBadge: "One key",
+    atlasTitle: "Connect Atlas Cloud and start now",
+    atlasDesc: "It powers script + image + video + voiceover — models are auto-picked.",
+    atlasGetKey: "No key? Get one free in a minute",
+    atlasKeyPlaceholder: "Paste your Atlas Cloud API key",
+    atlasConnectStart: "Connect & start",
+    atlasConnecting: "Connecting…",
+    atlasUseOther: "Prefer another platform (OpenAI / DeepSeek…)? Open full settings",
+    atlasKeyInvalid: "Key invalid or unauthorized — check and retry",
+    atlasConnectFailed: "Connection failed — check your network and retry",
     // 主按钮 + 安心文案
     ctaStart: "Start generating",
     busyDefault: "Generating…",

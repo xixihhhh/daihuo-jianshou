@@ -34,6 +34,7 @@ export default function StartPage() {
   const locale = useLocale();
   const setLocale = useSetLocale();
   const { llm } = useSettingsStore();
+  const applyAtlasOneKey = useSettingsStore((s) => s.applyAtlasOneKey);
   const llmReady = llm.apiKey.trim().length > 0;
   // 示例商品跟随界面语言
   const examples = getExampleProducts(locale);
@@ -50,6 +51,9 @@ export default function StartPage() {
   const [stage, setStage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [needKey, setNeedKey] = useState(false);
+  const [atlasKey, setAtlasKey] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentProject[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -113,7 +117,11 @@ export default function StartPage() {
   const canStart =
     mode === "topic" ? topic.trim().length >= 2 : images.length >= 1 && productName.trim().length > 0;
 
-  const llmConfig = () => ({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.model, visionModel: llm.visionModel });
+  // 实时从 store 取 LLM 配置：一键接入后同一轮即可读到新写入的 Key，避免闭包拿到旧值
+  const llmConfig = () => {
+    const l = useSettingsStore.getState().llm;
+    return { baseUrl: l.baseUrl, apiKey: l.apiKey, model: l.model, visionModel: l.visionModel };
+  };
 
   const startTopic = async () => {
     const res = await fetch("/api/topic/script", {
@@ -169,12 +177,8 @@ export default function StartPage() {
     router.push(`/project/${project.id}/script`);
   };
 
-  const onStart = async () => {
-    if (!canStart || busy) return;
-    if (!llmReady) {
-      setNeedKey(true);
-      return;
-    }
+  // 真正跑生成（脚本/上传两种模式共用），失败回收 busy/stage
+  const runGeneration = async () => {
     setBusy(true);
     setError(null);
     try {
@@ -184,6 +188,45 @@ export default function StartPage() {
       setError(e instanceof Error ? e.message : t("errGeneric"));
       setBusy(false);
       setStage("");
+    }
+  };
+
+  const onStart = () => {
+    if (!canStart || busy) return;
+    // 没配 LLM：就地展开 Atlas 一键接入面板（不跳走、不丢已填内容）
+    if (!llmReady) {
+      setNeedKey(true);
+      return;
+    }
+    runGeneration();
+  };
+
+  // 粘贴一个 Atlas Key → 校验 → 写好全套配置 → 立刻接着生成
+  const connectAtlasAndStart = async () => {
+    const key = atlasKey.trim();
+    if (!key || connecting || busy) return;
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      const res = await fetch("/api/ai/test-provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "atlas-cloud", apiKey: key }),
+      });
+      const data = await res.json().catch(() => ({ status: "unknown" }));
+      // 只在「明确无效」时拦截；unknown（网络/端点不确定）放行，直接试生成
+      if (data.status === "invalid") {
+        setConnectError(t("atlasKeyInvalid"));
+        setConnecting(false);
+        return;
+      }
+      applyAtlasOneKey(key);
+      setConnecting(false);
+      setNeedKey(false);
+      await runGeneration();
+    } catch {
+      setConnectError(t("atlasConnectFailed"));
+      setConnecting(false);
     }
   };
 
@@ -232,6 +275,22 @@ export default function StartPage() {
         .cf-reassure b{color:var(--dim);font-weight:600}
         .cf-keybox{margin-top:12px;border:1px solid rgba(94,234,212,.3);background:rgba(94,234,212,.07);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--dim);display:flex;align-items:center;justify-content:space-between;gap:12px}
         .cf-keybox a{color:var(--ink);background:var(--teal);padding:7px 13px;border-radius:9px;font-weight:600;text-decoration:none;white-space:nowrap}
+        .cf-keyform{margin-top:12px;border:1px solid rgba(94,234,212,.32);background:rgba(94,234,212,.06);border-radius:14px;padding:14px}
+        .cf-keyhead{font-size:14.5px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:9px;margin-bottom:5px}
+        .cf-keyhead .badge{font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink);background:var(--teal);border-radius:6px;padding:2px 8px}
+        .cf-keydesc{font-size:12.5px;color:var(--dim);line-height:1.55;margin-bottom:11px}
+        .cf-keydesc a{color:var(--teal);text-decoration:none;white-space:nowrap}
+        .cf-keydesc a:hover{text-decoration:underline;text-underline-offset:2px}
+        .cf-keyrow{display:flex;gap:8px}
+        .cf-keyinput{flex:1;min-width:0;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:10px;color:var(--text);font:inherit;font-size:14px;padding:11px 13px;outline:none;transition:.18s}
+        .cf-keyinput:focus{border-color:rgba(94,234,212,.5)}
+        .cf-keybtn{padding:0 18px;border:0;border-radius:10px;background:var(--teal);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:.18s}
+        .cf-keybtn:hover:not(:disabled){transform:translateY(-1px)}
+        .cf-keybtn:disabled{opacity:.5;cursor:not-allowed}
+        .cf-keyalt{margin-top:10px;font-size:12px}
+        .cf-keyalt a{color:var(--muted);text-decoration:none;border-bottom:1px dashed var(--bd2);padding-bottom:1px}
+        .cf-keyalt a:hover{color:var(--dim)}
+        .cf-keyerr{margin-top:9px;color:#FCA5A5;font-size:12.5px}
         .cf-err{margin-top:12px;color:#FCA5A5;font-size:13px}
         .cf-examples{margin-top:24px;font-size:13px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
         .cf-chip{padding:6px 12px;border:1px solid var(--bd);border-radius:999px;background:var(--surface);color:var(--dim);cursor:pointer;transition:.18s}
@@ -328,9 +387,34 @@ export default function StartPage() {
             )}
 
             {needKey && !llmReady ? (
-              <div className="cf-keybox">
-                <span>{t("keyboxText")}</span>
-                <Link href="/settings">{t("keyboxCta")}</Link>
+              <div className="cf-keyform">
+                <div className="cf-keyhead">
+                  <span className="badge">{t("atlasBadge")}</span>
+                  {t("atlasTitle")}
+                </div>
+                <div className="cf-keydesc">
+                  {t("atlasDesc")}{" "}
+                  <a href="https://www.atlascloud.ai" target="_blank" rel="noreferrer">{t("atlasGetKey")} ↗</a>
+                </div>
+                <div className="cf-keyrow">
+                  <input
+                    className="cf-keyinput"
+                    type="password"
+                    value={atlasKey}
+                    autoFocus
+                    onChange={(e) => setAtlasKey(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") connectAtlasAndStart(); }}
+                    placeholder={t("atlasKeyPlaceholder")}
+                  />
+                  <button className="cf-keybtn" onClick={connectAtlasAndStart} disabled={atlasKey.trim().length === 0 || connecting || busy}>
+                    {connecting ? t("atlasConnecting") : busy ? (stage || t("busyDefault")) : t("atlasConnectStart")}
+                    {!connecting && !busy && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
+                  </button>
+                </div>
+                {connectError && <div className="cf-keyerr">{connectError}</div>}
+                <div className="cf-keyalt">
+                  <Link href="/settings">{t("atlasUseOther")}</Link>
+                </div>
               </div>
             ) : (
               <div className="cf-cta-row">

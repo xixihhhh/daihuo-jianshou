@@ -9,6 +9,7 @@ import {
   type ImageGenParams,
   type VideoGenParams,
 } from "@/lib/gen-params";
+import { ATLAS_BASE_URL, ATLAS_ONEKEY_MODELS, fillAtlasModelDefaults } from "@/lib/atlas-onekey";
 
 // AI Provider 配置
 export interface ProviderSetting {
@@ -81,6 +82,8 @@ interface SettingsState {
   removeCustomModel: (id: string) => void;
   setImageParams: (params: ImageGenParams) => void;
   setVideoParams: (params: VideoGenParams) => void;
+  /** 一个 Atlas Key 一键接入：脚本+看图+生图+生视频+配音全配好（不覆盖用户已选模型/已开的配音） */
+  applyAtlasOneKey: (apiKey: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -140,6 +143,34 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({ customModels: state.customModels.filter((m) => m.id !== id) })),
       setImageParams: (params) => set({ imageParams: params }),
       setVideoParams: (params) => set({ videoParams: params }),
+      // 一个 Atlas Key 一键接入全套：LLM 脚本 + Vision 看图 + 生图 + 生视频 + Atlas 配音
+      applyAtlasOneKey: (apiKey) =>
+        set((state) => {
+          const key = apiKey.trim();
+          const def = fillAtlasModelDefaults({
+            image: state.defaultImageModel,
+            video: state.defaultVideoModel,
+          });
+          return {
+            llm: {
+              provider: "Atlas Cloud",
+              baseUrl: ATLAS_BASE_URL,
+              apiKey: key,
+              model: ATLAS_ONEKEY_MODELS.llm,
+              visionModel: ATLAS_ONEKEY_MODELS.vision,
+            },
+            providers: {
+              ...state.providers,
+              "atlas-cloud": { ...state.providers["atlas-cloud"], enabled: true, apiKey: key },
+            },
+            defaultImageModel: def.image,
+            defaultVideoModel: def.video,
+            // 配音：之前没开过才默认接 Atlas TTS（复用同一个 Key），已配则保持不动
+            tts: state.tts.enabled
+              ? state.tts
+              : { ...state.tts, enabled: true, provider: "atlas", baseUrl: ATLAS_BASE_URL, model: "", voice: "" },
+          };
+        }),
     }),
     {
       name: "daihuo-jianshou-settings",
