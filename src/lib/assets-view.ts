@@ -80,17 +80,23 @@ export function pendingShotCount(rows: AssetItem[]): number {
   return rows.filter((r) => r.status === "pending").length;
 }
 
+/** 仍待配画面、且不是商品原图（商品原图分镜不该用免费素材覆盖）的分镜数 */
+export function pendingNonProductShotCount(rows: AssetItem[]): number {
+  return rows.filter((r) => r.status === "pending" && r.visualSource !== "product_image").length;
+}
+
 /**
- * 是否应展示「自动配画面（免费素材）」入口：
- * topic（无商品一句话成片）项目，或没有商品图、却仍有待配画面分镜的项目——
- * 这些场景靠免费素材库（keyless Openverse 图片）配画面，无需 AI 生图 Key。
+ * 是否应展示「自动配画面（免费素材）」入口（免费素材库 = keyless Openverse 图片，零生图 Key）：
+ * - topic（无商品一句话成片）项目：始终提供，这是其首选出片路径；
+ * - 其它项目（含带货）：当**未配置生图模型**、却仍有待配画面的非商品分镜时提供——
+ *   让没有 AI Key 的用户也能给钩子/背书等 B-roll 分镜配好画面（商品原图分镜不受影响）。
  */
 export function shouldOfferStockFill(
   rows: AssetItem[],
   contentType: string | undefined,
-  productImageCount: number,
+  hasImageModel: boolean,
 ): boolean {
   if (rows.length === 0) return false;
-  const isTopic = contentType === "topic";
-  return isTopic || (productImageCount === 0 && pendingShotCount(rows) > 0);
+  if (contentType === "topic") return true;
+  return !hasImageModel && pendingNonProductShotCount(rows) > 0;
 }

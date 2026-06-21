@@ -73,7 +73,8 @@ export default function AssetsPage() {
 
   const doneCount = assets.filter((a) => a.status === "done").length;
   const allDone = assets.length > 0 && doneCount === assets.length;
-  const offerStockFill = !loading && shouldOfferStockFill(assets, contentType, productImages.length);
+  // 未配置生图模型时（modelTarget 为空）给无 Key 用户提供免费素材配画面入口
+  const offerStockFill = !loading && shouldOfferStockFill(assets, contentType, modelTarget !== null);
 
   // 载入真实数据：项目信息 + 已选脚本分镜 + 解析默认生图模型所属平台
   useEffect(() => {

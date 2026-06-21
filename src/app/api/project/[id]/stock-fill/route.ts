@@ -66,6 +66,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       results.push({ shotId: sid, ok: false, query: "", reason: "已有素材，跳过" });
       continue;
     }
+    // 商品原图分镜不配免费素材：合成时用商品原图（商品保真），免费素材会盖掉商品
+    if (shot.visualSource === "product_image") {
+      results.push({ shotId: sid, ok: false, query: "", reason: "商品原图分镜，跳过" });
+      continue;
+    }
     const query = shotQuery(shot);
     if (!query) {
       results.push({ shotId: sid, ok: false, query: "", reason: "无检索词" });
