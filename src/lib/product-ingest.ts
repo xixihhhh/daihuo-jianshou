@@ -18,16 +18,22 @@ const CURRENCY_SYMBOL: Record<string, string> = {
   USD: "$", CNY: "¥", RMB: "¥", EUR: "€", GBP: "£", JPY: "¥", HKD: "HK$", TWD: "NT$", KRW: "₩", AUD: "A$", CAD: "C$",
 };
 
-/** 解码常见 HTML 实体（meta content 里常见 &amp; &#39; 等） */
+const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
+/**
+ * 解码常见 HTML 实体（meta content 里常见 &amp; &#39; 等）。
+ * 单趟扫描、每个实体只解一次：链式 replace 会把先还原出的 `&` 再当下一条规则的实体二次解码
+ * （如 `&amp;#39;` 本应保留为字面 `&#39;`，链式会错解成 `'`），单趟回调可杜绝。
+ */
 export function decodeEntities(s: string): string {
   return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/g, (m, e: string) => {
+      if (e[0] === "#") {
+        const code = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+        return Number.isFinite(code) ? String.fromCharCode(code) : m;
+      }
+      return NAMED_ENTITIES[e] ?? m;
+    })
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -36,14 +42,18 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** 取某个 meta（property 或 name）的 content，兼容属性顺序两种写法 */
+/**
+ * 取某个 meta（property 或 name）的 content，兼容属性顺序两种写法。
+ * content 用「开引号反向引用」匹配收尾（(["'])((?:(?!\1).)*)\1），而非 [^"']*——
+ * 否则 content="Tom's Mug" 这类内部含另一种引号的会在撇号处被腰斩。content 落在捕获组 2。
+ */
 export function getMeta(html: string, keys: string[]): string | undefined {
   for (const key of keys) {
     const k = escapeRe(key);
     const m =
-      html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${k}["'][^>]*content=["']([^"']*)["']`, "i")) ||
-      html.match(new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${k}["']`, "i"));
-    if (m && m[1].trim()) return decodeEntities(m[1]);
+      html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${k}["'][^>]*content=(["'])((?:(?!\\1).)*)\\1`, "i")) ||
+      html.match(new RegExp(`<meta[^>]+content=(["'])((?:(?!\\1).)*)\\1[^>]*(?:property|name)=["']${k}["']`, "i"));
+    if (m && m[2].trim()) return decodeEntities(m[2]);
   }
   return undefined;
 }
@@ -90,13 +100,30 @@ export function extractJsonLdProduct(html: string): any | undefined {
   return undefined;
 }
 
+/**
+ * 价格格式化：拼货币符号前先判 price 是否已自带符号/字母币种（避免 $$19.99），
+ * 并把 0 / 负数 / 非数视为无效（避免产出无意义的「$0」）。jsonLd 与 OG 两路共用。
+ */
+function formatPrice(price: unknown, currency: string | undefined): string | undefined {
+  if (price == null) return undefined;
+  const raw = String(price).trim();
+  if (!raw) return undefined;
+  // 纯数字的 0/负数直接判无效；带符号串（$0 等）再按提取的数值判
+  const asNum = Number(raw);
+  if (Number.isFinite(asNum) && asNum <= 0) return undefined;
+  const numeric = parseFloat(raw.replace(/[^\d.]/g, ""));
+  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+  // 已含货币符号或「USD 」类字母币种前缀 → 原样返回，不再重复加符号
+  if (/[¥$€£₩]/.test(raw) || /^[A-Za-z]{2,3}[\s ]/.test(raw)) return raw;
+  const cur = (currency || "").toUpperCase();
+  const sym = CURRENCY_SYMBOL[cur] ?? (cur ? `${cur} ` : "");
+  return `${sym}${raw}`;
+}
+
 function jsonLdPrice(node: any): string | undefined {
   const offers = Array.isArray(node.offers) ? node.offers[0] : node.offers;
   const price = offers?.price ?? offers?.lowPrice ?? offers?.highPrice;
-  if (price == null || price === "") return undefined;
-  const cur = (offers?.priceCurrency || node.priceCurrency || "").toUpperCase();
-  const sym = CURRENCY_SYMBOL[cur] ?? (cur ? `${cur} ` : "");
-  return `${sym}${price}`;
+  return formatPrice(price, offers?.priceCurrency || node.priceCurrency);
 }
 
 function jsonLdImages(node: any): string[] {
@@ -123,10 +150,8 @@ export function parseProductFromHtml(html: string, baseUrl: string): ProductInge
 
   // 价格
   const ogPrice = getMeta(html, ["product:price:amount", "og:price:amount"]);
-  const ogCur = (getMeta(html, ["product:price:currency", "og:price:currency"]) || "").toUpperCase();
-  const priceText =
-    (ld && jsonLdPrice(ld)) ||
-    (ogPrice ? `${CURRENCY_SYMBOL[ogCur] ?? (ogCur ? `${ogCur} ` : "")}${ogPrice}` : undefined);
+  const ogCur = getMeta(html, ["product:price:currency", "og:price:currency"]);
+  const priceText = (ld && jsonLdPrice(ld)) || formatPrice(ogPrice, ogCur);
 
   // 描述
   const description =

@@ -80,3 +80,46 @@ describe("parseProductFromHtml", () => {
     expect(p.images).toEqual(["https://c.com/x.jpg", "https://c.com/y.jpg"]);
   });
 });
+
+// 解析 bug 群回归（audit 工作流实测复现）：撇号截断 / 二次解码 / 价格双符号·$0
+describe("product-ingest 解析健壮性回归", () => {
+  it("getMeta：双引号 content 内含单引号不被截断", () => {
+    expect(getMeta(`<meta property="og:title" content="Tom's Coffee Mug">`, ["og:title"])).toBe("Tom's Coffee Mug");
+  });
+  it("getMeta：单引号 content 内含双引号不被截断", () => {
+    expect(getMeta(`<meta name="twitter:title" content='Say "Hi" now'>`, ["twitter:title"])).toBe('Say "Hi" now');
+  });
+  it("getMeta：既有简单用例不回归", () => {
+    expect(getMeta(`<meta property="og:title" content="Hi">`, ["og:title"])).toBe("Hi");
+    expect(getMeta(`<meta content="Yo" name="twitter:title">`, ["twitter:title"])).toBe("Yo");
+  });
+  it("decodeEntities：不二次解码已转义实体（&amp;#39; 保留为 &#39;）", () => {
+    expect(decodeEntities("Tom&amp;#39;s")).toBe("Tom&#39;s");
+    expect(decodeEntities("5 &amp;lt; 10")).toBe("5 &lt; 10");
+  });
+  it("decodeEntities：既有混合用例不回归", () => {
+    expect(decodeEntities("A &amp; B&#39;s  caf&#xe9;")).toBe("A & B's café");
+  });
+  it("价格：已自带符号不重复加（$19.99 不变 $$19.99）", () => {
+    const html = `<script type="application/ld+json">${JSON.stringify({ "@type": "Product", name: "X", offers: { price: "$19.99", priceCurrency: "USD" } })}</script>`;
+    expect(parseProductFromHtml(html, "https://s.com").priceText).toBe("$19.99");
+  });
+  it("价格：0 / 负数视为无效（不产出 $0）", () => {
+    const mk = (price: unknown) => `<script type="application/ld+json">${JSON.stringify({ "@type": "Product", name: "X", offers: { price, priceCurrency: "USD" } })}</script>`;
+    expect(parseProductFromHtml(mk(0), "https://s.com").priceText).toBeUndefined();
+    expect(parseProductFromHtml(mk("-5"), "https://s.com").priceText).toBeUndefined();
+  });
+  it("价格：纯数字正常加符号", () => {
+    const html = `<script type="application/ld+json">${JSON.stringify({ "@type": "Product", name: "X", offers: { price: 19.99, priceCurrency: "USD" } })}</script>`;
+    expect(parseProductFromHtml(html, "https://s.com").priceText).toBe("$19.99");
+  });
+  it("解析：含撇号标题 + 自带符号价格端到端正确", () => {
+    const html = `<head>
+      <meta property="og:title" content="L'Oréal Men's Serum">
+      <script type="application/ld+json">${JSON.stringify({ "@type": "Product", name: "", offers: { price: "$29.90", priceCurrency: "USD" } })}</script>
+    </head>`;
+    const p = parseProductFromHtml(html, "https://shop.com/p");
+    expect(p.title).toBe("L'Oréal Men's Serum");
+    expect(p.priceText).toBe("$29.90");
+  });
+});
