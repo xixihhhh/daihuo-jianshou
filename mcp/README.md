@@ -12,6 +12,7 @@ Drive ClipForge's text-to-video pipeline from any MCP client (Claude Desktop / C
 | Tool | 说明 | 需要 LLM Key |
 |------|------|:---:|
 | `clipforge_create_video` | 一句话 → 脚本 → 免费配画面 → 免费配音+字幕 → 合成竖屏成片，返回可下载 mp4 地址 | ✅ |
+| `clipforge_ingest_product` | 贴商品链接 → 抓标题/价/图（JSON-LD>OG>Twitter>标题）→ 一键建带货项目下图，带货「链接优先」入口 | — |
 | `clipforge_generate_script` | 只生成去商品化旁白分镜脚本（含英文素材检索词） | ✅ |
 | `clipforge_search_stock` | 从免费可商用素材库检索画面（keyless Openverse 图片优先） | — |
 | `clipforge_list_projects` | 列出 ClipForge 里的项目 | — |

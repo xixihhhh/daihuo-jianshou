@@ -153,6 +153,22 @@ const TOOLS = [
     },
   },
   {
+    name: "clipforge_ingest_product",
+    description:
+      "贴一个商品页链接，自动抓取标题/价格/商品图（解析优先级 schema.org JSON-LD > OpenGraph > Twitter Card > 标题/meta），可一键建带货项目并下载前几张商品图。带货成片的「链接优先」入口。不需要 LLM；对带标准 OG/JSON-LD 标签的页面（Shopify、独立站、TikTok Shop 等）支持最好，部分平台有反爬可能解析不全。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "商品页链接（http/https）" },
+        createProject: {
+          type: "boolean",
+          description: "是否一键建带货项目并下载前几张商品图，默认 true；false 则仅返回解析出的商品信息不落库",
+        },
+      },
+      required: ["url"],
+    },
+  },
+  {
     name: "clipforge_generate_script",
     description:
       "只生成去商品化的旁白分镜脚本（不配画面/不合成），返回 projectId 与各分镜（含英文素材检索词）。需要 LLM 环境变量。",
@@ -359,8 +375,25 @@ async function handleGetVideo(args) {
   return ok({ ok: true, projectId, status: composition.status, videoUrl: absVideoUrl(composition) });
 }
 
+async function handleIngestProduct(args) {
+  const url = String(args.url || "").trim();
+  if (!/^https?:\/\/.+/i.test(url)) throw new Error("url 必须是合法的 http/https 商品链接");
+  const createProject = args.createProject !== false; // 默认建项目并下图
+  const data = await api("/api/ingest/product", { method: "POST", body: { url, createProject } });
+  return ok({
+    ok: true,
+    projectId: data.projectId ?? null,
+    product: data.product ?? null,
+    productImages: data.productImages ?? [],
+    hint: data.projectId
+      ? "已建带货项目并抓取商品图。下一步：在网页端为该项目生成带货脚本后，用 clipforge_compose 出片（带货脚本需 LLM，暂未走 MCP）。"
+      : "仅解析、未建项目（createProject=false）。",
+  });
+}
+
 const HANDLERS = {
   clipforge_create_video: handleCreateVideo,
+  clipforge_ingest_product: handleIngestProduct,
   clipforge_generate_script: handleGenerateScript,
   clipforge_search_stock: handleSearchStock,
   clipforge_list_projects: handleListProjects,
