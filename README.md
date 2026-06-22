@@ -1,10 +1,10 @@
-<p align="center"><img src="docs/banner.png" alt="ClipForge — 一句话/商品图成片，面向 TikTok、Reels、Shorts 的 AI 短视频工具" width="820"/></p>
+<p align="center"><img src="docs/banner.png" alt="ClipForge — 开源 AI 带货短视频神器，一张商品图自动产出抖音小店/快手/小红书/TikTok Shop 卖货短视频" width="820"/></p>
 
-# ClipForge — 开源免费 AI 短视频生成工具 ｜ 一句话 / 商品图一键成片
+# ClipForge — 开源 AI 带货短视频神器 ｜ 一张商品图，自动出卖货视频
 
-> 输入**一句话**或**一张商品图**，几十秒产出可直接发布的 **抖音 / 快手 / 小红书 / TikTok 竖屏短视频**——AI 写脚本 · 自动配画面 · 免费配音 · 自动字幕。**全程 0 API Key · 无水印 · 本地运行 · 中英双语。**
+> 上传**一张商品图** → AI 自动**提炼卖点 · 写种草脚本 · 锁定商品原图不变形** · 配画面 + 配音 + 字幕 → 几十秒产出能直接发的 **抖音小店 / 快手 / 小红书 / TikTok Shop 卖货短视频**。**0 成本批量出片 · 开源自部署 · 无水印。**
 >
-> <sub>📌 原『**带货剪手** / daihuo-jianshou』升级而来，仓库 · Star · 历史全部延续，旧链接自动跳转。</sub>
+> <sub>📌 原『**带货剪手** / daihuo-jianshou』，仓库 · Star · 历史全部延续；也支持「一句话主题成片」做任意非带货题材。</sub>
 
 <p align="right"><a href="README.en.md">English</a> · <strong>中文</strong></p>
 
@@ -19,29 +19,30 @@
   <img src="https://img.shields.io/badge/AI-多模型聚合-FF6F00?style=flat-square" alt="AI Multi-Model" />
 </p>
 
-## 🔥 凭什么选 ClipForge
+## 🛍️ 不是又一个 AI 视频工具——它**专为带货而生**
 
-> 一句话总结：**别人按条扣费、带水印、要你上传云端；ClipForge 开源免费、无水印、全程本地、零 Key 也能成片。**
+市面上 AI 短视频工具一抓一大把，但大多做不了真正的带货：**不会提炼卖点、不懂平台算法、还会把你的商品改得面目全非**。ClipForge 从第一天就是为**卖货转化**设计的：
 
-- 🆓 **真·免费，零 Key**：免费路径全程不需要任何 API Key——免费素材（Openverse 图片 + **Wikimedia 实拍视频**）+ 免费微软 Edge TTS 配音 + 本地 FFmpeg 合成，**0 成本出片**。
-- 🚫 **无水印 · 可商用**：自部署、开源（AGPL-3.0），成片干净。
-- 🔒 **本地优先 · 隐私**：项目、素材、API Key 全在你自己机器，**不上传任何云**。
-- 🛍️ **带货 + 通用双场景**：上传商品图做带货种草（**商品原图保真、不变形**），或一句话主题成片（科普 / 生活 / 旅行任意题材）。
-- 🎬 **免 Key 实拍视频 B-roll**：开箱即用的免费视频源（Wikimedia Commons），不止静态图——逐镜「视频优先、缺则图片」。
-- 🤖 **能被 AI Agent 调用**：内置 **MCP Server**，在 Claude Desktop / Claude Code / Cursor 里一句话成片。
-- 🧩 **多模型聚合（可选）**：一个接口接 **7 大**生图/生视频平台、30+ 模型（Seedance 2.0 / GPT Image 2 / Kling 3.0 / Veo 3 …），想要更高画质再用。
-- 🌍 **中英双语**：界面 + 文档中英一键切换，按系统语言自动判定。
+- 🎯 **商品保真（带货命门）**：image-to-image 锁定商品原图，换背景 / 打光也**不改商品本体**——绝不把你的产品 P 坏。
+- 🧲 **会卖货的脚本**：5 大品类深度模板 × 4 种带货风格（痛点种草 / 场景安利 / 对比测评 / 剧情）+ **黄金 3 秒钩子库**，不是干巴巴念参数。
+- 📈 **平台算法适配**：自动产出话题标签 / 封面文案 / 互动引导，贴合**抖音 / 快手 / 小红书**算法与小黄车 / 小店转化。
+- 📦 **批量 + 爆款复刻**：大促前选 10 个商品一键批量出片、爆款脚本存模板一键套用、输入竞品链接**换品重拍**、A/B 多版本测转化。
 
-## 🎬 两种零门槛玩法
+## 🆓 而且，0 成本就能批量出片
 
-- **🗣️ 一句话主题成片**（0 Key）：输入一句话 → AI 写旁白脚本 → 免费素材库自动配齐画面（含免 Key 实拍视频）→ 免费 AI 配音 → FFmpeg 合成竖屏成片。
-- **🛍️ 商品带货成片**：上传商品图 → AI 分析卖点、生成多套带货脚本 → 逐镜生成 / 配画面 → 合成 → 一键导出抖音 / 快手 / 小红书 / TikTok 规格。
+- **真·免费、零 Key**：免费素材（Openverse 图 + **Wikimedia 实拍视频**）+ 免费微软 Edge TTS 配音 + 免费背景音乐 + 本地 FFmpeg 合成——**没有任何 AI Key 也能出整片**。
+- **无水印 · 本地隐私**：自部署、开源（AGPL-3.0），商品图 / 项目 / Key 全在你自己机器，不上传任何云。
+- **想要更高画质再加 Key**：一个接口聚合 **7 大**生图/生视频平台、30+ 模型（GPT Image 2 / Seedance 2.0 / Kling 3.0 …）。
+- **能被 AI Agent 调用**：内置 **MCP Server**，在 Claude / Cursor 里一句话出片；中英双语界面。
 
-<p align="center"><img src="docs/hero.png" alt="ClipForge 工作流：一句话 / 商品图 → AI 脚本 → 自动配画面 → 免费配音 → 字幕 → 竖屏成片" width="820"/></p>
+## 🎬 两种玩法（带货为主，也能做任意题材）
 
-> 🌍 带货只是转化最强的模板之一，而非前提——ClipForge 面向**任意主题**的短视频创作，并在推进 **Electron 一键桌面包**（Win/Mac 双击即用，详见 [Roadmap](#roadmap)）。
+- **🛍️ 商品带货成片（主场景）**：上传商品图 → AI 提炼卖点、写多套带货脚本 → 商品原图保真出镜 + 免费素材配 B-roll → 免费配音 + 字幕 + BGM → 一键导出抖音 / 快手 / 小红书 / TikTok Shop 规格。
+- **🗣️ 一句话主题成片**：不卖货也能用——输入一句话主题，AI 写旁白 → 免费素材自动配画面（含免 Key 实拍视频）→ 免费配音 → 合成竖屏成片。
 
-**关键词 / Keywords**: AI 短视频生成 · AI 带货剪辑 · 一句话成片 · 文字转视频 / text to video · 抖音 / 快手 / 小红书 / TikTok / Reels / Shorts 短视频制作 · faceless video generator · AI UGC 电商广告 · AI 配音 · 免费素材自动剪辑 · 开源自部署视频工具 · MCP · Seedance 2.0 · GPT Image 2 · Edge TTS · Wikimedia / Openverse
+<p align="center"><img src="docs/hero.png" alt="ClipForge 带货工作流：商品图 → AI 提炼卖点写脚本 → 商品保真配画面 → 免费配音字幕 → 抖音/快手/小红书/TikTok 卖货短视频" width="820"/></p>
+
+**关键词 / Keywords**: AI 带货短视频 · 带货视频制作 · 电商短视频 · 商品视频生成 · 种草视频 · 抖音小店 / 快手 / 小红书 / TikTok Shop 带货 · AI 卖点提炼 · 商品图转视频 · 批量出片 · 爆款复刻 · faceless UGC ads · product video generator · AI 配音 · 开源自部署 · MCP · GPT Image 2 / Seedance 2.0
 
 ---
 
@@ -59,7 +60,7 @@
 
 ---
 
-## 🆚 横向对比：传统流程 vs 商业 SaaS vs ClipForge
+## 🆚 做一条带货视频：传统外包 vs ClipForge
 
 | 痛点 | 传统方式 | ClipForge |
 |------|---------|---------|
@@ -77,7 +78,7 @@
 ## ❓ 常见问题 FAQ
 
 **ClipForge 是什么？**
-ClipForge（原带货剪手 / daihuo-jianshou）是一款**开源免费的 AI 短视频生成工具**：输入一句话主题或一张商品图，自动生成脚本、配画面、配音、字幕，一键产出抖音 / 快手 / 小红书 / TikTok 竖屏短视频。
+ClipForge（原带货剪手 / daihuo-jianshou）是一款**开源免费的 AI 带货短视频工具**：上传一张商品图，AI 自动提炼卖点、写带货脚本、**保持商品原图不变形**、配画面 + 配音 + 字幕，一键产出抖音小店 / 快手 / 小红书 / TikTok Shop 卖货短视频；也支持「一句话主题成片」做任意非带货题材。
 
 **真的完全免费吗？需要 API Key 吗？**
 免费路径 **0 Key**：素材用免费可商用 CC 库（Openverse 图片 + Wikimedia 实拍视频），配音用免费微软 Edge TTS，合成用本地 FFmpeg。只有想用付费 AI 生图 / 生视频模型时，才需要对应平台的 Key。
