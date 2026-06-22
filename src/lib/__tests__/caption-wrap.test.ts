@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { wrapCaption } from "@/lib/video-composer/composer";
+import { wrapCaption, chunkCaption } from "@/lib/video-composer/composer";
 
 // 估宽与组件内一致：CJK≈fontSize，拉丁≈fontSize×0.55；上限 frameWidth×0.86
 const fits = (line: string, fontSize: number, frameWidth: number) => {
@@ -44,5 +44,41 @@ describe("wrapCaption（字幕自动换行）", () => {
   it("空串返回空串", () => {
     expect(wrapCaption("", 36, 720)).toBe("");
     expect(wrapCaption("   ", 36, 720)).toBe("");
+  });
+});
+
+describe("chunkCaption（rapid 短句卡切分）", () => {
+  it("短文案/短时长 → 单块（整句一镜到底）", () => {
+    expect(chunkCaption("你好", 0, 1)).toEqual([{ text: "你好", startTime: 0, endTime: 1 }]);
+    expect(chunkCaption("Hi there", 0, 1).length).toBe(1);
+  });
+
+  it("空串 → 空数组", () => {
+    expect(chunkCaption("", 0, 3)).toEqual([]);
+    expect(chunkCaption("   ", 0, 3)).toEqual([]);
+  });
+
+  it("长中文按字切多块：顺序不重叠、首块起于 start、末块止于 end、合起来还原原文", () => {
+    const txt = "清晨的海浪轻轻拍打着柔软的沙滩";
+    const out = chunkCaption(txt, 0, 6);
+    expect(out.length).toBeGreaterThan(1);
+    expect(out[0].startTime).toBe(0);
+    expect(out[out.length - 1].endTime).toBe(6);
+    // 顺序、不重叠
+    for (let i = 1; i < out.length; i++) expect(out[i].startTime).toBeCloseTo(out[i - 1].endTime, 3);
+    // 拼回原文（中文无空格）
+    expect(out.map((c) => c.text).join("")).toBe(txt);
+  });
+
+  it("英文按词切块（不拆词）", () => {
+    const out = chunkCaption("the quick brown fox jumps over the lazy dog now", 0, 6);
+    expect(out.length).toBeGreaterThan(1);
+    expect(out.map((c) => c.text).join(" ")).toBe("the quick brown fox jumps over the lazy dog now");
+  });
+
+  it("块数随时长增加（更长的镜头切更多块），且封顶 8", () => {
+    const txt = "一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十";
+    expect(chunkCaption(txt, 0, 2).length).toBeLessThan(chunkCaption(txt, 0, 10).length);
+    expect(chunkCaption(txt, 0, 60).length).toBeLessThanOrEqual(8);
   });
 });

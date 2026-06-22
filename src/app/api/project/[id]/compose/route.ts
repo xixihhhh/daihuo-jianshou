@@ -10,7 +10,7 @@ import { resolveRenderProfile } from "@/lib/compose-presets";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { composeVideo, FADE_DURATION, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
+import { composeVideo, FADE_DURATION, chunkCaption, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
 import { isAudibleFromVolumedetect } from "@/lib/video-composer/audio-probe";
 import { fetchFreeBgm } from "@/lib/free-bgm";
 import type { Shot } from "@/lib/db/schema";
@@ -259,7 +259,8 @@ export async function POST(
       const start = acc;
       acc += r.duration;
       const end = acc;
-      if (r.shot.voiceover) subtitleTexts.push({ text: r.shot.voiceover, startTime: start, endTime: end });
+      // 把整句旁白切成 rapid 短句卡（每段一闪），适配 muted 观看 / 带货留存
+      if (r.shot.voiceover) subtitleTexts.push(...chunkCaption(r.shot.voiceover, start, end));
       const ov = r.shot.textOverlay;
       if (ov && ov.style !== "subtitle" && ov.text) {
         overlays.push({ text: ov.text, style: ov.style as "title" | "highlight" | "price", startTime: start, endTime: end });

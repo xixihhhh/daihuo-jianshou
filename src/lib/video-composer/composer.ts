@@ -91,6 +91,37 @@ export function wrapCaption(text: string, fontSize: number, frameWidth: number):
 }
 
 /**
+ * 把一句旁白切成「短句卡」并在 [startTime,endTime] 内顺序排布——rapid 短字幕是 2026 muted 观看 / 带货留存的标配，
+ * 替代「一整句静态显示一镜到底」。目标 ~1.2s 一块（封顶 8 块）；CJK 按字、Latin 按词均分，时间按块长比例分配。
+ * 纯函数可单测；返回的多段字幕由现有 composer 逐段 drawtext 渲染（互不重叠，一次只显一块）。
+ */
+export function chunkCaption(
+  text: string,
+  startTime: number,
+  endTime: number
+): { text: string; startTime: number; endTime: number }[] {
+  const clean = (text || "").replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const total = Math.max(endTime - startTime, 0.1);
+  const n = Math.max(1, Math.min(Math.round(total / 1.2), 8));
+  if (n === 1) return [{ text: clean, startTime, endTime }];
+  const cjk = /[぀-ヿ一-鿿가-힯]/.test(clean); // 假名/汉字/谚文
+  const units = cjk ? Array.from(clean) : clean.split(/\s+/);
+  if (units.length <= n) return [{ text: clean, startTime, endTime }];
+  const per = Math.ceil(units.length / n);
+  const chunks: string[] = [];
+  for (let i = 0; i < units.length; i += per) chunks.push(units.slice(i, i + per).join(cjk ? "" : " "));
+  const lens = chunks.map((c) => Math.max(c.length, 1));
+  const sum = lens.reduce((a, b) => a + b, 0);
+  let acc = startTime;
+  return chunks.map((c, i) => {
+    const s = acc;
+    acc = i === chunks.length - 1 ? endTime : acc + (lens[i] / sum) * total;
+    return { text: c, startTime: Number(s.toFixed(3)), endTime: Number(acc.toFixed(3)) };
+  });
+}
+
+/**
  * 转义 shell 双引号字符串中的特殊字符
  * 防止文件路径包含特殊字符时导致命令注入
  */
