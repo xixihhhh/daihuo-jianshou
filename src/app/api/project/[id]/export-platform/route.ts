@@ -55,9 +55,10 @@ export async function POST(
       `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=24:4[bg];` +
       `[0:v]scale=${w}:${h}:force_original_aspect_ratio=decrease[fg];` +
       `[bg][fg]overlay=(W-w)/2:(H-h)/2`;
+    // -map_metadata 0 显式保留源片元数据（关键：把 AIGC 隐式合规标识带到平台导出片——用户真正上传的是这条）
     const cmd =
       `"${ffmpegBin()}" -y -i "${src}" -filter_complex "${filter}" ` +
-      `-c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart ` +
+      `-map_metadata 0 -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart ` +
       `-c:a aac -b:a 192k "${outFile}"`;
 
     await execAsync(cmd, { maxBuffer: 50 * 1024 * 1024 });
