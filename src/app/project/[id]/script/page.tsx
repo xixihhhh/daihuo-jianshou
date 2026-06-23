@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoaderCircle } from "react-icons/lu";
+import { LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoaderCircle, LuTriangleAlert } from "react-icons/lu";
+import { checkScriptCompliance } from "@/lib/ad-compliance";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -225,6 +226,11 @@ export default function ScriptPage() {
   }, [id]);
 
   const currentScript = scripts[selectedScript];
+  // 出片前广告法合规扫描：对当前脚本旁白+贴片做规则校验，命中风险词则警示（不拦截）
+  const adViolations = useMemo(
+    () => (currentScript ? checkScriptCompliance(currentScript.shots as { voiceover?: string; textOverlay?: { text?: string } | null }[]) : []),
+    [currentScript]
+  );
 
   // 模板相关状态
   const { addTemplate } = useTemplateStore();
@@ -446,6 +452,28 @@ export default function ScriptPage() {
 
               <TabsContent value="timeline" className="mt-0">
                 <div className="space-y-3">
+                  {adViolations.length > 0 && (
+                    <Card className="border-amber-500/40 bg-amber-500/5">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <LuTriangleAlert className="w-4 h-4 text-amber-500" />
+                          <span className="text-sm font-semibold">{t("adComplianceTitle", { n: adViolations.length })}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2.5">{t("adComplianceHint")}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {adViolations.map((v) => (
+                            <span
+                              key={v.term}
+                              title={v.suggestion}
+                              className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs cursor-help"
+                            >
+                              「{v.term}」· {v.category}
+                            </span>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                   {currentScript?.shots.map((shot, index) => {
                     const typeInfo = shotTypeLabels[shot.type];
                     return (

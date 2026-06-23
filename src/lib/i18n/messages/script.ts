@@ -40,6 +40,8 @@ export const script: NamespaceMessages = {
     saveAsTemplate: "存为模板",
     regenerate: "重新生成",
     shotCount: "{n} 个镜头",
+    adComplianceTitle: "广告法合规提醒（{n} 处风险词）",
+    adComplianceHint: "脚本含可能违反《广告法》的风险词，发布易被限流/下架。鼠标悬停查看修改建议，建议生成素材前先改。",
     // Tabs
     tabTimeline: "分镜时间线",
     tabText: "文案编辑",
@@ -97,6 +99,8 @@ export const script: NamespaceMessages = {
     saveAsTemplate: "Save as template",
     regenerate: "Regenerate",
     shotCount: "{n} shots",
+    adComplianceTitle: "Ad-compliance check ({n} risky terms)",
+    adComplianceHint: "The script contains terms that may violate ad regulations and risk takedown/throttling. Hover a term for a fix suggestion — best to edit before generating assets.",
     // Tabs
     tabTimeline: "Shot timeline",
     tabText: "Edit copy",
