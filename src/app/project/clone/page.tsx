@@ -99,7 +99,25 @@ export default function ClonePage() {
       if (!projRes.ok) throw new Error(t("errorProjectCreate"));
       const project = await projRes.json();
 
-      // 2) 生成脚本（参考爆款通用结构 + 商品信息）
+      // 2) 上传用户的商品图（携带 projectId）——修复：此前写死 [] 把用户必传的商品图整体丢弃，
+      //    导致 product_closeup 分镜没有商品画面、合成缺镜或直接「没有可用素材」失败。
+      const formData = new FormData();
+      productImages.forEach((img) => formData.append("files", img.file));
+      formData.append("projectId", project.id);
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!uploadRes.ok) {
+        const e = await uploadRes.json().catch(() => ({}));
+        throw new Error(e.error || t("errorCloneFailed"));
+      }
+      const { paths } = await uploadRes.json();
+      // 2.5) 回写项目的商品图路径
+      await fetch(`/api/project/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productImages: paths }),
+      });
+
+      // 3) 生成脚本（参考爆款通用结构 + 商品信息 + 真实上传的商品图）
       const scriptRes = await fetch("/api/llm/script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,7 +128,7 @@ export default function ClonePage() {
           targetDuration: 40,
           styleType: "auto",
           videoMode: "product_closeup",
-          productImages: [],
+          productImages: paths,
           referenceUrl: videoUrl,
           llmConfig: {
             baseUrl: llm.baseUrl,
@@ -125,7 +143,7 @@ export default function ClonePage() {
         throw new Error(e.error || t("errorScriptGen"));
       }
 
-      // 3) 跳转到脚本页
+      // 4) 跳转到脚本页
       router.push(`/project/${project.id}/script`);
     } catch (err) {
       setGenError(err instanceof Error ? err.message : t("errorCloneFailed"));
