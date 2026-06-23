@@ -137,6 +137,14 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("-loop 1 -t 3");
   });
 
+  it("图片片段精确补齐到 clip.duration（zoompan+tpad+trim 防累计漂移）", () => {
+    const cmd = buildComposeCommand(baseConfig);
+    // 图片段(img1, duration 3)：zoompan 运镜 + tpad 克隆末帧补足 + trim 到精确 3s
+    expect(cmd).toContain("zoompan");
+    expect(cmd).toContain("tpad=stop_mode=clone:stop_duration=3");
+    expect(cmd).toContain("trim=duration=3");
+  });
+
   it("有 BGM + 旁白时正确混音（normalize=0 不腰斩旁白、aloop 铺满）", () => {
     const config: ComposeConfig = {
       ...baseConfig,

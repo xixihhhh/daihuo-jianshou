@@ -216,7 +216,9 @@ export function buildComposeCommand(config: ComposeConfig): string {
       // 因此先 trim 取首帧，再用 zoompan 的 d=duration*fps 控制总输出帧数。
       // 末尾 SEGMENT_NORM 统一像素格式/SAR/帧率/时基：免费素材库的真实图片像素格式各异
       // （yuvj420p/yuv420p/yuvj444p…），不归一会让 concat/xfade 报「Error reinitializing filters」而合成失败。
-      filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,trim=end_frame=1,setpts=PTS-STARTPTS,${motion.getFilter(width, height, clip.duration)},setpts=PTS-STARTPTS,${SEGMENT_NORM}[v${i}]`);
+      // zoompan 的 d=duration*fps 取整后会比 clip.duration 短 1~2 帧，多段图片累计后视频比音频/字幕短一截（漂移）。
+      // 与视频段一致地用 tpad 克隆末帧补足、再 trim 到精确 duration，保证每段图片恒等于 clip.duration。
+      filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,trim=end_frame=1,setpts=PTS-STARTPTS,${motion.getFilter(width, height, clip.duration)},tpad=stop_mode=clone:stop_duration=${clip.duration},trim=duration=${clip.duration},setpts=PTS-STARTPTS,${SEGMENT_NORM}[v${i}]`);
     } else {
       // 视频片段：缩放铺满 + 按分镜时长对齐。免费素材库（Wikimedia 等）真实视频长度不一，
       // 短于分镜时长的片段若只 trim 会留黑尾、并使音画/字幕错位——先 tpad 克隆末帧补到目标时长，
