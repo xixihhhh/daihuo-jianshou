@@ -163,6 +163,11 @@ export interface ComposeConfig {
     startTime: number;
     endTime: number;
   }[];
+  /** 带货商品卡贴片（opt-in）：左下角商品图缩略 + 商品名，开头若干秒展示，营造「挂车」感 */
+  productCard?: {
+    imagePath: string; // 商品图本地路径
+    name?: string;
+  };
 }
 
 export interface ClipInput {
@@ -367,6 +372,43 @@ export function buildComposeCommand(config: ComposeConfig): string {
     const ovStream = "ov_out";
     filterParts.push(`[${currentVideoStream}]${drawOverlays}[${ovStream}]`);
     currentVideoStream = ovStream;
+  }
+
+  // 商品卡贴片（opt-in）：左下角统一卡片 = 商品图缩略 + 商品名 + 购买引导，开头 ~5s 展示，营造带货「挂车」感
+  if (config.productCard?.imagePath) {
+    const cardIdx = inputs.length;
+    inputs.push(`-loop 1 -i "${escapeShellPath(config.productCard.imagePath)}"`);
+    const thumb = Math.round(width * 0.16);
+    const mx = Math.round(width * 0.045); // 左边距
+    const pad = Math.round(width * 0.022); // 卡片内边距
+    const nm = (config.productCard.name || "").trim().slice(0, 10);
+    const nameAreaW = nm ? Math.round(width * 0.4) : 0;
+    const cardW = thumb + (nameAreaW ? pad + nameAreaW : 0);
+    // 用数值定位（避免 drawbox 不支持 H、drawtext/overlay 支持 H 的变量差异）：cardY = 画面高 - 缩略图 - 底部留白
+    const cardY = height - thumb - Math.round(height * 0.17); // 底部偏上，避开底部字幕区
+    const start = 0.4;
+    const end = Math.min(5, accumulated);
+    const en = `enable='between(t,${start},${end})'`;
+    const cardFont = config.subtitle?.fontFile ?? resolveChineseFontFile();
+    const cardFontArg = cardFont ? `fontfile='${escapeDrawText(cardFont)}':` : "";
+    // 1) 统一卡片底：半透明深色，把缩略图与文字裹成一张卡
+    filterParts.push(`[${currentVideoStream}]drawbox=x=${mx - pad}:y=${cardY - pad}:w=${cardW + 2 * pad}:h=${thumb + 2 * pad}:color=black@0.5:t=fill:${en}[pcard_bg]`);
+    currentVideoStream = "pcard_bg";
+    // 2) 商品图缩略（等比填充裁成正方形）
+    filterParts.push(`[${cardIdx}:v]scale=${thumb}:${thumb}:force_original_aspect_ratio=increase,crop=${thumb}:${thumb},setsar=1[pcard]`);
+    filterParts.push(`[${currentVideoStream}][pcard]overlay=${mx}:${cardY}:${en}[pcard_v]`);
+    currentVideoStream = "pcard_v";
+    // 3) 商品名 + 黄色购买引导（缩略图右侧）
+    if (nm) {
+      const nameSize = Math.round(width * 0.04);
+      const ctaSize = Math.round(width * 0.03);
+      const tx = mx + thumb + pad;
+      filterParts.push(
+        `[${currentVideoStream}]drawtext=${cardFontArg}expansion=none:text='${escapeDrawText(nm)}':fontsize=${nameSize}:fontcolor=white:x=${tx}:y=${cardY + Math.round(thumb * 0.2)}:${en},` +
+          `drawtext=${cardFontArg}expansion=none:text='点击下方购买 →':fontsize=${ctaSize}:fontcolor=0xffd60a:x=${tx}:y=${cardY + Math.round(thumb * 0.58)}:${en}[pcard_out]`
+      );
+      currentVideoStream = "pcard_out";
+    }
   }
 
   // 响度归一到社媒标准（~-14 LUFS，EBU R128 / loudnorm）：跨视频音量一致，避免忽大忽小被抖音/TikTok 二次压制。

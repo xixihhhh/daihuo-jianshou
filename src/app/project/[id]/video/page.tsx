@@ -50,6 +50,8 @@ interface ComposeConfig {
   /** 带货：片尾购买 CTA 贴片 */
   ctaEnabled: boolean;
   ctaText: string;
+  /** 带货：左下角商品卡贴片（商品图缩略+名+购买引导，需商品图） */
+  productCard: boolean;
 }
 
 // 免费配音音色（微软 Edge keyless TTS，无需 Key）——与后端 FREE_TTS_VOICES 对应
@@ -130,6 +132,7 @@ export default function VideoPage() {
     aiDisclosure: false,
     ctaEnabled: false,
     ctaText: "👇 点击下方小黄车下单",
+    productCard: false,
   });
 
   // 合成状态
@@ -277,6 +280,7 @@ export default function VideoPage() {
           aspectRatio: config.aspectRatio,
           ...(config.aiDisclosure && { aiDisclosure: true }),
           ...(config.ctaEnabled && config.ctaText.trim() && { ctaText: config.ctaText.trim() }),
+          ...(config.productCard && { productCard: true }),
           ...(bgm?.path && { bgmPath: bgm.path }),
           // 没上传 BGM 且选了非 none 的配乐情绪 → 自动取一条该情绪的免费 CC 配乐（之前这里漏发，下拉形同虚设）
           ...(!bgm?.path && config.bgm !== "none" && { freeBgm: true, bgmMood: config.bgm }),
@@ -600,6 +604,15 @@ export default function VideoPage() {
                     className="bg-muted/30 border-border/50 text-xs"
                   />
                 )}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{t("productCardLabel")}</span>
+                  <button
+                    onClick={() => setConfig((c) => ({ ...c, productCard: !c.productCard }))}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${config.productCard ? "bg-primary" : "bg-muted"}`}
+                  >
+                    <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${config.productCard ? "translate-x-5" : "translate-x-0.5"}`} />
+                  </button>
+                </div>
               </CardContent>
             </Card>
 

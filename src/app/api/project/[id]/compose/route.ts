@@ -309,6 +309,14 @@ export async function POST(
       overlays: overlays.length > 0 ? overlays : undefined,
     };
 
+    // 商品卡贴片（opt-in）：用商品图首图 + 商品名做左下角挂车卡
+    if (body.productCard === true) {
+      const cardImg = toLocalPath(productImages[0]);
+      if (cardImg) {
+        config.productCard = { imagePath: cardImg, name: (project.productName as string) || project.name || undefined };
+      }
+    }
+
         // 执行合成（FFmpeg）
         const outputPath = await composeVideo(config);
         // 完成：更新合成记录与项目状态
