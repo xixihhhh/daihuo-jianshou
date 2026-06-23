@@ -6,7 +6,7 @@ import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { generateSpeech, type TTSConfig } from "@/lib/tts";
 import { generateSpeechFree, DEFAULT_FREE_VOICE } from "@/lib/edge-tts";
-import { resolveRenderProfile } from "@/lib/compose-presets";
+import { resolveRenderProfile, isRenderPreset } from "@/lib/compose-presets";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -185,9 +185,11 @@ export async function POST(
       );
     }
 
-    // 渲染质量预设（快速/标准/高清）→ 分辨率 + 编码参数；预设优先于 body.resolution
-    const profile = resolveRenderProfile(typeof body.renderPreset === "string" ? body.renderPreset : undefined);
-    const resolution: "720p" | "1080p" = body.renderPreset
+    // 渲染质量预设（快速/标准/高清）→ 分辨率 + 编码参数；只有「合法」预设才顶替 body.resolution，
+    // 否则非法预设字符串会静默把用户显式选的 720p 顶成 1080p。
+    const validPreset = isRenderPreset(body.renderPreset) ? body.renderPreset : undefined;
+    const profile = resolveRenderProfile(validPreset);
+    const resolution: "720p" | "1080p" = validPreset
       ? profile.resolution
       : body.resolution === "720p"
         ? "720p"

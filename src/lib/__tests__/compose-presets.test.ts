@@ -4,6 +4,7 @@ import {
   DEFAULT_RENDER_PRESET,
   resolveRenderProfile,
   safeEncodeParams,
+  isRenderPreset,
 } from "@/lib/compose-presets";
 
 describe("resolveRenderProfile（渲染质量预设）", () => {
@@ -19,6 +20,21 @@ describe("resolveRenderProfile（渲染质量预设）", () => {
   it("画质单调：高清 crf < 标准 crf < 快速 crf（越小越清晰）", () => {
     expect(RENDER_PRESETS.hd.crf).toBeLessThan(RENDER_PRESETS.standard.crf);
     expect(RENDER_PRESETS.standard.crf).toBeLessThan(RENDER_PRESETS.fast.crf);
+  });
+});
+
+describe("isRenderPreset（区分合法预设与非法字符串）", () => {
+  it("合法预设为 true", () => {
+    expect(isRenderPreset("fast")).toBe(true);
+    expect(isRenderPreset("standard")).toBe(true);
+    expect(isRenderPreset("hd")).toBe(true);
+  });
+  it("非法字符串/空/非字符串为 false（不应顶掉用户显式分辨率）", () => {
+    expect(isRenderPreset("ultra")).toBe(false);
+    expect(isRenderPreset("")).toBe(false);
+    expect(isRenderPreset(undefined)).toBe(false);
+    expect(isRenderPreset(null)).toBe(false);
+    expect(isRenderPreset(123)).toBe(false);
   });
 });
 

@@ -36,6 +36,11 @@ export function resolveRenderProfile(preset: string | undefined): RenderProfile 
   return RENDER_PRESETS[preset as RenderPreset] ?? RENDER_PRESETS[DEFAULT_RENDER_PRESET];
 }
 
+/** 判断是否为合法的渲染预设——用于区分「真选了预设」与「传了非法字符串」（后者不应顶掉用户显式分辨率） */
+export function isRenderPreset(v: unknown): v is RenderPreset {
+  return typeof v === "string" && v in RENDER_PRESETS;
+}
+
 /** 校验并夹取编码参数为合法范围，供合成器最后一道兜底（即使外部直接传也安全） */
 export function safeEncodeParams(videoPreset: string | undefined, crf: number | undefined): {
   videoPreset: string;
