@@ -16,6 +16,23 @@ export interface FreeBgmResult {
   sourceUrl: string;
 }
 
+// 品类 → 配乐情绪检索词：让美妆/美食/数码等各取贴合的免费 CC 音乐，而非全都同一条 ambient。
+const CATEGORY_BGM_MOOD: Record<string, string> = {
+  beauty: "upbeat fashion pop instrumental",
+  food: "warm cozy acoustic background",
+  home: "calm relaxing acoustic background",
+  fashion: "upbeat trendy pop instrumental",
+  digital: "energetic electronic tech background",
+  tech: "energetic electronic tech background",
+  other: "ambient background music",
+};
+
+/** 由商品品类得到配乐情绪检索词；未知/空回退通用 ambient。纯函数可单测。 */
+export function moodQueryForCategory(category?: string | null): string {
+  const key = (category || "").toLowerCase().trim();
+  return CATEGORY_BGM_MOOD[key] || "ambient background music";
+}
+
 /**
  * 为项目取一条免费 CC 背景音乐并下载到 uploads/<project>/bgm/。
  * 偏好时长 ≥ 8s 的曲目（太短循环噪点大）。任何失败都吞掉返回 null，绝不阻塞合成。
