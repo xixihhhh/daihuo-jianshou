@@ -64,6 +64,13 @@ describe("buildKaraokeAss", () => {
     expect(ass).toContain("&H0000FF00");
   });
 
+  it("默认 MarginV 走安全区（PlayResY 1920 → 326，避开平台底部 UI），可被显式覆盖", () => {
+    const f = buildKaraokeAss(lines).split("\n").find((l) => l.startsWith("Style: K,"))!.split(",");
+    expect(Number(f[f.length - 2])).toBe(326); // 安全区 marginV（旧值 240 落在死区内）
+    const f2 = buildKaraokeAss(lines, { marginV: 100 }).split("\n").find((l) => l.startsWith("Style: K,"))!.split(",");
+    expect(Number(f2[f2.length - 2])).toBe(100); // 显式指定优先
+  });
+
   it("含数字单位自动强调：放大字号 + 热色 \\1c（价格/折扣突出）", () => {
     const d = buildKaraokeAss([{ text: "立省50%闭眼入", startTime: 0, endTime: 3 }])
       .split("\n")

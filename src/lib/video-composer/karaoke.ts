@@ -4,6 +4,8 @@
  * 纯函数产出 ASS 文本（不落盘、不调 ffmpeg），可单测；由 composer 用 libass(subtitles 滤镜)烧录。
  */
 
+import { karaokeSafeMarginV } from "./safe-zone";
+
 export interface KaraokeLine {
   text: string;
   startTime: number; // 秒
@@ -131,6 +133,8 @@ function buildKaraokeLineText(text: string, durationSec: number, cfg: LineCfg): 
 /** 生成完整 ASS 文本（含样式 + 逐字卡拉OK事件）。 */
 export function buildKaraokeAss(lines: KaraokeLine[], opts: KaraokeStyleOpts = {}): string {
   const o = { ...DEFAULTS, ...opts };
+  // 未显式指定 MarginV 时，按安全区抬到平台底部 UI 之上（避免字幕被小黄车/进度条遮挡）
+  if (opts.marginV === undefined) o.marginV = karaokeSafeMarginV(o.playResY);
   const outline = Math.max(2, Math.round(o.fontSize * 0.07));
   const header = [
     "[Script Info]",

@@ -265,7 +265,7 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("drawtext");
     expect(cmd).toContain("fontsize=40");
     expect(cmd).toContain("fontcolor=yellow");
-    expect(cmd).toContain("h*0.88-text_h"); // bottom 多行安全锚点（按文字块底边定位，向上生长）
+    expect(cmd).toContain("h*0.83-text_h"); // bottom 字幕抬到平台底部 UI 安全区之上（0.17 底距，按文字块底边向上生长）
     expect(cmd).toContain("line_spacing="); // 多行行距
     expect(cmd).toContain("box=1:boxcolor=black@0.45"); // 字幕底框
   });

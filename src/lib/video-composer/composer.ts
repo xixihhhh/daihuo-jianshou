@@ -7,6 +7,7 @@ import { TRANSITIONS, type TransitionMode } from "./transitions";
 import { MOTIONS, DEFAULT_MOTION } from "./motions";
 import { safeEncodeParams } from "@/lib/compose-presets";
 import { buildAigcMetadataArgs } from "@/lib/compliance-metadata";
+import { CAPTION_SAFE_BOTTOM_RATIO } from "./safe-zone";
 
 /**
  * 探测一个可用的中文字体文件路径
@@ -376,7 +377,9 @@ export function buildComposeCommand(config: ComposeConfig): string {
     const fontColor = config.subtitle.color || "white";
     const borderW = config.subtitle.strokeWidth || 3;
     // 多行安全的纵向锚点：底部按文字块底边定位（向上生长，不会越过画面底边）；居中/顶部含 text_h
-    const yPos = config.subtitle.position === "top" ? "h*0.08" : config.subtitle.position === "center" ? "(h-text_h)/2" : "h*0.88-text_h";
+    // bottom 字幕基线抬到平台底部 UI 安全区之上（与商品卡 0.17 底距对齐，避免被小黄车/进度条遮挡）
+    const bottomY = (1 - CAPTION_SAFE_BOTTOM_RATIO).toFixed(2); // 0.83
+    const yPos = config.subtitle.position === "top" ? "h*0.08" : config.subtitle.position === "center" ? "(h-text_h)/2" : `h*${bottomY}-text_h`;
     const lineSpacing = Math.round(fontSize * 0.28);
     // 半透明底框，提升可读性（带货短视频常见样式）
     const boxArg = `box=1:boxcolor=black@0.45:boxborderw=${Math.round(fontSize * 0.35)}:`;
@@ -432,7 +435,8 @@ export function buildComposeCommand(config: ComposeConfig): string {
     const nameAreaW = nm ? Math.round(width * 0.4) : 0;
     const cardW = thumb + (nameAreaW ? pad + nameAreaW : 0);
     // 用数值定位（避免 drawbox 不支持 H、drawtext/overlay 支持 H 的变量差异）：cardY = 画面高 - 缩略图 - 底部留白
-    const cardY = height - thumb - Math.round(height * 0.17); // 底部偏上，避开底部字幕区
+    // 字幕基线已抬到安全区(底距 0.17)，商品卡再上移到字幕之上(底距 0.25)，保持「卡在上、字幕在下」的不重叠堆叠
+    const cardY = height - thumb - Math.round(height * 0.25);
     const start = 0.4;
     const end = Math.min(5, accumulated);
     const en = `enable='between(t,${start},${end})'`;
