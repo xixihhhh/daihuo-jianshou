@@ -16,7 +16,7 @@ Drive ClipForge's text-to-video pipeline from any MCP client (Claude Desktop / C
 | `clipforge_generate_script` | 只生成去商品化旁白分镜脚本（含英文素材检索词） | ✅ |
 | `clipforge_search_stock` | 从免费可商用素材库检索画面（keyless Openverse 图片优先） | — |
 | `clipforge_list_projects` | 列出 ClipForge 里的项目 | — |
-| `clipforge_compose` | 为已有脚本+素材的项目合成出片（免费 Edge TTS） | — |
+| `clipforge_compose` | 为已有脚本+素材的项目合成出片（免费 Edge TTS）；可开 卡拉OK字幕 / 商品卡 / AI合规标识 / 购买CTA / BGM情绪 / 旁白闪避 等带货增强 | — |
 | `clipforge_list_voices` | 列出可用的免费 Edge TTS 中文音色（供 voice 参数选用） | — |
 | `clipforge_get_video` | 查询某项目最新合成结果（状态/可下载地址），不重合成；用于轮询异步产物或取回旧视频 | — |
 

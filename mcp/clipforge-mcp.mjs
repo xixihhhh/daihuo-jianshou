@@ -48,8 +48,12 @@ function composeBody(args) {
   if (ASPECT_RATIOS.includes(args.aspectRatio)) body.aspectRatio = args.aspectRatio;
   if (QUALITY_PRESETS.includes(args.quality)) body.renderPreset = args.quality;
   if (args.bgm === true) body.freeBgm = true; // 自动加一段免费 CC 背景音乐
+  if (["upbeat", "chill", "energetic", "emotional"].includes(args.bgmMood)) body.bgmMood = args.bgmMood; // BGM 情绪
+  if (args.bgmDuck === true) body.bgmDuck = true; // 旁白闪避（旁白更清晰）
   if (args.karaoke === true) body.karaoke = true; // 卡拉OK逐字字幕
   if (args.productCard === true) body.productCard = true; // 商品卡贴片（有商品图才生效）
+  if (args.aiDisclosure === true) body.aiDisclosure = true; // AI 合规标识
+  if (typeof args.ctaText === "string" && args.ctaText.trim()) body.ctaText = args.ctaText.trim(); // 片尾购买 CTA
   return body;
 }
 
@@ -69,6 +73,23 @@ const OUTPUT_OPTION_PROPS = {
   productCard: {
     type: "boolean",
     description: "带货商品卡贴片（左下角商品图缩略+名+价+购买引导）。仅对有商品图的带货项目生效，topic 视频无效。默认 false",
+  },
+  bgmMood: {
+    type: "string",
+    enum: ["upbeat", "chill", "energetic", "emotional"],
+    description: "免费 BGM 的情绪（需 bgm=true）：upbeat 欢快 / chill 舒缓 / energetic 动感 / emotional 情感。不传则按商品品类自动挑",
+  },
+  bgmDuck: {
+    type: "boolean",
+    description: "旁白闪避：旁白一响自动压低 BGM、停顿回升，旁白更清晰（需有 BGM）。默认 false",
+  },
+  aiDisclosure: {
+    type: "boolean",
+    description: "烧「AI 生成」合规标识（抖音/TikTok 对 AI 合成内容的要求；另含 GB45438 隐式文件元数据始终写入）。默认 false",
+  },
+  ctaText: {
+    type: "string",
+    description: "片尾购买 CTA 文案（如「👇 点击下方小黄车下单」），不传则不加片尾 CTA",
   },
 };
 
