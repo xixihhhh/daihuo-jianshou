@@ -1,4 +1,4 @@
-import { join } from "path";
+import { join, dirname } from "path";
 import { getDataDir } from "@/lib/paths";
 import { ffmpegBin } from "@/lib/ffmpeg-path";
 import { mkdir } from "fs/promises";
@@ -43,6 +43,23 @@ function escapeDrawText(text: string): string {
     // 若转成 \% 则 ffmpeg 8.0 报 `Stray %` 致整条字幕/贴片渲染为空白（静默失效）。
     .replace(/\[/g, "\\\\[")      // 方括号（FFmpeg filter 流标记）
     .replace(/\]/g, "\\\\]");
+}
+
+/** 转义 subtitles/ass 滤镜的路径：反斜杠→正斜杠、转义冒号(Windows 盘符)与单引号，避免破坏 filtergraph */
+function escapeSubtitlesPath(p: string): string {
+  return p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+}
+
+/** 由探测到的中文字体文件推断其 ASS Fontname（libass 跨平台按名匹配；macOS CoreText 一般也能兜底） */
+export function resolveChineseFontFamily(): string {
+  const p = (resolveChineseFontFile() || "").toLowerCase();
+  if (p.includes("pingfang")) return "PingFang SC";
+  if (p.includes("stheiti")) return "STHeiti";
+  if (p.includes("hiragino")) return "Hiragino Sans GB";
+  if (p.includes("notosanscjk") || p.includes("noto")) return "Noto Sans CJK SC";
+  if (p.includes("wqy") || p.includes("zenhei")) return "WenQuanYi Zen Hei";
+  if (p.includes("arial unicode")) return "Arial Unicode MS";
+  return "PingFang SC";
 }
 
 /** 判断是否为 CJK（中日韩）字符——用于估算字宽与换行策略 */
@@ -155,6 +172,8 @@ export interface ComposeConfig {
     strokeColor?: string;
     strokeWidth?: number;
     position?: "bottom" | "center" | "top";
+    /** 卡拉OK逐字字幕（opt-in）：传入已写好的 ASS 文件路径则改用 libass 烧录，替代逐句 drawtext */
+    karaokeAssPath?: string;
   };
   /** 文字贴片：价格贴/卖点贴/标题贴，叠在画面上方区域（带货常见样式） */
   overlays?: {
@@ -322,8 +341,15 @@ export function buildComposeCommand(config: ComposeConfig): string {
     }
   }
 
-  // 字幕
-  if (config.subtitle?.texts.length) {
+  // 字幕：① 卡拉OK逐字（libass 烧 ASS，opt-in）；② 否则逐句 drawtext
+  if (config.subtitle?.karaokeAssPath) {
+    const subtitleStream = `sub_out`;
+    const fontFile = config.subtitle.fontFile ?? resolveChineseFontFile();
+    // fontsdir 指向中文字体所在目录，确保 Linux 等无 CoreText 环境 libass 也能找到中文字体
+    const fontsdirArg = fontFile ? `:fontsdir=${escapeSubtitlesPath(dirname(fontFile))}` : "";
+    filterParts.push(`[${currentVideoStream}]subtitles=${escapeSubtitlesPath(config.subtitle.karaokeAssPath)}${fontsdirArg}[${subtitleStream}]`);
+    currentVideoStream = subtitleStream;
+  } else if (config.subtitle?.texts.length) {
     const subtitleStream = `sub_out`;
     // 字号按画面宽度自适应（约 5%），带货字幕需醒目；可被 config 覆盖
     const fontSize = config.subtitle.fontSize || Math.round(width * 0.05);

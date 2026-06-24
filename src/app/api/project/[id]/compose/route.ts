@@ -10,7 +10,8 @@ import { resolveRenderProfile, isRenderPreset } from "@/lib/compose-presets";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { composeVideo, FADE_DURATION, chunkCaption, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
+import { composeVideo, FADE_DURATION, chunkCaption, resolveChineseFontFamily, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
+import { buildKaraokeAss } from "@/lib/video-composer/karaoke";
 import { isAudibleFromVolumedetect } from "@/lib/video-composer/audio-probe";
 import { buildComplianceOverlays } from "@/lib/compliance-overlays";
 import { fetchFreeBgm, moodQueryForCategory, moodQueryForMood } from "@/lib/free-bgm";
@@ -254,6 +255,7 @@ export async function POST(
     // 字幕 + 文字贴片：按渲染分镜的有效时长累计，与画面时间轴严格对齐（修复缺素材导致的漂移 + 字幕卡配音）
     let acc = 0;
     const subtitleTexts: { text: string; startTime: number; endTime: number }[] = [];
+    const karaokeLines: { text: string; startTime: number; endTime: number }[] = [];
     const overlays: { text: string; style: "title" | "highlight" | "price"; startTime: number; endTime: number }[] = [];
     rendered.forEach((r, idx) => {
       // 与 composer 的 xfade 时间轴严格一致：ffmpeg_fade 转入的片段与前段重叠 FADE_DURATION，整条时间轴前移，
@@ -263,7 +265,10 @@ export async function POST(
       acc += r.duration;
       const end = acc;
       // 把整句旁白切成 rapid 短句卡（每段一闪），适配 muted 观看 / 带货留存
-      if (r.shot.voiceover) subtitleTexts.push(...chunkCaption(r.shot.voiceover, start, end));
+      if (r.shot.voiceover) {
+        subtitleTexts.push(...chunkCaption(r.shot.voiceover, start, end));
+        karaokeLines.push({ text: r.shot.voiceover, startTime: start, endTime: end }); // 卡拉OK整句留屏逐字高亮
+      }
       const ov = r.shot.textOverlay;
       if (ov && ov.style !== "subtitle" && ov.text) {
         overlays.push({ text: ov.text, style: ov.style as "title" | "highlight" | "price", startTime: start, endTime: end });
@@ -308,6 +313,16 @@ export async function POST(
       subtitle: subtitleTexts.length > 0 ? { texts: subtitleTexts, position: "bottom" } : undefined,
       overlays: overlays.length > 0 ? overlays : undefined,
     };
+
+    // 卡拉OK逐字字幕（opt-in）：把每镜整句旁白写成 ASS \k 卡拉OK，libass 烧录，替代 rapid 短句卡
+    if (body.karaoke === true && karaokeLines.length > 0) {
+      const ass = buildKaraokeAss(karaokeLines, { fontName: resolveChineseFontFamily() });
+      const assDir = join(getDataDir(), "output", id);
+      await mkdir(assDir, { recursive: true });
+      const assPath = join(assDir, `karaoke_${comp.id}.ass`);
+      await writeFile(assPath, ass, "utf8");
+      config.subtitle = { texts: [], karaokeAssPath: assPath };
+    }
 
     // 商品卡贴片（opt-in）：用商品图首图 + 商品名做左下角挂车卡
     if (body.productCard === true) {
