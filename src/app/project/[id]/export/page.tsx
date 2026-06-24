@@ -264,11 +264,12 @@ export default function ExportPage() {
             <span className="text-lg font-bold tracking-tight">ClipForge</span>
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm text-muted-foreground">{projectName || t("projectFallback")}</span>
+          <span className="text-sm text-muted-foreground truncate max-w-[40vw] sm:max-w-xs">{projectName || t("projectFallback")}</span>
         </div>
         <div className="flex items-center gap-3">
           <LanguageToggle />
-          <div className="flex items-center gap-1">
+          {/* 步骤胶囊在窄屏放不下，移动端隐藏（仅进度展示、非导航） */}
+          <div className="hidden sm:flex items-center gap-1">
             {["stepScript", "stepAssets", "stepVideo", "stepExport"].map((stepKey, i) => (
               <div key={stepKey} className="flex items-center">
                 <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 3 ? "bg-primary text-primary-foreground" : "text-primary"}`}>

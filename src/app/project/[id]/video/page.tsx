@@ -360,12 +360,14 @@ export default function VideoPage() {
               <span className="text-lg font-bold tracking-tight">ClipForge</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">{projectName || t("defaultProjectName")}</span>
+            <span className="text-sm text-muted-foreground truncate max-w-[40vw] sm:max-w-xs">{projectName || t("defaultProjectName")}</span>
           </div>
 
           {/* 步骤进度 */}
           <div className="flex items-center gap-1">
             <LanguageToggle />
+            {/* 步骤胶囊在窄屏放不下，移动端隐藏（仅进度展示、非导航） */}
+            <div className="hidden sm:flex items-center gap-1">
             {[t("stepScript"), t("stepAssets"), t("stepVideo"), t("stepExport")].map((step, i) => (
               <div key={step} className="flex items-center">
                 <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 2 ? "bg-primary text-primary-foreground" : i < 2 ? "text-primary" : "text-muted-foreground"}`}>
@@ -377,6 +379,7 @@ export default function VideoPage() {
                 {i < 3 && <div className="mx-1 h-px w-4 bg-border" />}
               </div>
             ))}
+            </div>
           </div>
         </div>
       </header>
