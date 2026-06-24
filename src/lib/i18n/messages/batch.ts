@@ -49,6 +49,7 @@ export const batch: NamespaceMessages = {
     // 步骤 2
     step2Label: "步骤 2：统一配置",
     videoModeLabel: "视频模式",
+    livePresenterHint: "「真人出镜」不渲染数字人：需在合成步骤自备真人素材，或只用 AI 生成中远景人物场景。没有真人素材时，建议改用「产品特写」或「场景演示」。",
     scriptStyleLabel: "脚本风格",
     durationLabel: "目标时长",
     autoComposeLabel: "生成脚本后自动配画面 + 合成成片（免费，全程 0 Key）",
@@ -113,6 +114,7 @@ export const batch: NamespaceMessages = {
     // 步骤 2
     step2Label: "Step 2: Shared settings",
     videoModeLabel: "Video mode",
+    livePresenterHint: "Live-presenter mode renders no digital human: bring your own real-person footage at the compose step, or use AI mid/long-shot person scenes only. No footage? Switch to Product close-up or Scene demo.",
     scriptStyleLabel: "Script style",
     durationLabel: "Target duration",
     autoComposeLabel: "Auto-fill footage + render the video after scripting (free, 0 API key)",

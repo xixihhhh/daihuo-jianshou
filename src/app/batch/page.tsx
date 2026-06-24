@@ -445,6 +445,10 @@ export default function BatchPage() {
                     );
                   })}
                 </div>
+                {/* 「真人出镜」诚实预期：本工具不渲染数字人，靠自备真人素材或 AI 中远景人物 */}
+                {videoMode === "live_presenter" && (
+                  <p className="mt-2 text-[11px] leading-relaxed text-amber-400/90">{t("livePresenterHint")}</p>
+                )}
               </div>
 
               {/* 脚本风格 */}
