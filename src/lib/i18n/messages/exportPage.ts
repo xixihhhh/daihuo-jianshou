@@ -28,7 +28,7 @@ export const exportPage: NamespaceMessages = {
     doneSubtitle: "你的带货视频已准备就绪，可以下载或分享",
     // 操作按钮
     downloadVideo: "下载视频",
-    copyShareLink: "复制分享链接",
+    copyShareLink: "复制视频链接",
     // 发布文案
     publishTitle: "发布文案",
     publishGenerating: "生成中...",
@@ -105,7 +105,7 @@ export const exportPage: NamespaceMessages = {
     doneTitleAccent: "is ready",
     doneSubtitle: "Your commerce video is ready to download or share",
     downloadVideo: "Download video",
-    copyShareLink: "Copy share link",
+    copyShareLink: "Copy video link",
     publishTitle: "Publishing copy",
     publishGenerating: "Generating...",
     publishRegenerate: "Regenerate",
