@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildUserPrompt, buildBatchPrompt } from "@/lib/script-engine/prompts";
 import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
 import { extractJSON, parseScriptResponse } from "@/lib/script-engine/generator";
-import { buildComposeCommand, type ComposeConfig } from "@/lib/video-composer/composer";
+import { buildComposeCommand, resolveChineseFontFamily, type ComposeConfig } from "@/lib/video-composer/composer";
 
 // ==================== Prompt 构建测试 ====================
 
@@ -565,5 +565,13 @@ describe("parseScriptResponse", () => {
     });
     const scripts = parseScriptResponse(content, "pain_point");
     expect(scripts[0].totalDuration).toBe(8);
+  });
+});
+
+describe("内置全 CJK 字幕字体", () => {
+  it("打包的 public/fonts/subtitle.otf(Noto CJK)被选中，卡拉OK族名为 Noto Sans CJK SC（韩/日字幕渲染前提）", () => {
+    // 内置字体在仓库里(public/fonts/subtitle.otf)，应优先于系统字体被选中；
+    // 卡拉OK 走 libass 按族名匹配，必须回字体真实族名才能用上内置字体（否则系统 PingFang 缺谚文→豆腐块）
+    expect(resolveChineseFontFamily()).toBe("Noto Sans CJK SC");
   });
 });
