@@ -46,6 +46,8 @@ export async function generateSpeech(text: string, config: TTSConfig): Promise<B
 
 const clamp = (n: number, min: number, max: number) => Math.min(Math.max(n, min), max);
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** 截断错误体到 200 字并显式标注省略，避免「悄悄截断」让人误以为这就是完整错误 */
+const clipErr = (s: string) => (s.length > 200 ? s.slice(0, 200) + "…(已截断)" : s);
 
 /** 把响应里的音频字段（URL / data URI / base64 / hex）统一下载或解码成 Buffer */
 async function audioToBuffer(input: string): Promise<Buffer> {
@@ -85,7 +87,7 @@ async function generateSpeechOpenAI(text: string, config: TTSConfig): Promise<Bu
   });
   if (!resp.ok) {
     const errText = await resp.text().catch(() => "");
-    throw new Error(`TTS 请求失败: ${resp.status} ${resp.statusText} - ${errText.slice(0, 200)}`);
+    throw new Error(`TTS 请求失败: ${resp.status} ${resp.statusText} - ${clipErr(errText)}`);
   }
   return Buffer.from(await resp.arrayBuffer());
 }
@@ -121,7 +123,7 @@ async function generateSpeechAtlas(text: string, config: TTSConfig): Promise<Buf
   });
   if (!submit.ok) {
     const t = await submit.text().catch(() => "");
-    throw new Error(`Atlas TTS 提交失败: ${submit.status} - ${t.slice(0, 200)}`);
+    throw new Error(`Atlas TTS 提交失败: ${submit.status} - ${clipErr(t)}`);
   }
   const sj = (await submit.json()) as { data?: { id?: string }; id?: string };
   const taskId = sj?.data?.id ?? sj?.id;
@@ -184,7 +186,7 @@ async function generateSpeechMiniMax(text: string, config: TTSConfig): Promise<B
   });
   if (!resp.ok) {
     const t = await resp.text().catch(() => "");
-    throw new Error(`MiniMax TTS 请求失败: ${resp.status} - ${t.slice(0, 200)}`);
+    throw new Error(`MiniMax TTS 请求失败: ${resp.status} - ${clipErr(t)}`);
   }
   const j = (await resp.json()) as {
     data?: { audio?: string };
@@ -223,7 +225,7 @@ async function generateSpeechFal(text: string, config: TTSConfig): Promise<Buffe
   });
   if (!submit.ok) {
     const t = await submit.text().catch(() => "");
-    throw new Error(`fal TTS 提交失败: ${submit.status} - ${t.slice(0, 200)}`);
+    throw new Error(`fal TTS 提交失败: ${submit.status} - ${clipErr(t)}`);
   }
   const sj = (await submit.json()) as { request_id?: string; status_url?: string; response_url?: string };
   if (!sj?.request_id) throw new Error("fal TTS 未返回 request_id");
