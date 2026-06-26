@@ -106,4 +106,8 @@ describe("buildPublishPrompt（LLM 发布文案提示词，跟随 locale）", ()
     expect(p).toContain("云柔抽纸");
     expect(p).toContain("种草文案");
   });
+  it("caption 要求关键词前置（2026 搜索发现度：抖音/TikTok 前几字权重高）", () => {
+    expect(buildPublishPrompt({ productName: "Glow Serum", category: "beauty" }, "en")).toContain("first ~30 characters for search discoverability");
+    expect(buildPublishPrompt({ productName: "云柔抽纸", category: "home" })).toContain("开头先点出商品核心关键词");
+  });
 });

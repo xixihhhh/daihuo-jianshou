@@ -78,7 +78,7 @@ Output STRICT JSON only (no extra text):
 {
   "titles": ["3 catchy short titles with emotion/pain-point/number hooks, each <= 60 chars"],
   "hashtags": ["6-10 hashtags with #, TikTok-style, matching the category and platform trends"],
-  "caption": "one-line caption, conversational, with a clear call to action, <= 150 chars"
+  "caption": "one-line caption, conversational, with a clear call to action, <= 150 chars; lead with the main product keyword in the first ~30 characters for search discoverability"
 }`;
   }
   const platformHint = platform ? `目标平台：${platform}。` : "目标平台：抖音/快手/小红书。";
@@ -89,7 +89,7 @@ ${category ? `品类：${category}\n` : ""}${productDescription ? `卖点：${pr
 {
   "titles": ["3 个吸睛短标题，含情绪/痛点/数字钩子，每个 ≤20 字"],
   "hashtags": ["6-10 个带 # 的话题标签，贴合品类与平台热点"],
-  "caption": "一句话种草文案，口语化，含行动号召，≤40 字"
+  "caption": "一句话种草文案，口语化，含行动号召，≤40 字；开头先点出商品核心关键词（利于平台搜索发现）"
 }`;
 }
 
