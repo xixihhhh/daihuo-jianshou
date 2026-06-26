@@ -149,6 +149,15 @@ const AI_PROVIDERS = [
   },
 ];
 
+// 中文厂商名按 key 映射到 i18n 显示名（英文用户原本看到硬编码中文「火山引擎/阿里百炼/硅基流动」）。
+// 只覆盖中文名的厂商；其余（Atlas Cloud/OpenAI 等）名字本就是英文品牌、直接用 platform.name。
+// 注意：platform.name 仍作身份用于 enabledNames 自定义模型过滤，故不改 name、只改显示。
+const PROVIDER_NAME_KEYS: Record<string, string> = {
+  volcengine: "providerVolcengineName",
+  alibaba: "providerAlibabaName",
+  siliconflow: "providerSiliconflowName",
+};
+
 // 密码输入框（可切换显示/隐藏）
 function PasswordInput({
   value,
@@ -290,7 +299,7 @@ export default function SettingsPage() {
       const data = await res.json();
       setProviderTest((s) => ({ ...s, [key]: { state: data.status ?? "unknown", msg: data.message } }));
     } catch {
-      setProviderTest((s) => ({ ...s, [key]: { state: "unknown", msg: "网络异常" } }));
+      setProviderTest((s) => ({ ...s, [key]: { state: "unknown", msg: t("connectFailed") } }));
     }
   };
 
@@ -536,7 +545,7 @@ export default function SettingsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <h3 className="font-semibold text-sm">
-                                {platform.name}
+                                {PROVIDER_NAME_KEYS[platform.key] ? t(PROVIDER_NAME_KEYS[platform.key]) : platform.name}
                               </h3>
                               {provider.enabled && (
                                 <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-400">
