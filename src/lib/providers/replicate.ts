@@ -71,6 +71,8 @@ export class ReplicateProvider extends BaseProvider {
     if (!finalStatus.result) {
       throw new ProviderError('任务完成但未返回结果', 'NO_RESULT', this.name)
     }
+    // getTaskStatus 只有 taskId、无从得知模型，置了空 modelId；这里回填实际模型（与 alibaba/volcengine/siliconflow 一致，否则返给前端的 modelId 为空串）
+    finalStatus.result.modelId = options.modelId
     return finalStatus.result as ImageResult
   }
 
@@ -92,6 +94,8 @@ export class ReplicateProvider extends BaseProvider {
     if (!finalStatus.result) {
       throw new ProviderError('任务完成但未返回结果', 'NO_RESULT', this.name)
     }
+    // 同 generateImage：getTaskStatus 置了空 modelId，这里回填实际模型，避免返给前端的 modelId 为空串
+    finalStatus.result.modelId = options.modelId
     return finalStatus.result as VideoResult
   }
 
