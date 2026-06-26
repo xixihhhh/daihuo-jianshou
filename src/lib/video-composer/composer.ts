@@ -54,6 +54,9 @@ function escapeSubtitlesPath(p: string): string {
 /** 由探测到的中文字体文件推断其 ASS Fontname（libass 跨平台按名匹配；macOS CoreText 一般也能兜底） */
 export function resolveChineseFontFamily(): string {
   const p = (resolveChineseFontFile() || "").toLowerCase();
+  // 项目内置全 CJK 字幕字体（public/fonts/subtitle.*）即 Noto Sans CJK SC——
+  // 卡拉OK 走 libass 按 Fontname 匹配，必须回这个内部族名才能用上内置字体（否则会去找系统 PingFang，韩文又成豆腐块）
+  if (p.includes("fonts/subtitle") || p.includes("fonts\\subtitle")) return "Noto Sans CJK SC";
   if (p.includes("pingfang")) return "PingFang SC";
   if (p.includes("stheiti")) return "STHeiti";
   if (p.includes("hiragino")) return "Hiragino Sans GB";

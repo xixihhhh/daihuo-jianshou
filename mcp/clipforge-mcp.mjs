@@ -59,20 +59,20 @@ function composeBody(args) {
 
 /**
  * 按主题文字的书写系统挑默认免费音色（未显式指定 voice 时用）。
- * 否则英文/日文主题会被中文默认音色读得发音错乱。返回 null = 用服务端中文默认。
- * 假名→日，汉字→中(null)，其余(拉丁等)→英。韩语暂不支持(字幕字体缺谚文)。西语等拉丁语种需显式指定。
+ * 否则英文/日文/韩文主题会被中文默认音色读得发音错乱。返回 null = 用服务端中文默认。
+ * 假名→日，谚文→韩，汉字→中(null)，其余(拉丁等)→英。西语等拉丁语种无法靠脚本区分，需显式指定。
  */
 export function defaultVoiceForTopic(topic) {
   const t = String(topic || "");
-  if (/[぀-ヿ]/.test(t)) return "ja-JP-NanamiNeural"; // 平/片假名 → 日（中文字体能渲染假名）
-  // 注：韩语谚文暂不映射——中文字幕字体不含谚文，字幕会成豆腐块；待打包全 CJK 字体后再开
+  if (/[぀-ヿ]/.test(t)) return "ja-JP-NanamiNeural"; // 平/片假名 → 日
+  if (/[가-힯]/.test(t)) return "ko-KR-SunHiNeural"; // 谚文 → 韩（内置 Noto CJK 字幕字体覆盖谚文）
   if (/[一-鿿]/.test(t)) return null; // 汉字 → 中文默认
   return "en-US-AriaNeural"; // 拉丁等 → 英文
 }
 
 /** create_video / compose 共用的「成片选项」JSON-Schema 属性 */
 const OUTPUT_OPTION_PROPS = {
-  voice: { type: "string", description: "Edge TTS 音色 value（见 clipforge_list_voices）。create_video 不指定则按主题语言自动挑（英文主题→英文音色，日文同理；中文→晓晓）" },
+  voice: { type: "string", description: "Edge TTS 音色 value（见 clipforge_list_voices）。create_video 不指定则按主题语言自动挑（英文主题→英文音色，日/韩同理；中文→晓晓）" },
   aspectRatio: { type: "string", enum: ASPECT_RATIOS, description: "画幅，默认 9:16 竖屏" },
   quality: { type: "string", enum: QUALITY_PRESETS, description: "画质预设 fast/standard/hd，默认 standard" },
   bgm: {
@@ -262,7 +262,7 @@ const TOOLS = [
   },
   {
     name: "clipforge_list_voices",
-    description: "列出可用的免费 Edge TTS 多语言音色（中/英/日/西，含 value/label/gender/lang）及默认音色，供 create_video / compose 的 voice 参数选用。不需要 LLM。",
+    description: "列出可用的免费 Edge TTS 多语言音色（中/英/日/韩/西，含 value/label/gender/lang）及默认音色，供 create_video / compose 的 voice 参数选用。不需要 LLM。",
     inputSchema: { type: "object", properties: {} },
   },
   {

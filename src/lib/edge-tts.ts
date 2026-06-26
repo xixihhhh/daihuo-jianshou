@@ -34,10 +34,9 @@ export const FREE_TTS_VOICES: { value: string; label: string; gender: "female" |
   { value: "en-US-AriaNeural", label: "Aria · US English (female)", gender: "female", lang: "en-US" },
   { value: "en-US-GuyNeural", label: "Guy · US English (male)", gender: "male", lang: "en-US" },
   { value: "en-GB-SoniaNeural", label: "Sonia · UK English (female)", gender: "female", lang: "en-GB" },
-  // 日语市场（汉字假名都在中文字幕字体覆盖内，字幕能正常渲染）
+  // 日/韩市场（内置 Noto CJK 字幕字体 public/fonts/subtitle.otf 覆盖假名+谚文，字幕能正常渲染）
   { value: "ja-JP-NanamiNeural", label: "Nanami · 日本語 (female)", gender: "female", lang: "ja-JP" },
-  // 注：韩语(ko-KR)暂不列——中文字幕字体不含谚文字形，字幕会渲染成豆腐块；
-  // 待 public/fonts 打包全 CJK 字体(Noto Sans CJK)覆盖谚文后再开。详见 spawn 的字体任务。
+  { value: "ko-KR-SunHiNeural", label: "SunHi · 한국어 (female)", gender: "female", lang: "ko-KR" },
   // 西语市场（拉丁字形在中文字体覆盖内）
   { value: "es-ES-ElviraNeural", label: "Elvira · Español (female)", gender: "female", lang: "es-ES" },
 ];
