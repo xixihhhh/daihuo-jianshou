@@ -77,7 +77,7 @@ ${category ? `Category: ${category}\n` : ""}${productDescription ? `Selling poin
 Output STRICT JSON only (no extra text):
 {
   "titles": ["3 catchy short titles with emotion/pain-point/number hooks, each <= 60 chars"],
-  "hashtags": ["6-10 hashtags with #, TikTok-style, matching the category and platform trends"],
+  "hashtags": ["6-10 hashtags with #, TikTok-style; the FIRST must be a product-specific/branded hashtag (the product name, no spaces) for keyword-search discovery, the rest matching category and platform trends"],
   "caption": "one-line caption, conversational, with a clear call to action, <= 150 chars; lead with the main product keyword in the first ~30 characters for search discoverability"
 }`;
   }
@@ -88,7 +88,7 @@ ${category ? `品类：${category}\n` : ""}${productDescription ? `卖点：${pr
 要求严格输出 JSON（不要多余文字）：
 {
   "titles": ["3 个吸睛短标题，含情绪/痛点/数字钩子，每个 ≤20 字"],
-  "hashtags": ["6-10 个带 # 的话题标签，贴合品类与平台热点"],
+  "hashtags": ["6-10 个带 # 的话题标签；第 1 个必须是商品专属/品牌标签（商品名、不含空格），利于商品词搜索发现，其余贴合品类与平台热点"],
   "caption": "一句话种草文案，口语化，含行动号召，≤40 字；开头先点出商品核心关键词（利于平台搜索发现）"
 }`;
 }
@@ -112,18 +112,22 @@ export function buildPublishPack(input: PublishPackInput): PublishPack {
         clip(`三个理由让你入手${name}`, 22),
       ];
 
-  // 话题：品类 + 平台，去重、带 #、控制在 ~10 个内
+  // 话题：商品专属标签 + 品类 + 平台，去重、带 #、控制在 ~10 个内。
+  // 商品专属标签放最前——2026 抖音/TikTok 搜索发现高度依赖商品词，通用品类标签(好物分享/BeautyTok)
+  // 曝光泛而不精；加一个商品名标签，让搜该商品的人能精准搜到你的视频。
   const platform = (input.platform || "").toLowerCase();
   const catTags = en ? CATEGORY_TAGS_EN : CATEGORY_TAGS;
+  const rawName = (input.productName || "").trim();
+  // 商品名去掉空格/标点（话题标签不能含空格），仅保留字母数字与 CJK，限长
+  const productTag = rawName ? `#${clip(rawName.replace(/[^\p{L}\p{N}]/gu, ""), en ? 24 : 12)}` : "";
   const tagWords = [
     ...(catTags[cat] || catTags.other),
     ...(PLATFORM_TAGS[platform] || []),
   ];
   const seen = new Set<string>();
   const hashtags: string[] = [];
-  for (const w of tagWords) {
-    const tag = `#${w}`;
-    if (seen.has(tag)) continue;
+  for (const tag of [productTag, ...tagWords.map((w) => `#${w}`)]) {
+    if (!tag || tag === "#" || seen.has(tag)) continue;
     seen.add(tag);
     hashtags.push(tag);
     if (hashtags.length >= 10) break;

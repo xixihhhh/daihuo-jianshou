@@ -110,4 +110,30 @@ describe("buildPublishPrompt（LLM 发布文案提示词，跟随 locale）", ()
     expect(buildPublishPrompt({ productName: "Glow Serum", category: "beauty" }, "en")).toContain("first ~30 characters for search discoverability");
     expect(buildPublishPrompt({ productName: "云柔抽纸", category: "home" })).toContain("开头先点出商品核心关键词");
   });
+  it("hashtags 要求首个为商品专属/品牌标签（2026 商品词搜索发现）", () => {
+    expect(buildPublishPrompt({ productName: "云柔抽纸", category: "home" })).toContain("商品专属");
+    expect(buildPublishPrompt({ productName: "Glow Serum", category: "beauty" }, "en")).toContain("product-specific/branded hashtag");
+  });
+});
+
+describe("buildPublishPack 商品专属话题标签（2026 商品词搜索发现）", () => {
+  it("商品名标签排在话题首位、去空格/标点", () => {
+    const p = buildPublishPack({ productName: "云柔 加厚抽纸", category: "home" });
+    expect(p.hashtags[0]).toBe("#云柔加厚抽纸");
+  });
+  it("英文商品名标签去空格（Glow Serum→#GlowSerum）", () => {
+    const p = buildPublishPack({ productName: "Glow Serum", category: "beauty", locale: "en" });
+    expect(p.hashtags[0]).toBe("#GlowSerum");
+    expect(p.hashtags[0]).not.toContain(" ");
+  });
+  it("空商品名不产出空标签(#)、首位回退到品类标签", () => {
+    const p = buildPublishPack({ category: "home" });
+    expect(p.hashtags).not.toContain("#");
+    expect((p.hashtags[0] || "").length).toBeGreaterThan(1);
+  });
+  it("商品标签是追加而非替换品类标签", () => {
+    const p = buildPublishPack({ productName: "精华液", category: "beauty" });
+    expect(p.hashtags[0]).toBe("#精华液");
+    expect(p.hashtags).toContain("#美妆");
+  });
 });
