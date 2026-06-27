@@ -7,7 +7,7 @@
  * status: starting | processing | succeeded | failed | canceled
  * output: 图片为 url 数组；视频通常为单个 url 字符串
  */
-import { BaseProvider, ProviderError } from './base'
+import { BaseProvider } from './base'
 import type {
   ProviderConfig,
   ImageOptions,
@@ -68,12 +68,10 @@ export class ReplicateProvider extends BaseProvider {
 
     const prediction = await this.createPrediction(options.modelId, input)
     const finalStatus = await this.pollTaskStatus(prediction.id, { interval: 2500 })
-    if (!finalStatus.result) {
-      throw new ProviderError('任务完成但未返回结果', 'NO_RESULT', this.name)
-    }
+    const result = this.requireResult(finalStatus.result)
     // getTaskStatus 只有 taskId、无从得知模型，置了空 modelId；这里回填实际模型（与 alibaba/volcengine/siliconflow 一致，否则返给前端的 modelId 为空串）
-    finalStatus.result.modelId = options.modelId
-    return finalStatus.result as ImageResult
+    result.modelId = options.modelId
+    return result as ImageResult
   }
 
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
@@ -91,12 +89,10 @@ export class ReplicateProvider extends BaseProvider {
 
     const prediction = await this.createPrediction(options.modelId, input)
     const finalStatus = await this.pollTaskStatus(prediction.id, { interval: 5000 })
-    if (!finalStatus.result) {
-      throw new ProviderError('任务完成但未返回结果', 'NO_RESULT', this.name)
-    }
+    const result = this.requireResult(finalStatus.result)
     // 同 generateImage：getTaskStatus 置了空 modelId，这里回填实际模型，避免返给前端的 modelId 为空串
-    finalStatus.result.modelId = options.modelId
-    return finalStatus.result as VideoResult
+    result.modelId = options.modelId
+    return result as VideoResult
   }
 
   /** 创建预测：官方模型走 /models/{owner}/{name}/predictions */

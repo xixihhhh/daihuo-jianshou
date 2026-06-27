@@ -141,12 +141,8 @@ export class SiliconFlowProvider extends BaseProvider {
       interval: 5000,
     })
 
-    if (!finalStatus.result) {
-      throw new ProviderError('任务完成但未返回结果', 'NO_RESULT', this.name)
-    }
-
     // 状态接口不回显 model，用调用方的 modelId 回填
-    const result = finalStatus.result as VideoResult
+    const result = this.requireResult(finalStatus.result) as VideoResult
     result.modelId = options.modelId
     return result
   }

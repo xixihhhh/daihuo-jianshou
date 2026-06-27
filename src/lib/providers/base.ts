@@ -202,6 +202,16 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
+   * 校验异步任务完成后确有结果，否则抛统一的 NO_RESULT。
+   * 收敛各 provider 重复的「if (!finalStatus.result) throw」守卫——把 3 行降为 1 行、口径统一，
+   * 减少某个 provider 漏写守卫而隐性失败的风险（审计曾因 provider 各自实现而发现重复 bug）。
+   */
+  protected requireResult<T>(result: T | undefined | null, message = '任务完成但未返回结果', code = 'NO_RESULT'): T {
+    if (result == null) throw new ProviderError(message, code, this.name)
+    return result
+  }
+
+  /**
    * 延迟执行
    * @param ms 延迟毫秒数
    */

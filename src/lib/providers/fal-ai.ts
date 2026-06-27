@@ -126,11 +126,7 @@ export class FalAIProvider extends BaseProvider {
       interval: 2000,
     })
 
-    if (!finalStatus.result) {
-      throw new ProviderError('任务完成但未返回结果', 'NO_RESULT', this.name)
-    }
-
-    return finalStatus.result as ImageResult
+    return this.requireResult(finalStatus.result) as ImageResult
   }
 
   /**
@@ -187,11 +183,7 @@ export class FalAIProvider extends BaseProvider {
       interval: 5000,
     })
 
-    if (!finalStatus.result) {
-      throw new ProviderError('任务完成但未返回结果', 'NO_RESULT', this.name)
-    }
-
-    return finalStatus.result as VideoResult
+    return this.requireResult(finalStatus.result) as VideoResult
   }
 
   /**

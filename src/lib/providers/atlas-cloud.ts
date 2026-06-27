@@ -276,10 +276,7 @@ export class AtlasCloudProvider extends BaseProvider {
 
   /** 从最终任务状态中提取输出 URL 列表 */
   private extractOutputs(finalStatus: TaskStatus): string[] {
-    const result = finalStatus.result
-    if (!result) {
-      throw new ProviderError('任务完成但未返回结果', 'NO_RESULT', this.name)
-    }
+    const result = this.requireResult(finalStatus.result)
     const urls = 'imageUrls' in result ? result.imageUrls : result.videoUrls
     if (!urls || urls.length === 0) {
       throw new ProviderError('任务完成但输出为空', 'EMPTY_OUTPUT', this.name)
