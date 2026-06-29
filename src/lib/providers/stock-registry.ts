@@ -169,7 +169,7 @@ export function rankStockCandidates(
     const am = a.mediaType === mediaType ? 0 : 1;
     const bm = b.mediaType === mediaType ? 0 : 1;
     if (am !== bm) return am - bm;
-    // 本地自有素材优先（同媒体类型时）：用户既已上传 B-roll 就先用自己的，免费素材补不足（对标 the reference tool a local source 的意图）
+    // 本地自有素材优先（同媒体类型时）：用户既已上传 B-roll 就先用自己的，免费素材补不足
     const al = a.source === "local" ? 0 : 1;
     const bl = b.source === "local" ? 0 : 1;
     if (al !== bl) return al - bl;

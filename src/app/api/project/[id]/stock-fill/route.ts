@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .where(eq(assetsTable.projectId, id));
   const already = new Set(existing.map((e) => e.shotId));
 
-  // 本地素材池存在则纳入自动配画面：用户自有 B-roll 与免费素材一同参与择优（对标 the reference tool a local source）
+  // 本地素材池存在则纳入自动配画面：用户自有 B-roll 与免费素材一同参与择优
   const materialsDir = join(getDataDir(), "uploads", id, "materials");
   let localDir: string | undefined;
   try {

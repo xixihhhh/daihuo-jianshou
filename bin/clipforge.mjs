@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ClipForge CLI —— 命令行一句话出片，对标 an open-source short-video tool 的 `python a CLI a subject`。
+ * ClipForge CLI —— 命令行一句话出片：给一个主题，自动写脚本、配画面、配音、合成成片。
  *
  * 是 ClipForge HTTP API 的薄封装（与 mcp/clipforge-mcp.mjs 同一套编排：DB / FFmpeg / 免费 TTS / 免费素材），
  * 零第三方依赖、纯 Node。需先启动实例（pnpm dev / pnpm start）。素材+配音全程免 Key，只有写脚本要一个 LLM Key。
@@ -253,7 +253,7 @@ async function cmdGet(flags) {
   return { ok: true, projectId, status: composition.status, videoUrl: absVideoUrl(composition) };
 }
 
-const HELP = `ClipForge CLI · 命令行一句话出片（对标 an open-source short-video tool a CLI）
+const HELP = `ClipForge CLI · 命令行一句话出片
 
 用法：
   clipforge create --topic "在家手冲咖啡" [--duration 25] [--style knowledge]

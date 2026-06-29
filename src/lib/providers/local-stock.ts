@@ -1,6 +1,5 @@
 /**
  * 本地素材源 —— 把项目 uploads/{id}/materials/ 里用户自带的视频/图片当作素材候选，
- * 对标 an open-source short-video tool 的 `a local source local files
  * 让「用自拍/自有 B-roll 配画面」无需任何网络与 Key；目录由服务端按项目 ID 拼出，文件名来自 readdir（非用户输入）。
  */
 

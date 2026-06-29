@@ -6,7 +6,7 @@
  * 然后统一下载到 data/uploads 落 assets 表，被 composer 当普通 video/image/audio 片段消费。
  */
 
-/** 已接入的素材源 id（local = 项目自带本地 B-roll 池，对标 the reference tool 的 a local source） */
+/** 已接入的素材源 id（local = 项目自带本地 B-roll 池：用户上传的自有素材） */
 export type StockSourceId = "pexels" | "pixabay" | "openverse" | "wikimedia" | "local";
 
 export type StockMediaType = "video" | "image" | "audio";
@@ -100,7 +100,7 @@ export const STOCK_SOURCES: StockSourceMeta[] = [
     label: "本地素材",
     keyless: true,
     mediaTypes: ["video", "image"],
-    note: "用项目里上传的自拍/自有 B-roll 配画面，免网络免 Key（对标 the reference tool a local source）",
+    note: "用项目里上传的自拍/自有 B-roll 配画面，免网络免 Key",
   },
 ];
 

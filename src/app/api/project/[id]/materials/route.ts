@@ -41,7 +41,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 /**
  * POST /api/project/[id]/materials —— 上传自有视频/图片 B-roll 到本地素材池。
- * 对标 an open-source short-video tool 的 a local source：用自拍/自有素材配画面，免网络免 Key。
+ * 用自拍/自有素材配画面：上传到项目素材池，免网络免 Key。
  * multipart：files=<File[]>。落到 uploads/{id}/materials/，文件名重命名（不用原名，防安全问题）。
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
