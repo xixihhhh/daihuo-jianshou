@@ -4,6 +4,7 @@
  */
 
 import { getTemplatesByCategory, categoryNameMap, type ProductCategory } from "./templates";
+import { buildHookGuidance } from "./hook-patterns";
 
 // ==================== 系统角色 Prompt ====================
 
@@ -547,8 +548,8 @@ export function buildUserPrompt(input: ScriptGenerationInput): string {
   // 添加风格指令
   parts.push(`\n${styleDirective}`);
 
-  // 添加黄金3秒策略
-  parts.push(`\n${goldenThreeSecondsStrategies}`);
+  // 添加黄金3秒钩子指引（按品类优选机制 + 三拍结构）
+  parts.push(`\n${buildHookGuidance(category)}`);
 
   // 添加参考模板
   parts.push(`\n【参考脚本案例（仅供参考风格和节奏，不要照搬内容）】`);
