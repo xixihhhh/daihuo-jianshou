@@ -19,6 +19,20 @@ describe("shotsToCues", () => {
     const cues = shotsToCues([{ duration: 0, voiceover: "x" }]);
     expect(cues[0].endMs - cues[0].startMs).toBeGreaterThanOrEqual(500);
   });
+  it("短分镜(<500ms)不重叠：cue 尊重真实时长、不撑大", () => {
+    const cues = shotsToCues([
+      { duration: 0.2, voiceover: "a" },
+      { duration: 0.2, voiceover: "b" },
+      { duration: 0.2, voiceover: "c" },
+    ]);
+    expect(cues.map((c) => [c.startMs, c.endMs])).toEqual([
+      [0, 200],
+      [200, 400],
+      [400, 600],
+    ]);
+    // 逐对断言无重叠
+    for (let i = 1; i < cues.length; i++) expect(cues[i - 1].endMs).toBeLessThanOrEqual(cues[i].startMs);
+  });
   it("全空 → 空数组", () => {
     expect(shotsToCues([{ duration: 3, voiceover: "  " }])).toEqual([]);
   });

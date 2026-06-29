@@ -60,7 +60,13 @@ export function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const tok = argv[i];
     if (tok.startsWith("--")) {
-      const key = tok.slice(2);
+      const eqBody = tok.slice(2);
+      const eq = eqBody.indexOf("=");
+      if (eq !== -1) {
+        out.flags[eqBody.slice(0, eq)] = eqBody.slice(eq + 1); // --key=value 写法
+        continue;
+      }
+      const key = eqBody;
       const next = argv[i + 1];
       if (next === undefined || next.startsWith("--")) {
         out.flags[key] = true; // 布尔开关

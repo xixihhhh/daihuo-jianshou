@@ -36,9 +36,11 @@ export function shotsToCues(shots: ShotLike[], opts: { gapMs?: number } = {}): S
     const text = (shot.voiceover ?? "").trim();
     if (text) {
       const startMs = cursorMs;
-      // 时长缺失/为 0 但有文案时给最小可见时长，避免空 cue
-      const endMs = startMs + Math.max(durMs || MIN_CUE_MS, MIN_CUE_MS) - gapMs;
-      cues.push({ index: ++index, startMs, endMs: Math.max(endMs, startMs + MIN_CUE_MS), text });
+      // cue 时长尊重真实分镜时长，保证与时间轴一致、相邻 cue 不重叠（短分镜也不撑大到 500ms）；
+      // 仅当时长缺失/为 0 才退到最小可见时长（此退化输入下可能与紧邻 cue 轻微重叠，已属异常）
+      const cueLen = durMs > 0 ? durMs : MIN_CUE_MS;
+      const endMs = Math.max(startMs + cueLen - gapMs, startMs + 1);
+      cues.push({ index: ++index, startMs, endMs, text });
     }
     cursorMs += durMs; // 无论有无文案，时间轴都按规划时长推进
   }
