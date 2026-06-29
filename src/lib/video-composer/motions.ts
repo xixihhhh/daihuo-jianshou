@@ -1,5 +1,7 @@
 // 商品原图运动效果 - 基于 FFmpeg zoompan 滤镜
 // 用于商品展示镜头，不让 AI 碰商品图，用运动模板代替
+import { interpolate } from "./easing";
+
 export interface MotionConfig {
   name: string;
   label: string;
@@ -16,7 +18,8 @@ export const MOTIONS: Record<string, MotionConfig> = {
     getFilter: (w, h, d) => {
       const fps = 30;
       const frames = d * fps;
-      return `zoompan=z='min(zoom+0.002,1.5)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
+      const z = interpolate("on", frames, 1, 1.5, "easeOut"); // 缓出放大，减速到位，比匀速更有导演感
+      return `zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
     },
   },
   zoom_out_slow: {
@@ -26,7 +29,8 @@ export const MOTIONS: Record<string, MotionConfig> = {
     getFilter: (w, h, d) => {
       const fps = 30;
       const frames = d * fps;
-      return `zoompan=z='if(eq(on,1),1.5,max(zoom-0.002,1))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
+      const z = interpolate("on", frames, 1.5, 1, "easeOut"); // 缓出缩小
+      return `zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
     },
   },
   pan_left: {
@@ -56,7 +60,8 @@ export const MOTIONS: Record<string, MotionConfig> = {
     getFilter: (w, h, d) => {
       const fps = 30;
       const frames = d * fps;
-      return `zoompan=z='min(zoom+0.001,1.3)':x='iw/2-(iw/zoom/2)+on*0.5':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
+      const z = interpolate("on", frames, 1, 1.3, "easeOut"); // 缓出放大 + 轻微平移
+      return `zoompan=z='${z}':x='iw/2-(iw/zoom/2)+on*0.5':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
     },
   },
   bounce: {
