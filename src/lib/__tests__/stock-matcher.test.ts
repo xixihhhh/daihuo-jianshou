@@ -19,10 +19,10 @@ describe("broadenQuery（永远有素材兜底）", () => {
 
   it("去重且排除与原词相同", () => {
     const r = broadenQuery("nature");
-    expect(r).not.toContain("nature"); // 原词被排除
-    // 其余兜底仍在
+    expect(r).not.toContain("nature"); // original word is excluded
+    // remaining fallbacks are still present
     expect(r).toContain("lifestyle");
-    expect(new Set(r).size).toBe(r.length); // 无重复
+    expect(new Set(r).size).toBe(r.length); // no duplicates
   });
 
   it("空串：返回万能兜底", () => {

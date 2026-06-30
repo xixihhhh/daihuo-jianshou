@@ -13,7 +13,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 import { PerformanceFeedback } from "@/components/performance-feedback";
 
-// 平台导出配置（规划中功能，展示用）。name 用 i18n key（nameKey）在渲染时取译文
+// platform export config (planned feature, for display). name uses an i18n key (nameKey) resolved to the translated text at render time
 const platformConfigs = [
   { id: "douyin", nameKey: "platformDouyin", ratio: "9:16", resolution: "1080p", subtitle: "居中+描边", color: "from-pink-500 to-red-500" },
   { id: "kuaishou", nameKey: "platformKuaishou", ratio: "9:16", resolution: "1080p", subtitle: "贴边框", color: "from-orange-500 to-amber-500" },
@@ -21,13 +21,13 @@ const platformConfigs = [
   { id: "tiktok", nameKey: "platformTiktok", ratio: "9:16", resolution: "1080p", subtitle: "居中+描边", color: "from-slate-700 to-slate-900" },
 ];
 
-// A/B 变体预设：用现有参数（字幕风格 + 配乐情绪）各重渲一条，便于投放对比哪个转化高（全程免 Key）
+// A/B variant presets: re-render one video per preset using existing params (subtitle style + BGM mood) to compare which converts better in ads (no key required throughout)
 const AB_PRESETS: { key: string; labelKey: string; compose: Record<string, unknown> }[] = [
   { key: "karaoke", labelKey: "abVariantKaraoke", compose: { karaoke: true, bgmMood: "upbeat" } },
   { key: "rapid", labelKey: "abVariantRapid", compose: { bgmMood: "energetic" } },
 ];
 
-// 脚本风格 → i18n key（在渲染时取译文）
+// script style → i18n key (resolved to translated text at render time)
 const styleLabelKeys: Record<string, string> = {
   pain_point: "stylePainPoint",
   scene: "styleScene",
@@ -61,11 +61,11 @@ export default function ExportPage() {
   const [composition, setComposition] = useState<Composition | null>(null);
   const [scriptInfo, setScriptInfo] = useState<ScriptInfo | null>(null);
   const [fileSize, setFileSize] = useState<string>("");
-  // 发布文案
+  // publish copy
   const { llm } = useSettingsStore();
   const [productMeta, setProductMeta] = useState<{ productName: string; category: string; description: string } | null>(null);
   const [publish, setPublish] = useState<{ loading: boolean; titles: string[]; hashtags: string[]; caption: string; error?: string; template?: boolean }>({ loading: false, titles: [], hashtags: [], caption: "" });
-  // A/B 变体生成（重渲不同字幕风格+配乐各一条，供投放对比）
+  // A/B variant generation (re-render with different subtitle styles and BGM, one each, for ad comparison)
   const [abVariants, setAbVariants] = useState<{ key: string; labelKey: string; status: "running" | "done" | "error"; url?: string }[]>([]);
   const [abRunning, setAbRunning] = useState(false);
 
@@ -78,7 +78,7 @@ export default function ExportPage() {
     try { await navigator.clipboard.writeText(text); showToast(t("copied")); } catch { showToast(t("copyFailed")); }
   };
 
-  // 顺序重渲每个 A/B 变体（不同字幕风格+配乐），完成一条出一条下载链接；全程免 Key
+  // sequentially re-render each A/B variant (different subtitle style + BGM); produce a download link as each one completes; no key required throughout
   const generateAbVariants = async () => {
     if (abRunning) return;
     setAbRunning(true);
@@ -97,7 +97,7 @@ export default function ExportPage() {
           }),
         });
         if (!res.ok) throw new Error("compose failed");
-        // 按本次合成的 compositionId 精确轮询（避免 GET latest 在同秒多变体间串号成同一文件）
+        // poll by the compositionId from this render (avoids GET latest aliasing multiple same-second variants to the same file)
         const { compositionId } = await res.json();
         const url = await new Promise<string>((resolve, reject) => {
           const poll = setInterval(async () => {
@@ -107,7 +107,7 @@ export default function ExportPage() {
               const c = d.composition;
               if (c?.status === "done" && c.url) { clearInterval(poll); resolve(c.url); }
               else if (c?.status === "failed") { clearInterval(poll); reject(new Error("failed")); }
-            } catch { /* 单次轮询失败忽略 */ }
+            } catch { /* ignore single poll failure */ }
           }, 3000);
           setTimeout(() => { clearInterval(poll); reject(new Error("timeout")); }, 300000);
         });
@@ -120,13 +120,13 @@ export default function ExportPage() {
   };
 
   const generatePublish = async () => {
-    // 未配置 LLM：用免 Key 模板版文案包兜底，依旧能「复制即发」（配了 LLM 则走下方 AI 路径拿更优文案）
+    // LLM not configured: fall back to the key-free template copy pack so users can still "copy and publish" (with LLM configured, the AI path below produces better copy)
     if (!llm.apiKey) {
       const pack = buildPublishPack({
         productName: productMeta?.productName || projectName,
         category: productMeta?.category,
         sellingPoints: productMeta?.description,
-        locale: locale === "en" ? "en" : "zh", // 跟随界面语言：英文用户拿英文发布文案
+        locale: locale === "en" ? "en" : "zh", // follow the UI language: English users receive English copy
       });
       setPublish({ loading: false, titles: pack.titles, hashtags: pack.hashtags, caption: pack.caption, template: true });
       return;
@@ -140,7 +140,7 @@ export default function ExportPage() {
           productName: productMeta?.productName || projectName,
           category: productMeta?.category,
           productDescription: productMeta?.description,
-          locale: locale === "en" ? "en" : "zh", // 跟随界面语言：英文用户的 LLM 也出英文文案
+          locale: locale === "en" ? "en" : "zh", // follow the UI language: English users' LLM also outputs English copy
           llmConfig: { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.model },
         }),
       });
@@ -189,7 +189,7 @@ export default function ExportPage() {
           }
         }
       } catch {
-        // 忽略，走空态
+        // ignore, fall through to empty state
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -199,7 +199,7 @@ export default function ExportPage() {
     };
   }, [id]);
 
-  // 拿到真实成片后，HEAD 探测文件大小
+  // once the real composed video is available, HEAD-probe for the file size
   useEffect(() => {
     if (!composition?.url) return;
     let cancelled = false;
@@ -212,7 +212,7 @@ export default function ExportPage() {
           setFileSize(mb >= 1 ? `${mb.toFixed(1)} MB` : `${(Number(len) / 1024).toFixed(0)} KB`);
         }
       } catch {
-        // 忽略
+        // ignore
       }
     })();
     return () => {
@@ -220,7 +220,7 @@ export default function ExportPage() {
     };
   }, [composition?.url]);
 
-  // 多平台导出状态：platformId → { status, url }
+  // multi-platform export state: platformId → { status, url }
   const [platformExports, setPlatformExports] = useState<Record<string, { status: "idle" | "exporting" | "done" | "error"; url?: string }>>({});
   const exportPlatform = async (platformId: string) => {
     setPlatformExports((prev) => ({ ...prev, [platformId]: { status: "exporting" } }));
@@ -272,7 +272,7 @@ export default function ExportPage() {
         </div>
         <div className="flex items-center gap-3">
           <LanguageToggle />
-          {/* 步骤胶囊在窄屏放不下，移动端隐藏（仅进度展示、非导航） */}
+          {/* step pills don't fit on narrow screens, hidden on mobile (progress display only, not navigation) */}
           <div className="hidden sm:flex items-center gap-1">
             {["stepScript", "stepAssets", "stepVideo", "stepExport"].map((stepKey, i) => (
               <div key={stepKey} className="flex items-center">
@@ -303,7 +303,7 @@ export default function ExportPage() {
     );
   }
 
-  // 空态：还没有合成视频
+  // empty state: no composed video yet
   if (!composition || !composition.url) {
     return (
       <div className="min-h-screen grid-bg">
@@ -331,7 +331,7 @@ export default function ExportPage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* Toast 提示 */}
+      {/* toast notification */}
       {toast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm shadow-xl">
@@ -344,7 +344,7 @@ export default function ExportPage() {
       {headerBar}
 
       <main className="mx-auto max-w-3xl px-6 py-10">
-        {/* 完成提示 */}
+        {/* completion banner */}
         <div className="text-center mb-8">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 mb-4">
             <LuCircleCheck className="w-8 h-8 text-emerald-500" />
@@ -357,7 +357,7 @@ export default function ExportPage() {
           </p>
         </div>
 
-        {/* 视频预览（真实成片） */}
+        {/* video preview (real composed output) */}
         <Card className="glass-card neon-glow mb-6 overflow-hidden">
           <CardContent className="p-0">
             <div className="mx-auto max-w-xs">
@@ -371,7 +371,7 @@ export default function ExportPage() {
               </div>
             </div>
 
-            {/* 视频信息条 */}
+            {/* video info bar */}
             <div className="px-5 py-3 border-t border-border/30 flex items-center justify-between">
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span>{composition.resolution ?? "1080p"}</span>
@@ -391,7 +391,7 @@ export default function ExportPage() {
           </CardContent>
         </Card>
 
-        {/* 操作按钮 */}
+        {/* action buttons */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mb-8">
           <a href={`${composition.url}?download=1`} download={composition.fileName}>
             <Button className="brand-gradient text-white h-11 px-8 text-sm font-semibold w-full">
@@ -409,7 +409,7 @@ export default function ExportPage() {
           </Button>
         </div>
 
-        {/* 发布文案（AI 生成标题/话题/种草文案） */}
+        {/* publish copy (AI-generated title / hashtags / promotional caption) */}
         <Card className="glass-card mb-6">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-3">
@@ -466,7 +466,7 @@ export default function ExportPage() {
           </CardContent>
         </Card>
 
-        {/* 多平台导出（真实重编码） */}
+        {/* multi-platform export (real re-encoding) */}
         <Card className="glass-card mb-6">
           <CardContent className="p-5">
             <div className="flex items-center gap-2 mb-4">
@@ -515,12 +515,12 @@ export default function ExportPage() {
           </CardContent>
         </Card>
 
-        {/* 效果回流：发布后回填数据 → 学出哪种风格更能卖 */}
+        {/* performance feedback: backfill data after publishing → learn which style sells better */}
         <div className="mb-6">
           <PerformanceFeedback projectId={id} />
         </div>
 
-        {/* A/B 变体：换字幕风格+配乐各重渲一条，投放对比哪个转化高 */}
+        {/* A/B variants: re-render one video per subtitle style + BGM combo to compare conversion rates in ads */}
         <Card className="glass-card mb-6">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
@@ -552,7 +552,7 @@ export default function ExportPage() {
           </CardContent>
         </Card>
 
-        {/* 视频详情（真实脚本数据） */}
+        {/* video details (real script data) */}
         <Card className="glass-card">
           <CardContent className="p-5">
             <h3 className="text-sm font-semibold mb-4">{t("detailTitle")}</h3>
@@ -581,7 +581,7 @@ export default function ExportPage() {
           </CardContent>
         </Card>
 
-        {/* 底部导航 */}
+        {/* bottom navigation */}
         <div className="mt-8 flex items-center justify-center gap-4">
           <Link href="/project/new">
             <Button className="brand-gradient text-white">

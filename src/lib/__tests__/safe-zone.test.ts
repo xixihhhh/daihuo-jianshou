@@ -14,9 +14,9 @@ describe("字幕安全区", () => {
 
   it("MarginV 抬高后字幕基线落在底部 UI 死区(底部≈16.7%)之上", () => {
     const playResY = 1920;
-    const baselineY = playResY - karaokeSafeMarginV(playResY); // 字幕距顶
-    const deadZoneTop = playResY * (1 - 0.167); // 平台底部 UI 死区上沿
-    expect(baselineY).toBeLessThanOrEqual(deadZoneTop); // 基线在死区上方
+    const baselineY = playResY - karaokeSafeMarginV(playResY); // distance from top to caption baseline
+    const deadZoneTop = playResY * (1 - 0.167); // top edge of the platform's bottom UI dead zone
+    expect(baselineY).toBeLessThanOrEqual(deadZoneTop); // baseline must be above the dead zone
   });
 
   it("比旧的 marginV=240(死区内)更靠上", () => {

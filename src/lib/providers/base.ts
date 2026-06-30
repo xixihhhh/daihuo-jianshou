@@ -1,6 +1,6 @@
 /**
- * AI Provider 基础抽象类
- * 提供通用的 HTTP 请求、错误处理、任务轮询等能力
+ * AI Provider base abstract class
+ * Provides common HTTP request, error handling, and task polling capabilities
  */
 
 import type {
@@ -16,13 +16,13 @@ import type {
   TaskStatusEnum,
 } from './types'
 
-/** API 请求错误 */
+/** API request error */
 export class ProviderError extends Error {
-  /** 错误码 */
+  /** Error code */
   code: string
-  /** HTTP 状态码 */
+  /** HTTP status code */
   statusCode?: number
-  /** 所属平台 */
+  /** Provider name */
   provider: string
 
   constructor(message: string, code: string, provider: string, statusCode?: number) {
@@ -34,7 +34,7 @@ export class ProviderError extends Error {
   }
 }
 
-/** 基础 Provider 抽象类 */
+/** Base Provider abstract class */
 export abstract class BaseProvider implements AIProvider {
   abstract readonly name: string
   abstract readonly displayName: string
@@ -45,20 +45,20 @@ export abstract class BaseProvider implements AIProvider {
     this.config = config
   }
 
-  // ==================== 抽象方法（子类必须实现） ====================
+  // ==================== abstract methods (subclasses must implement) ====================
 
   abstract generateImage(options: ImageOptions): Promise<ImageResult>
   abstract generateVideo(options: VideoOptions): Promise<VideoResult>
   abstract getTaskStatus(taskId: string): Promise<TaskStatus>
   abstract listModels(mediaType?: MediaType): Promise<Model[]>
 
-  // ==================== 通用工具方法 ====================
+  // ==================== common utility methods ====================
 
   /**
-   * 发送 HTTP 请求
-   * @param path API 路径（相对于 baseUrl）
-   * @param options 请求选项
-   * @returns 解析后的 JSON 数据
+   * Send an HTTP request
+   * @param path API path (relative to baseUrl)
+   * @param options Request options
+   * @returns Parsed JSON data
    */
   protected async request<T = unknown>(
     path: string,
@@ -73,7 +73,7 @@ export abstract class BaseProvider implements AIProvider {
     const url = `${this.config.baseUrl}${path}`
     const requestTimeout = timeout ?? this.config.timeout ?? 30000
 
-    // 构建请求头
+    // build request headers
     const mergedHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       ...this.getAuthHeaders(),
@@ -81,7 +81,7 @@ export abstract class BaseProvider implements AIProvider {
       ...headers,
     }
 
-    // 瞬时错误自动重试（429 限流、5xx、网络异常、超时），最多 2 次重试，指数退避
+    // auto-retry on transient errors (429 rate-limit, 5xx, network failure, timeout), up to 2 retries with exponential backoff
     const maxRetries = 2
     let lastError: unknown
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -97,7 +97,7 @@ export abstract class BaseProvider implements AIProvider {
 
         if (!response.ok) {
           const errorBody = await response.text().catch(() => '')
-          // 429/5xx 属可重试瞬时错误
+          // 429/5xx are retryable transient errors
           if ((response.status === 429 || response.status >= 500) && attempt < maxRetries) {
             lastError = new ProviderError(
               `API 请求失败: ${response.status} ${response.statusText}`,
@@ -119,7 +119,7 @@ export abstract class BaseProvider implements AIProvider {
         return (await response.json()) as T
       } catch (error) {
         clearTimeout(timeoutId)
-        // 4xx 等非瞬时错误：直接抛出不重试
+        // non-transient errors like 4xx: throw immediately without retry
         if (error instanceof ProviderError && error.statusCode && error.statusCode < 500 && error.statusCode !== 429) {
           throw error
         }
@@ -129,7 +129,7 @@ export abstract class BaseProvider implements AIProvider {
           : error instanceof ProviderError
             ? error
             : new ProviderError(`网络请求异常: ${error instanceof Error ? error.message : String(error)}`, 'NETWORK_ERROR', this.name)
-        // 网络/超时/瞬时错误：还有重试机会就退避后重试
+        // network/timeout/transient errors: back off and retry if attempts remain
         if (attempt < maxRetries) {
           await this.sleep(500 * Math.pow(2, attempt))
           continue
@@ -139,13 +139,13 @@ export abstract class BaseProvider implements AIProvider {
         clearTimeout(timeoutId)
       }
     }
-    // 理论不会走到，兜底
+    // should never reach here — fallback guard
     throw lastError instanceof Error ? lastError : new ProviderError('请求失败', 'UNKNOWN', this.name)
   }
 
   /**
-   * 获取认证请求头
-   * 子类可覆盖以自定义认证方式
+   * Get authentication headers
+   * Subclasses can override to customize the authentication scheme
    */
   protected getAuthHeaders(): Record<string, string> {
     return {
@@ -154,19 +154,19 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
-   * 轮询任务状态直到完成
-   * @param taskId 任务 ID
-   * @param options 轮询选项
-   * @returns 最终的任务状态
+   * Poll task status until completion
+   * @param taskId Task ID
+   * @param options Polling options
+   * @returns Final task status
    */
   protected async pollTaskStatus(
     taskId: string,
     options: {
-      /** 轮询间隔（毫秒），默认 3000 */
+      /** Polling interval in milliseconds, default 3000 */
       interval?: number
-      /** 最大轮询次数，默认 200 */
+      /** Maximum number of poll attempts, default 200 */
       maxAttempts?: number
-      /** 完成状态判断，默认检查 completed/failed/cancelled */
+      /** Terminal state check; defaults to checking for completed/failed/cancelled */
       isTerminal?: (status: TaskStatusEnum) => boolean
     } = {}
   ): Promise<TaskStatus> {
@@ -190,7 +190,7 @@ export abstract class BaseProvider implements AIProvider {
         return status
       }
 
-      // 等待指定间隔后继续轮询
+      // wait for the specified interval before the next poll
       await this.sleep(interval)
     }
 
@@ -202,9 +202,10 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
-   * 校验异步任务完成后确有结果，否则抛统一的 NO_RESULT。
-   * 收敛各 provider 重复的「if (!finalStatus.result) throw」守卫——把 3 行降为 1 行、口径统一，
-   * 减少某个 provider 漏写守卫而隐性失败的风险（审计曾因 provider 各自实现而发现重复 bug）。
+   * Assert that an async task has a result after completion, or throw a unified NO_RESULT error.
+   * Consolidates the repeated `if (!finalStatus.result) throw` guard across providers — reduces it
+   * from 3 lines to 1, enforces a consistent error code, and eliminates the risk of a provider
+   * silently failing by forgetting the guard (audits found duplicate bugs from per-provider implementations).
    */
   protected requireResult<T>(result: T | undefined | null, message = '任务完成但未返回结果', code = 'NO_RESULT'): T {
     if (result == null) throw new ProviderError(message, code, this.name)
@@ -212,23 +213,23 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
-   * 延迟执行
-   * @param ms 延迟毫秒数
+   * Sleep for a given duration
+   * @param ms Duration in milliseconds
    */
   protected sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   /**
-   * 上传文件到指定 URL 获取远程地址
-   * 部分平台需要先上传图片/视频素材
-   * @param fileUrl 本地或远程文件 URL
-   * @param uploadPath 上传 API 路径
-   * @returns 上传后的远程文件 URL
+   * Upload a file to a given URL and return its remote address
+   * Some platforms require images/videos to be uploaded before use
+   * @param fileUrl Local or remote file URL
+   * @param uploadPath Upload API path
+   * @returns Remote file URL after upload
    */
   protected async uploadMedia(fileUrl: string, uploadPath: string): Promise<string> {
-    // 默认实现：直接返回原始 URL（假设平台支持远程 URL）
-    // 子类可覆盖此方法实现平台特定的上传逻辑
+    // default implementation: return the original URL as-is (assumes platform supports remote URLs)
+    // subclasses can override this method to implement platform-specific upload logic
     return fileUrl
   }
 }

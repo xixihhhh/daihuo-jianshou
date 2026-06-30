@@ -1,60 +1,63 @@
 /**
- * 卡拉OK逐字高亮字幕（ASS）—— 2026 TikTok/带货爆款字幕标配：整句留屏，逐字随旁白「唱」过去变高亮色。
- * 我们自产 Edge TTS、文本已知，无需 ASR：按字符数把每行旁白时长均摊到每个字/词的 \k 卡拉OK时长。
- * 纯函数产出 ASS 文本（不落盘、不调 ffmpeg），可单测；由 composer 用 libass(subtitles 滤镜)烧录。
+ * Karaoke per-character highlight subtitles (ASS) — the 2026 TikTok / e-commerce viral subtitle standard:
+ * the full sentence stays on screen while each character lights up in sync with the narration as it "sings" through.
+ * Because we generate our own TTS and the text is already known, no ASR is needed: each line's duration is
+ * split proportionally across characters/words using the \k karaoke timing tag.
+ * Pure function that produces ASS text (no disk writes, no ffmpeg calls); unit-testable.
+ * The ASS is burned in by the composer via libass (subtitles filter).
  */
 
 import { karaokeSafeMarginV } from "./safe-zone";
 
 export interface KaraokeLine {
   text: string;
-  startTime: number; // 秒
-  endTime: number; // 秒
+  startTime: number; // seconds
+  endTime: number; // seconds
 }
 
 export interface KaraokeStyleOpts {
-  fontName?: string; // ASS Fontname；libass 经 fontconfig/CoreText/ fontsdir 解析
+  fontName?: string; // ASS Fontname; resolved by libass via fontconfig / CoreText / fontsdir
   fontSize?: number;
-  /** 已唱（高亮）色，ASS &HAABBGGRR；默认黄 */
+  /** sung (highlight) colour in ASS &HAABBGGRR format; default yellow */
   primaryColour?: string;
-  /** 未唱色；默认白 */
+  /** unsung colour; default white */
   secondaryColour?: string;
   outlineColour?: string;
   playResX?: number;
   playResY?: number;
-  /** 底部边距（px，PlayRes 坐标系） */
+  /** bottom margin in px (PlayRes coordinate space) */
   marginV?: number;
-  /** 含数字的单位（价格/折扣/数量）自动放大+换热色高亮，默认 true */
+  /** auto-enlarge and highlight units containing digits (prices/discounts/quantities) with an accent colour; default true */
   emphasizeNumbers?: boolean;
-  /** 强调高亮色（ASS &HAABBGGRR），默认橙红 */
+  /** accent highlight colour (ASS &HAABBGGRR); default orange-red */
   accentColour?: string;
 }
 
 const DEFAULTS = {
   fontName: "PingFang SC",
   fontSize: 46,
-  primaryColour: "&H0000F0FF", // 黄（高亮）
-  secondaryColour: "&H00FFFFFF", // 白（未唱）
+  primaryColour: "&H0000F0FF", // yellow (highlight)
+  secondaryColour: "&H00FFFFFF", // white (unsung)
   outlineColour: "&H00202020",
   playResX: 1080,
   playResY: 1920,
   marginV: 240,
   emphasizeNumbers: true,
-  accentColour: "&H000050FF", // 橙红，价格/折扣强调
+  accentColour: "&H000050FF", // orange-red, for price/discount emphasis
 };
 
-/** 秒 → ASS 时间戳 H:MM:SS.cc（厘秒） */
+/** seconds → ASS timestamp H:MM:SS.cc (centiseconds) */
 export function toAssTime(sec: number): string {
   const s = Math.max(0, sec);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const ss = Math.floor(s % 60);
   const cs = Math.round((s - Math.floor(s)) * 100);
-  const cc = cs === 100 ? 99 : cs; // 防进位越界
+  const cc = cs === 100 ? 99 : cs; // prevent carry overflow
   return `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}.${String(cc).padStart(2, "0")}`;
 }
 
-/** 转义 ASS Text 字段里的特殊字符（{ } 是覆盖块定界、\ 是控制符、换行用 \N） */
+/** Escape special characters in an ASS Text field ({ } delimit override blocks, \ is the control character, newline is \N) */
 export function assEscapeText(text: string): string {
   return String(text || "")
     .replace(/\\/g, "\\\\")
@@ -63,7 +66,7 @@ export function assEscapeText(text: string): string {
     .replace(/\r?\n/g, "\\N");
 }
 
-/** 切分为卡拉OK高亮单位：CJK 按字，拉丁按词（连带其后空格归到该词，避免词间塌缩） */
+/** Split text into karaoke highlight units: CJK per character, Latin per word (trailing space is absorbed into the preceding word to prevent inter-word collapsing) */
 export function splitKaraokeUnits(text: string): string[] {
   const clean = (text || "").replace(/\s+/g, " ").trim();
   if (!clean) return [];
@@ -81,7 +84,7 @@ export function splitKaraokeUnits(text: string): string[] {
       flushLatin();
       units.push(ch);
     } else if (ch === " ") {
-      latin += " "; // 空格并入当前拉丁词尾，随词作为一个卡拉单位后立即收束
+      latin += " "; // absorb space into the current Latin word tail; the combined unit is flushed immediately
       flushLatin();
     } else {
       latin += ch;
@@ -91,7 +94,7 @@ export function splitKaraokeUnits(text: string): string[] {
   return units.map((u) => u).filter((u) => u.length > 0);
 }
 
-/** ASS 颜色 &HAABBGGRR → 内联 \1c 用的 &HBBGGRR&（去掉 alpha） */
+/** Convert ASS colour &HAABBGGRR to the inline \1c form &HBBGGRR& (strip the alpha component) */
 function toInlineColour(assColour: string): string {
   const hex = String(assColour || "").replace(/^&H/i, "").replace(/&$/, "");
   const bgrr = hex.length >= 8 ? hex.slice(2) : hex;
@@ -100,15 +103,17 @@ function toInlineColour(assColour: string): string {
 
 interface LineCfg {
   baseFs: number;
-  primaryC: string; // 内联 \1c（普通字填充目标色）
-  accentC: string; // 内联 \1c（强调字填充目标色，热色）
+  primaryC: string; // inline \1c (fill target colour for normal characters)
+  accentC: string; // inline \1c (fill target colour for emphasised characters, hot colour)
   emphasize: boolean;
   emphScale: number;
 }
 
 /**
- * 为一行生成 {\k..}逐字 文本：行时长按各单位字符长占比换算成厘秒 \k；
- * 含数字的单位（价格/折扣/数量，如 50% / 9.9 / ¥39）自动放大 + 换热色高亮（带货爆款强调技法）。
+ * Build the {\k..} per-character text for a single line: each unit's \k duration (in centiseconds)
+ * is proportional to its character count relative to the line total.
+ * Units containing digits (prices/discounts/quantities, e.g. 50% / 9.9 / ¥39) are auto-enlarged
+ * and highlighted with the accent colour (standard e-commerce viral emphasis technique).
  */
 function buildKaraokeLineText(text: string, durationSec: number, cfg: LineCfg): string {
   const units = splitKaraokeUnits(text);
@@ -119,10 +124,10 @@ function buildKaraokeLineText(text: string, durationSec: number, cfg: LineCfg): 
   let used = 0;
   return units
     .map((u, i) => {
-      // 末单位吃余数；但单位数 > 总厘秒数(极短时长+长旁白)时余数会为负，下限钳到 1 防止 \k 负值乱序
+      // last unit absorbs the remainder; when unit count exceeds total centiseconds (very short duration + long narration), the remainder can be negative — clamp to 1 to prevent \k negative values causing out-of-order display
       const k = i === units.length - 1 ? Math.max(1, totalCs - used) : Math.max(1, Math.round((lens[i] / sumLen) * totalCs));
       used += k;
-      const emph = cfg.emphasize && /\d/.test(u); // 含数字 → 价格/折扣/数量，强调
+      const emph = cfg.emphasize && /\d/.test(u); // contains digit → price/discount/quantity, apply emphasis
       const fs = emph ? Math.round(cfg.baseFs * cfg.emphScale) : cfg.baseFs;
       const c = emph ? cfg.accentC : cfg.primaryC;
       return `{\\k${k}\\fs${fs}\\1c${c}}${assEscapeText(u)}`;
@@ -130,10 +135,10 @@ function buildKaraokeLineText(text: string, durationSec: number, cfg: LineCfg): 
     .join("");
 }
 
-/** 生成完整 ASS 文本（含样式 + 逐字卡拉OK事件）。 */
+/** Generate the full ASS text (style block + per-character karaoke events). */
 export function buildKaraokeAss(lines: KaraokeLine[], opts: KaraokeStyleOpts = {}): string {
   const o = { ...DEFAULTS, ...opts };
-  // 未显式指定 MarginV 时，按安全区抬到平台底部 UI 之上（避免字幕被小黄车/进度条遮挡）
+  // when MarginV is not explicitly set, raise it to the platform's bottom UI safe zone (avoids the shopping-cart button / progress bar covering subtitles)
   if (opts.marginV === undefined) o.marginV = karaokeSafeMarginV(o.playResY);
   const outline = Math.max(2, Math.round(o.fontSize * 0.07));
   const header = [

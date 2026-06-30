@@ -2,12 +2,13 @@ import { describe, it, expect, vi } from "vitest";
 import { ReplicateProvider } from "@/lib/providers/replicate";
 
 /**
- * ReplicateProvider 回归测试：getTaskStatus 只有 taskId、无从得知模型，故把 result.modelId 置空串；
- * generateImage/generateVideo 必须在返回前回填 options.modelId（与 alibaba/volcengine/siliconflow 一致），
- * 否则 `/api/ai/image|video` 直接 NextResponse.json(result) 会把空 modelId 返给前端。
+ * ReplicateProvider regression tests: getTaskStatus only has taskId and has no way to know the model,
+ * so result.modelId is set to an empty string there; generateImage/generateVideo must back-fill
+ * options.modelId before returning (consistent with alibaba/volcengine/siliconflow), otherwise
+ * `/api/ai/image|video` calling NextResponse.json(result) directly would return an empty modelId to the client.
  */
 describe("ReplicateProvider modelId 回填（审计修复）", () => {
-  // mock HTTP：createPrediction(/models/...) 返回 starting；getTaskStatus(/predictions/...) 返回 succeeded
+  // mock HTTP: createPrediction(/models/...) returns starting; getTaskStatus(/predictions/...) returns succeeded
   function mockProvider(output: string[]) {
     const p = new ReplicateProvider({ name: "replicate", apiKey: "test-token", baseUrl: "https://api.replicate.com/v1" });
     vi.spyOn(p as unknown as { request: (path: string) => Promise<unknown> }, "request").mockImplementation(

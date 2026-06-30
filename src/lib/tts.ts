@@ -1,37 +1,39 @@
 /**
- * TTS 配音 —— 多平台统一入口。
+ * TTS dubbing — unified entry point for multiple platforms.
  *
- * 支持四类付费 TTS，按 config.provider 分发（缺省 "openai" 向后兼容旧配置）：
- * - openai：OpenAI 兼容 /audio/speech（tts-1 / 硅基流动 CosyVoice / 火山方舟…），同步返回 mp3。
- * - atlas：Atlas Cloud generateAudio（xai/tts-v1），异步——提交拿 prediction id 后轮询取音频 URL。
- * - minimax：MiniMax 海螺 T2A v2，同步返回 hex 编码 mp3（国内端点需 GroupId）。
- * - falai：fal.ai（MiniMax Speech-02），队列异步——提交后轮询 status，完成取 audio.url。
+ * Supports four paid TTS providers, dispatched by config.provider
+ * (defaults to "openai" for backward compatibility with legacy configs):
+ * - openai: OpenAI-compatible /audio/speech (tts-1 / SiliconFlow CosyVoice / Volcengine Ark…), synchronous mp3.
+ * - atlas: Atlas Cloud generateAudio (xai/tts-v1), async — submit, get prediction id, then poll for audio URL.
+ * - minimax: MiniMax Hailuo T2A v2, synchronous hex-encoded mp3 (domestic endpoint requires GroupId).
+ * - falai: fal.ai (MiniMax Speech-02), queue async — submit, poll status, fetch audio.url on completion.
  *
- * 所有 provider 统一产出 mp3 字节（Buffer），上层（合成/试听）无需关心差异。
+ * All providers produce mp3 bytes (Buffer); callers (compose/preview) need not handle provider differences.
  */
 
 import type { TTSProvider } from "./tts-presets";
 import { CircuitBreaker } from "@/lib/circuit-breaker";
 
 export interface TTSConfig {
-  /** 平台，缺省 "openai" */
+  /** Platform; defaults to "openai" */
   provider?: TTSProvider;
-  /** baseUrl（按平台含义不同：OpenAI 兼容根、Atlas/MiniMax/fal 的服务根） */
+  /** baseUrl (meaning varies by platform: root for OpenAI-compatible, service root for Atlas/MiniMax/fal) */
   baseUrl: string;
   apiKey: string;
-  /** 模型 id */
+  /** Model id */
   model: string;
-  /** 音色 / voice_id */
+  /** Voice / voice_id */
   voice: string;
-  /** 语速倍率，0.5~2（各平台会各自夹取到合法区间），默认 1 */
+  /** Playback speed multiplier, 0.5–2 (each platform clamps to its own valid range); defaults to 1 */
   speed?: number;
-  /** MiniMax 国内端点的 GroupId（可选） */
+  /** GroupId for MiniMax domestic endpoint (optional) */
   groupId?: string;
 }
 
-/** 生成配音音频，返回 mp3 字节。失败抛错，由调用方决定降级。 */
-// 熔断：同一 provider 连续失败 2 次（多半 Key 失效/服务挂）就 fail-fast 后续配音，
-// 别让一整批分镜每个都各自超时拖垮合成；冷却 30s 后自动半开重试。
+/** Generate TTS audio, returns mp3 bytes. Throws on failure; caller decides on fallback. */
+// Circuit breaker: after 2 consecutive failures for the same provider (most likely an invalid key
+// or downed service), fail-fast all subsequent TTS calls so a bad key doesn't let every shot in a
+// batch time out individually and stall the whole compose pipeline; auto half-opens after 30s.
 const ttsBreakers = new Map<string, CircuitBreaker>();
 function ttsBreaker(provider: string): CircuitBreaker {
   let b = ttsBreakers.get(provider);
@@ -75,14 +77,15 @@ function dispatchTTS(clean: string, config: TTSConfig): Promise<Buffer> {
 
 const clamp = (n: number, min: number, max: number) => Math.min(Math.max(n, min), max);
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-/** 截断错误体到 200 字并显式标注省略，避免「悄悄截断」让人误以为这就是完整错误 */
+/** Truncate error body to 200 characters and explicitly mark the ellipsis, avoiding silent truncation that could be mistaken for a complete error message */
 const clipErr = (s: string) => (s.length > 200 ? s.slice(0, 200) + "…(已截断)" : s);
 
-/** 把响应里的音频字段（URL / data URI / base64 / hex）统一下载或解码成 Buffer */
+/** Normalize an audio field from a response (URL / data URI / base64 / hex) by downloading or decoding it into a Buffer */
 async function audioToBuffer(input: string): Promise<Buffer> {
   const s = input.trim();
   if (/^https?:\/\//i.test(s)) {
-    // 加 30s 超时：远端音频服务器慢/挂起时不会无限阻塞、连累整个 TTS→合成流程
+    // 30s timeout: prevents indefinite blocking when a remote audio server is slow or hung,
+    // which would stall the entire TTS → compose pipeline
     const resp = await fetch(s, { signal: AbortSignal.timeout(30000) });
     if (!resp.ok) throw new Error(`下载音频失败: ${resp.status}`);
     return Buffer.from(await resp.arrayBuffer());
@@ -91,7 +94,7 @@ async function audioToBuffer(input: string): Promise<Buffer> {
     const comma = s.indexOf(",");
     return Buffer.from(s.slice(comma + 1), "base64");
   }
-  // 纯 hex（仅 0-9a-f 且偶数长度）按 hex 解，否则按 base64
+  // Pure hex (only 0-9a-f and even length): decode as hex; otherwise decode as base64
   if (/^[0-9a-fA-F]+$/.test(s) && s.length % 2 === 0) return Buffer.from(s, "hex");
   return Buffer.from(s, "base64");
 }
@@ -148,7 +151,7 @@ async function generateSpeechAtlas(text: string, config: TTSConfig): Promise<Buf
       codec: "mp3",
       ...(config.speed != null && { speed: clamp(config.speed, 0.7, 1.5) }),
     }),
-    signal: AbortSignal.timeout(30000), // 提交加 30s 超时，避免挂起
+    signal: AbortSignal.timeout(30000), // 30s timeout on submit to avoid hanging
   });
   if (!submit.ok) {
     const t = await submit.text().catch(() => "");
@@ -158,10 +161,11 @@ async function generateSpeechAtlas(text: string, config: TTSConfig): Promise<Buf
   const taskId = sj?.data?.id ?? sj?.id;
   if (!taskId) throw new Error("Atlas TTS 未返回任务 id");
 
-  // 轮询 prediction（TTS 通常数秒内完成）
+  // Poll for prediction result (TTS usually completes within a few seconds)
   for (let i = 0; i < 60; i++) {
     await sleep(1000);
-    // 每次轮询加 10s 超时，且超时/网络抖动只跳过本轮（下轮再试），避免一次卡顿挂死整个生成
+    // 10s timeout per poll; on timeout or network jitter just skip this round and retry next,
+    // so a single slow poll doesn't deadlock the entire generation
     let pr: Response;
     try {
       pr = await fetch(`${base}/model/prediction/${taskId}`, { headers, signal: AbortSignal.timeout(10000) });
@@ -258,7 +262,7 @@ async function generateSpeechFal(text: string, config: TTSConfig): Promise<Buffe
   }
   const sj = (await submit.json()) as { request_id?: string; status_url?: string; response_url?: string };
   if (!sj?.request_id) throw new Error("fal TTS 未返回 request_id");
-  // 优先用返回的 status_url / response_url（最稳），否则按队列约定拼接
+  // Prefer the returned status_url / response_url (most reliable); fall back to constructing queue URLs by convention
   const statusUrl = sj.status_url || `${base}/${model}/requests/${sj.request_id}/status`;
   const resultUrl = sj.response_url || `${base}/${model}/requests/${sj.request_id}`;
 

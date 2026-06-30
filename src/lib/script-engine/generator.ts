@@ -1,7 +1,7 @@
 /**
- * 脚本生成器
- * 使用 OpenAI 兼容格式调用 LLM 生成带货短视频脚本
- * 支持自定义 LLM endpoint、流式输出、商品图片分析
+ * Script generator
+ * Calls an LLM in OpenAI-compatible format to generate e-commerce short-video scripts.
+ * Supports custom LLM endpoints, streaming output, and product image analysis.
  */
 
 import OpenAI from "openai";
@@ -17,72 +17,72 @@ import {
 } from "./prompts";
 import type { Shot } from "@/lib/db/schema";
 
-// ==================== 类型定义 ====================
+// ==================== Type definitions ====================
 
-/** LLM 配置 */
+/** LLM configuration */
 export interface LLMConfig {
-  /** API 地址（兼容 OpenAI 格式的任意 endpoint） */
+  /** API base URL (any OpenAI-compatible endpoint) */
   baseUrl: string;
-  /** API 密钥 */
+  /** API key */
   apiKey: string;
-  /** 文本模型名称 */
+  /** Text model name */
   model: string;
-  /** 视觉模型名称（用于商品图片分析，不指定则使用 model） */
+  /** Vision model name (used for product image analysis; falls back to model if not specified) */
   visionModel?: string;
 }
 
-/** 脚本生成输入参数 */
+/** Script generation input parameters */
 export interface ScriptInput extends ScriptGenerationInput {
-  /** LLM 配置 */
+  /** LLM configuration */
   llmConfig: LLMConfig;
 }
 
-/** 生成的脚本结果 */
+/** Generated script result */
 export interface GeneratedScript {
-  /** 脚本标题 */
+  /** Script title */
   title: string;
-  /** 脚本风格 */
+  /** Script style */
   styleType: string;
-  /** 总时长（秒） */
+  /** Total duration (seconds) */
   totalDuration: number;
-  /** 分镜列表 */
+  /** Shot list */
   shots: Shot[];
 }
 
-/** 流式输出回调 */
+/** Streaming output callbacks */
 export interface StreamCallbacks {
-  /** 收到文本片段时触发 */
+  /** Fired when a text token is received */
   onToken?: (token: string) => void;
-  /** 生成完成时触发 */
+  /** Fired when generation is complete */
   onComplete?: (scripts: GeneratedScript[]) => void;
-  /** 发生错误时触发 */
+  /** Fired when an error occurs */
   onError?: (error: Error) => void;
 }
 
-/** 商品分析结果 */
+/** Product analysis result */
 export interface ProductAnalysisResult {
-  /** 商品名称 */
+  /** Product name */
   productName: string;
-  /** 品类 */
+  /** Category */
   category: string;
-  /** 品牌 */
+  /** Brand */
   brand: string;
-  /** 视觉特征 */
+  /** Visual characteristics */
   visualFeatures: {
     mainColor: string;
     designStyle: string;
     productForm: string;
     texture: string;
   };
-  /** 卖点列表 */
+  /** List of selling points */
   sellingPoints: string[];
-  /** 目标用户 */
+  /** Target audience */
   targetAudience: string;
-  /** 使用场景 */
+  /** Usage scenarios */
   usageScenarios: string[];
-  /** 痛点 */
+  /** Pain points */
   painPoints: string[];
-  /** 视频建议 */
+  /** Video suggestions */
   videoSuggestions: {
     recommendedAngles: string[];
     keyVisuals: string[];
@@ -90,29 +90,29 @@ export interface ProductAnalysisResult {
   };
 }
 
-// ==================== 工具函数 ====================
+// ==================== Utility functions ====================
 
-/** 创建 OpenAI 客户端 */
+/** Create an OpenAI client */
 function createClient(config: LLMConfig): OpenAI {
   return new OpenAI({
     baseURL: config.baseUrl,
-    // 本地/免费 OpenAI 兼容端点（Ollama、Pollinations）无需真 Key；SDK 要求非空，缺省给占位符
+    // Local/free OpenAI-compatible endpoints (Ollama, Pollinations) don't need a real key; the SDK requires a non-empty value, so use a placeholder
     apiKey: config.apiKey || "no-key",
   });
 }
 
 /**
- * 从 LLM 返回的文本中提取 JSON
- * 兼容直接输出 JSON 和包裹在 markdown 代码块中的情况
+ * Extract JSON from LLM output text.
+ * Handles both raw JSON output and JSON wrapped in a markdown code block.
  */
 export function extractJSON(text: string): string {
-  // 尝试移除 markdown 代码块标记
+  // Try stripping markdown code block markers
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
   if (codeBlockMatch) {
     return codeBlockMatch[1].trim();
   }
 
-  // 尝试找到第一个 { 或 [ 开头的 JSON
+  // Try finding the first { or [ to locate the JSON
   const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
   if (jsonMatch) {
     return jsonMatch[1].trim();
@@ -122,16 +122,16 @@ export function extractJSON(text: string): string {
 }
 
 /**
- * 给「JSON 解析失败」的错误补一句可操作提示：以 {/[ 开头却未以 }/] 收尾，
- * 多半是 max_tokens 截断了输出——提示增大 token 上限，而非干巴巴的「非法 JSON」。
+ * Append an actionable hint to "JSON parse failed" errors: if the string starts with {/[ but doesn't end with }/],
+ * the output was likely truncated by max_tokens — suggest increasing the token limit rather than just saying "invalid JSON".
  */
 function truncationHint(jsonStr: string): string {
   return /^[{[]/.test(jsonStr) && !/[}\]]\s*$/.test(jsonStr) ? "（输出疑似被截断，请增大 max_tokens 后重试）" : "";
 }
 
 /**
- * 验证并修正单个 Shot 数据
- * 确保所有必填字段都有合法值
+ * Validate and correct a single Shot object.
+ * Ensures all required fields have valid values.
  */
 function validateShot(shot: Partial<Shot>, index: number): Shot {
   const validTypes: Shot["type"][] = ["hook", "pain_point", "product_reveal", "demo", "social_proof", "cta"];
@@ -140,7 +140,7 @@ function validateShot(shot: Partial<Shot>, index: number): Shot {
 
   const validMotions: NonNullable<Shot["motion"]>[] = ["zoom_in_slow", "pan_left", "pan_right", "ken_burns", "static"];
 
-  // 解析 LLM 产出的英文素材检索词（字段名 searchTerms 或 stockKeywords），取前 3 个非空字符串
+  // Parse LLM-generated English stock-search terms (field name searchTerms or stockKeywords), keep first 3 non-empty strings
   const rawTerms = (shot as Record<string, unknown>).searchTerms ?? shot.stockKeywords;
   const stockKeywords = Array.isArray(rawTerms)
     ? rawTerms.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim()).slice(0, 3)
@@ -153,11 +153,11 @@ function validateShot(shot: Partial<Shot>, index: number): Shot {
     description: shot.description || "",
     camera: shot.camera || "固定镜头",
     visualSource: validSources.includes(shot.visualSource as Shot["visualSource"]) ? (shot.visualSource as Shot["visualSource"]) : "ai_generate",
-    // 默认转场与 schema(videoClips.transitionType) 及 UI 默认保持一致（ai_start_end）
+    // Default transition matches the schema (videoClips.transitionType) and UI default (ai_start_end)
     transition: validTransitions.includes(shot.transition as Shot["transition"]) ? (shot.transition as Shot["transition"]) : "ai_start_end",
     voiceover: shot.voiceover || "",
     prompt: shot.prompt || undefined,
-    // 透传 LLM 按视频模式生成的扩展字段，避免被静默丢弃
+    // Pass through LLM-generated extended fields (video mode) so they are not silently dropped
     ...(stockKeywords?.length && { stockKeywords }),
     ...(shot.characterId && { characterId: shot.characterId }),
     ...(validMotions.includes(shot.motion as NonNullable<Shot["motion"]>) && { motion: shot.motion }),
@@ -171,7 +171,7 @@ function validateShot(shot: Partial<Shot>, index: number): Shot {
 }
 
 /**
- * 验证并修正完整的脚本数据
+ * Validate and correct a complete script object.
  */
 function validateScript(raw: Record<string, unknown>, fallbackStyleType: string): GeneratedScript {
   const shots = Array.isArray(raw.shots)
@@ -190,18 +190,18 @@ function validateScript(raw: Record<string, unknown>, fallbackStyleType: string)
   };
 }
 
-// ==================== 核心功能 ====================
+// ==================== Core functionality ====================
 
 /**
- * 生成带货脚本（单次调用，返回完整结果）
- * @param input - 脚本生成输入参数
- * @returns 生成的脚本数组
+ * Generate e-commerce scripts (single call, returns complete result).
+ * @param input - Script generation input parameters
+ * @returns Array of generated scripts
  */
 export async function generateScript(input: ScriptInput): Promise<GeneratedScript[]> {
   const client = createClient(input.llmConfig);
   const userPrompt = buildBatchPrompt(input, 3);
 
-  // 调用 LLM 生成脚本
+  // Call the LLM to generate the script
   let response;
   try {
     response = await client.chat.completions.create({
@@ -226,17 +226,17 @@ export async function generateScript(input: ScriptInput): Promise<GeneratedScrip
   return parseScriptResponse(content, input.styleType);
 }
 
-/** 主题成片脚本生成输入（一句话主题 + LLM 配置） */
+/** Topic-based script generation input (one-sentence topic + LLM config) */
 export interface TopicScriptGenInput extends TopicScriptInput {
   llmConfig: LLMConfig;
-  /** 生成几套方案，默认 3 */
+  /** Number of variants to generate, defaults to 3 */
   count?: number;
 }
 
 /**
- * 生成「一句话主题成片」脚本（去商品化，每个分镜带英文检索词供自动配画面）
- * @param input - 主题 + LLM 配置
- * @returns 生成的脚本数组（含 stockKeywords，可直接喂给 stock-fill 配齐画面）
+ * Generate "one-sentence topic" scripts (product-free; each shot includes English search terms for automatic media matching).
+ * @param input - Topic + LLM config
+ * @returns Array of generated scripts (includes stockKeywords, ready to feed directly into stock-fill for media matching)
  */
 export async function generateTopicScript(input: TopicScriptGenInput): Promise<GeneratedScript[]> {
   const client = createClient(input.llmConfig);
@@ -263,14 +263,14 @@ export async function generateTopicScript(input: TopicScriptGenInput): Promise<G
     throw new Error("LLM 未返回有效内容");
   }
 
-  // 主题成片没有带货风格概念，统一回退为 "custom"
+  // Topic-based videos have no e-commerce style concept; fall back uniformly to "custom"
   return parseScriptResponse(content, "custom");
 }
 
 /**
- * 生成单个脚本（更快的响应）
- * @param input - 脚本生成输入参数
- * @returns 单个生成的脚本
+ * Generate a single script (faster response).
+ * @param input - Script generation input parameters
+ * @returns A single generated script
  */
 export async function generateSingleScript(input: ScriptInput): Promise<GeneratedScript> {
   const client = createClient(input.llmConfig);
@@ -301,11 +301,11 @@ export async function generateSingleScript(input: ScriptInput): Promise<Generate
 }
 
 /**
- * 流式生成脚本
- * 支持实时获取生成进度，适合前端流式展示
- * @param input - 脚本生成输入参数
- * @param callbacks - 流式回调函数
- * @returns AbortController 用于取消生成
+ * Generate a script with streaming output.
+ * Supports real-time progress updates; suitable for frontend streaming display.
+ * @param input - Script generation input parameters
+ * @param callbacks - Streaming callback functions
+ * @returns AbortController for cancelling generation
  */
 export function generateScriptStream(
   input: ScriptInput,
@@ -340,11 +340,11 @@ export function generateScriptStream(
         }
       }
 
-      // 流式结束后解析完整结果
+      // Parse the complete result after streaming finishes
       const scripts = parseScriptResponse(fullContent, input.styleType);
       callbacks.onComplete?.(scripts);
     } catch (error) {
-      // 用户主动取消不算错误
+      // User-initiated cancellation is not an error
       if (abortController.signal.aborted) return;
       callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
     }
@@ -355,9 +355,9 @@ export function generateScriptStream(
 }
 
 /**
- * 创建流式生成的 ReadableStream
- * 用于 Next.js API Route 的流式响应
- * @param input - 脚本生成输入参数
+ * Create a ReadableStream for streaming script generation.
+ * Used for streaming responses in Next.js API routes.
+ * @param input - Script generation input parameters
  * @returns ReadableStream
  */
 export function createScriptStream(input: ScriptInput): ReadableStream<Uint8Array> {
@@ -394,14 +394,14 @@ export function createScriptStream(input: ScriptInput): ReadableStream<Uint8Arra
   });
 }
 
-// ==================== 商品图片分析 ====================
+// ==================== Product image analysis ====================
 
 /**
- * 分析商品图片
- * 调用视觉模型提取商品信息、卖点、目标用户等
- * @param imageUrls - 商品图片 URL 列表（支持 http/https 和 base64 data URI）
- * @param config - LLM 配置
- * @returns 商品分析结果的 JSON 字符串
+ * Analyse product images.
+ * Calls the vision model to extract product information, selling points, target audience, etc.
+ * @param imageUrls - List of product image URLs (http/https or base64 data URIs)
+ * @param config - LLM configuration
+ * @returns Product analysis result as a JSON string
  */
 export async function analyzeProduct(
   imageUrls: string[],
@@ -410,7 +410,7 @@ export async function analyzeProduct(
   const client = createClient(config);
   const model = config.visionModel || config.model;
 
-  // 构建带图片的消息内容
+  // Build message content with images
   const imageContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = imageUrls.map(
     (url) => ({
       type: "image_url" as const,
@@ -437,10 +437,10 @@ export async function analyzeProduct(
 }
 
 /**
- * 分析商品图片并返回结构化数据
- * @param imageUrls - 商品图片 URL 列表
- * @param config - LLM 配置
- * @returns 结构化的商品分析结果
+ * Analyse product images and return structured data.
+ * @param imageUrls - List of product image URLs
+ * @param config - LLM configuration
+ * @returns Structured product analysis result
  */
 export async function analyzeProductStructured(
   imageUrls: string[],
@@ -455,11 +455,11 @@ export async function analyzeProductStructured(
   }
 }
 
-// ==================== 解析工具 ====================
+// ==================== Parsing utilities ====================
 
 /**
- * 解析 LLM 返回的脚本内容
- * 兼容多种返回格式（单个对象、数组、嵌套对象等）
+ * Parse LLM script response content.
+ * Handles multiple return formats (single object, array, nested object, etc.)
  */
 export function parseScriptResponse(content: string, fallbackStyleType: string): GeneratedScript[] {
   const jsonStr = extractJSON(content);
@@ -471,25 +471,27 @@ export function parseScriptResponse(content: string, fallbackStyleType: string):
     throw new Error(`LLM 返回的内容不是合法 JSON${truncationHint(jsonStr)}: ${jsonStr.substring(0, 200)}`);
   }
 
-  // 处理不同的返回格式
+  // Handle different return formats
   let rawScripts: Record<string, unknown>[];
 
   if (Array.isArray(parsed)) {
-    // 直接返回数组
+    // direct array
     rawScripts = parsed;
   } else if (parsed.scripts && Array.isArray(parsed.scripts)) {
-    // { scripts: [...] } 格式
+    // { scripts: [...] } format
     rawScripts = parsed.scripts;
   } else if (parsed.shots && Array.isArray(parsed.shots)) {
-    // 单个脚本对象
+    // single script object
     rawScripts = [parsed];
   } else {
     throw new Error("无法解析 LLM 返回的脚本格式");
   }
 
-  // 丢弃没有任何分镜的脚本（LLM 偶尔返回只有 title、缺 shots 的残缺条目）；
-  // 全部为空则抛错——否则会把「零分镜脚本」当成功落库，下游配画面/合成无米可炊却不报错。
-  // 先滤掉 null/非对象元素：LLM 偶尔产出 [null, {...}]，validateScript 首行读 raw.shots 会对 null 抛错、连累整次解析。
+  // Discard scripts with no shots (LLM occasionally returns entries with only a title and no shots);
+  // if all are empty, throw — otherwise a "zero-shot script" would be saved as a success and downstream
+  // compositing / rendering would have nothing to work with, yet would not report an error.
+  // Filter out null/non-object elements first: LLM occasionally emits [null, {...}], and validateScript
+  // reads raw.shots on its first line, which throws on null and corrupts the entire parse.
   const scripts = rawScripts
     .filter((raw): raw is Record<string, unknown> => typeof raw === "object" && raw !== null)
     .map((raw) => validateScript(raw, fallbackStyleType))

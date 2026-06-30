@@ -8,7 +8,7 @@ describe("escapeSsml（SSML 特殊字符转义）", () => {
     );
   });
   it("& 必须先转义，避免二次转义出错", () => {
-    // 若顺序错误（先转 < 再转 &），&lt; 会被二次转义成 &amp;lt;
+    // if order is wrong (< escaped before &), &lt; would be double-escaped to &amp;lt;
     expect(escapeSsml("<")).toBe("&lt;");
     expect(escapeSsml("&lt;")).toBe("&amp;lt;");
   });
@@ -26,7 +26,7 @@ describe("免费音色清单", () => {
   });
   it("每个音色含合法 Edge 短名 + 性别 + 语言（value 与 lang 前缀一致）", () => {
     for (const v of FREE_TTS_VOICES) {
-      expect(v.value).toMatch(/^[a-z]{2}-[A-Z]{2}-.+Neural$/); // 语言-地区-名Neural
+      expect(v.value).toMatch(/^[a-z]{2}-[A-Z]{2}-.+Neural$/); // language-region-nameNeural
       expect(["female", "male"]).toContain(v.gender);
       expect(v.label.length).toBeGreaterThan(0);
       expect(v.value.startsWith(v.lang)).toBe(true);
@@ -35,8 +35,8 @@ describe("免费音色清单", () => {
   it("含中文+英文+多语言音色（全球化定位：外文脚本要外文原生发音）", () => {
     const langs = new Set(FREE_TTS_VOICES.map((v) => v.lang));
     expect(langs.has("zh-CN")).toBe(true);
-    expect(langs.has("en-US")).toBe(true); // 英文出海主力
-    expect(langs.size).toBeGreaterThanOrEqual(4); // 至少 4 种语言
+    expect(langs.has("en-US")).toBe(true); // primary language for overseas distribution
+    expect(langs.size).toBeGreaterThanOrEqual(4); // at least 4 languages
   });
   it("默认是温柔女声晓晓", () => {
     expect(DEFAULT_FREE_VOICE).toBe("zh-CN-XiaoxiaoNeural");

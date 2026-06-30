@@ -23,7 +23,7 @@ import { getExampleProducts } from "@/lib/examples";
 import { useT, useLocale } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 
-// 视频模式选项（labelKey 指向 batch 命名空间词条，渲染时取译文）
+// Video mode options (labelKey refers to a batch-namespace i18n key; resolved at render time)
 const videoModeOptions = [
   { value: "product_closeup", labelKey: "modeProductCloseup", icon: LuBox },
   { value: "graphic_montage", labelKey: "modeGraphicMontage", icon: LuLayoutGrid },
@@ -31,7 +31,7 @@ const videoModeOptions = [
   { value: "live_presenter", labelKey: "modeLivePresenter", icon: LuVideo },
 ];
 
-// 脚本风格选项（labelKey 指向 batch 命名空间词条，渲染时取译文）
+// Script style options (labelKey refers to a batch-namespace i18n key; resolved at render time)
 const scriptStyleOptions = [
   { value: "pain-point", labelKey: "stylePainPoint" },
   { value: "scenario", labelKey: "styleScenario" },
@@ -40,14 +40,14 @@ const scriptStyleOptions = [
   { value: "auto", labelKey: "styleAuto" },
 ];
 
-// 目标时长选项
+// Target duration options
 const durationOptions = [
   { value: "15", label: "15s" },
   { value: "30", label: "30s" },
   { value: "60", label: "60s" },
 ];
 
-// 品类 → batch 命名空间词条 key（渲染时取译文）
+// Category → batch-namespace i18n key (resolved at render time)
 const categoryLabelKeys: Record<string, string> = {
   home: "categoryHome",
   tech: "categoryTech",
@@ -57,7 +57,7 @@ const categoryLabelKeys: Record<string, string> = {
   other: "categoryOther",
 };
 
-// 脚本风格值 → 后端 styleType 规范化
+// Script style value → normalized backend styleType
 const styleTypeMap: Record<string, string> = {
   "pain-point": "pain_point",
   scenario: "scene",
@@ -66,18 +66,18 @@ const styleTypeMap: Record<string, string> = {
   auto: "auto",
 };
 
-// 批量任务状态（generating=写脚本；composing=配画面+合成成片；done=全部完成）
+// Batch task status (generating=writing script; composing=matching visuals+compositing; done=all finished)
 type TaskStatus = "pending" | "generating" | "composing" | "done" | "failed";
 
 interface BatchTask {
   id: string;
   productName: string;
   status: TaskStatus;
-  projectId?: string; // 生成成功后的项目 ID，用于跳转
+  projectId?: string; // project ID after successful generation, used for navigation
   error?: string;
 }
 
-// 任务状态 → batch 命名空间词条 key（渲染时取译文）
+// Task status → batch-namespace i18n key (resolved at render time)
 const statusLabelKeys: Record<TaskStatus, string> = {
   pending: "taskPending",
   generating: "taskGenerating",
@@ -86,7 +86,7 @@ const statusLabelKeys: Record<TaskStatus, string> = {
   failed: "taskFailed",
 };
 
-// 任务状态颜色
+// Task status badge colors
 const statusColors: Record<TaskStatus, string> = {
   pending: "bg-zinc-500/20 text-zinc-400 border-0",
   generating: "bg-amber-500/20 text-amber-400 border-0",
@@ -99,11 +99,11 @@ export default function BatchPage() {
   const t = useT("batch");
   const tc = useT("common");
   const locale = useLocale();
-  // 真实商品库 + LLM 配置
+  // Real product library + LLM config
   const { products, incrementVideoCount, addProduct } = useProductLibraryStore();
   const { llm } = useSettingsStore();
 
-  // 一键导入示例商品
+  // One-click import of example products
   const importExamples = useCallback(() => {
     const existing = new Set(products.map((p) => p.name));
     getExampleProducts(locale).forEach((ex) => {
@@ -121,26 +121,26 @@ export default function BatchPage() {
       });
     });
   }, [products, addProduct, locale]);
-  // 避免 SSR/水合不一致：挂载后再渲染列表
+  // Avoid SSR/hydration mismatch: render the list only after mount
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  // 商品选择状态
+  // Product selection state
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
-  // 配置状态
+  // Configuration state
   const [videoMode, setVideoMode] = useState("product_closeup");
   const [scriptStyle, setScriptStyle] = useState("auto");
   const [duration, setDuration] = useState("30");
-  // 生成脚本后是否自动配画面 + 合成成片（免费路径，0 Key）——把批量从"只出脚本"升级为"一键全成片"
+  // Whether to auto-compose visuals + render after script generation (free path, no API key needed) — upgrades batch from "script only" to "one-click full video"
   const [autoCompose, setAutoCompose] = useState(true);
-  const [productCard, setProductCard] = useState(true); // 批量带货默认叠商品卡贴片（有商品图才显示）
-  // 批量生成状态
+  const [productCard, setProductCard] = useState(true); // batch mode defaults to overlaying a product-card sticker (shown only when a product image is available)
+  // Batch generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [batchTasks, setBatchTasks] = useState<BatchTask[]>([]);
   const [isComplete, setIsComplete] = useState(false);
-  // 用于中断生成流程
+  // Used to abort the generation pipeline
   const abortRef = useRef(false);
 
-  // 切换商品选中状态
+  // Toggle product selection
   const toggleProduct = useCallback((productId: string) => {
     setSelectedProducts((prev) => {
       const next = new Set(prev);
@@ -153,10 +153,10 @@ export default function BatchPage() {
     });
   }, []);
 
-  // 配置缺失提示
+  // Missing config error message
   const [configError, setConfigError] = useState("");
 
-  // 开始批量生成（真实：逐个创建项目 + 生成脚本，复用单品流程）
+  // Start batch generation (real: create project + generate script per item, reusing the single-product flow)
   const handleStartBatch = useCallback(async () => {
     if (selectedProducts.size === 0 || isGenerating) return;
     if (!llm.apiKey) {
@@ -177,11 +177,11 @@ export default function BatchPage() {
     }));
     setBatchTasks(tasks);
 
-    // 处理单个商品（按 task.id 更新，支持乱序并发）
+    // Process a single product (updates by task.id, supports out-of-order concurrency)
     const processOne = async (product: (typeof selected)[number]) => {
       setBatchTasks((prev) => prev.map((t) => (t.id === product.id ? { ...t, status: "generating" } : t)));
       try {
-        // 1) 创建项目
+        // 1) Create project
         const projRes = await fetch("/api/project", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -197,7 +197,7 @@ export default function BatchPage() {
         if (!projRes.ok) throw new Error(t("errorProjectCreate"));
         const project = await projRes.json();
 
-        // 2) 生成脚本
+        // 2) Generate script
         const scriptRes = await fetch("/api/llm/script", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -223,21 +223,21 @@ export default function BatchPage() {
           throw new Error(e.error || t("errorScriptFailed"));
         }
 
-        // 3) 自动出片（免费路径）：配画面（逐镜视频优先、缺则图片）→ 免费 Edge TTS 合成 → 轮询到成片
+        // 3) Auto-render (free path): fill visuals (per-shot video preferred, fall back to image) → free Edge TTS → poll until video is done
         if (autoCompose && !abortRef.current) {
           setBatchTasks((prev) => prev.map((tk) => (tk.id === product.id ? { ...tk, status: "composing", projectId: project.id } : tk)));
           await fetch(`/api/project/${project.id}/stock-fill`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ source: "all", mediaType: "auto" }),
-          }).catch(() => {}); // 配画面失败不阻断（可能已有商品图/素材）
+          }).catch(() => {}); // visual-fill failure is non-fatal (product images/assets may already exist)
           const composeRes = await fetch(`/api/project/${project.id}/compose`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ freeTts: { enabled: true }, ...(productCard && { productCard: true }) }),
           });
           if (!composeRes.ok) throw new Error(t("errorComposeFailed"));
-          // 合成是异步的：轮询 composition 状态直到 done/failed（最多 ~3.75 分钟）
+          // Composition is async: poll composition status until done/failed (up to ~3.75 min)
           let composed = false;
           for (let i = 0; i < 90 && !abortRef.current; i++) {
             await new Promise((r) => setTimeout(r, 2500));
@@ -258,7 +258,7 @@ export default function BatchPage() {
       }
     };
 
-    // 并发池：最多 3 个同时跑，加速批量出片
+    // Concurrency pool: run at most 3 tasks simultaneously to speed up batch rendering
     const CONCURRENCY = 3;
     let cursor = 0;
     const worker = async () => {
@@ -276,16 +276,16 @@ export default function BatchPage() {
     setIsGenerating(false);
   }, [selectedProducts, isGenerating, products, llm, videoMode, duration, scriptStyle, autoCompose, productCard, incrementVideoCount]);
 
-  // 已完成的任务数量
+  // Number of completed tasks
   const doneCount = batchTasks.filter((t) => t.status === "done").length;
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* 顶部导航 */}
+      {/* Top navigation */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            {/* 返回按钮 */}
+            {/* Back button */}
             <Link href="/">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground -ml-2">
                 <LuArrowLeft className="w-4 h-4" />
@@ -311,7 +311,7 @@ export default function BatchPage() {
       </header>
 
       <main className="mx-auto max-w-2xl px-6 py-10">
-        {/* 页面标题 */}
+        {/* Page title */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight">
             <span className="brand-gradient-text">{t("heroTitle")}</span>
@@ -322,7 +322,7 @@ export default function BatchPage() {
         </div>
 
         <div className="space-y-6">
-          {/* 步骤 1：选择商品 */}
+          {/* Step 1: Select products */}
           <Card className="glass-card">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-4">
@@ -336,7 +336,7 @@ export default function BatchPage() {
               </div>
 
               {!mounted ? null : products.length === 0 ? (
-                /* 商品库为空的提示 */
+                /* Empty product library hint */
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
                     <LuPackage className="w-6 h-6 text-muted-foreground" />
@@ -356,7 +356,7 @@ export default function BatchPage() {
                   </div>
                 </div>
               ) : (
-                /* 商品列表（多选） */
+                /* Product list (multi-select) */
                 <div className="space-y-2">
                   {products.map((product) => {
                     const isSelected = selectedProducts.has(product.id);
@@ -371,7 +371,7 @@ export default function BatchPage() {
                             : "border-border/50 bg-muted/20 hover:border-primary/40"
                         } ${isGenerating ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
                       >
-                        {/* 复选框 */}
+                        {/* Checkbox */}
                         <div
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-all ${
                             isSelected
@@ -381,11 +381,11 @@ export default function BatchPage() {
                         >
                           {isSelected && <LuCheck className="w-3 h-3 text-white" />}
                         </div>
-                        {/* 商品图片占位 */}
+                        {/* Product image placeholder */}
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/30 border border-border/30">
                           <LuPackage className="w-5 h-5 text-muted-foreground" />
                         </div>
-                        {/* 商品信息 */}
+                        {/* Product info */}
                         <div className="min-w-0 flex-1">
                           <span className="text-sm font-medium block truncate">
                             {product.name}
@@ -402,12 +402,12 @@ export default function BatchPage() {
             </CardContent>
           </Card>
 
-          {/* 步骤 2：统一配置 */}
+          {/* Step 2: Unified configuration */}
           <Card className="glass-card">
             <CardContent className="p-5 space-y-5">
               <Label className="text-sm font-medium block">{t("step2Label")}</Label>
 
-              {/* 视频模式 */}
+              {/* Video mode */}
               <div>
                 <Label className="text-xs text-muted-foreground mb-2.5 block">{t("videoModeLabel")}</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -445,13 +445,13 @@ export default function BatchPage() {
                     );
                   })}
                 </div>
-                {/* 「真人出镜」诚实预期：本工具不渲染数字人，靠自备真人素材或 AI 中远景人物 */}
+                {/* Honest expectation for "live presenter": this tool does not render digital humans — relies on user-provided footage or AI mid/long-shot figures */}
                 {videoMode === "live_presenter" && (
                   <p className="mt-2 text-[11px] leading-relaxed text-amber-400/90">{t("livePresenterHint")}</p>
                 )}
               </div>
 
-              {/* 脚本风格 */}
+              {/* Script style */}
               <div>
                 <Label className="text-xs text-muted-foreground mb-2.5 block">{t("scriptStyleLabel")}</Label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -477,7 +477,7 @@ export default function BatchPage() {
                 </div>
               </div>
 
-              {/* 目标时长 */}
+              {/* Target duration */}
               <div>
                 <Label className="text-xs text-muted-foreground mb-2.5 block">{t("durationLabel")}</Label>
                 <div className="grid grid-cols-3 gap-2">
@@ -505,7 +505,7 @@ export default function BatchPage() {
             </CardContent>
           </Card>
 
-          {/* 批量任务列表（生成过程中显示） */}
+          {/* Batch task list (shown during generation) */}
           {batchTasks.length > 0 && (
             <Card className="glass-card">
               <CardContent className="p-5">
@@ -516,7 +516,7 @@ export default function BatchPage() {
                   </span>
                 </div>
 
-                {/* 进度条 */}
+                {/* Progress bar */}
                 <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden mb-4">
                   <div
                     className="h-full brand-gradient transition-all duration-500 rounded-full"
@@ -526,7 +526,7 @@ export default function BatchPage() {
                   />
                 </div>
 
-                {/* 任务列表 */}
+                {/* Task list */}
                 <div className="space-y-2">
                   {batchTasks.map((task) => (
                     <div
@@ -564,7 +564,7 @@ export default function BatchPage() {
                   ))}
                 </div>
 
-                {/* 完成提示 */}
+                {/* Completion notice */}
                 {isComplete && (
                   <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center">
                     <p className="text-sm text-emerald-400 font-medium">
@@ -576,7 +576,7 @@ export default function BatchPage() {
             </Card>
           )}
 
-          {/* 底部操作栏 */}
+          {/* Bottom action bar */}
           <div className="pt-2 pb-10">
             {configError && (
               <p className="text-sm text-destructive text-center mb-3">
@@ -586,7 +586,7 @@ export default function BatchPage() {
                 </Link>
               </p>
             )}
-            {/* 自动出片开关：把批量从「只出脚本」升级为「一键全成片」（免费路径） */}
+            {/* Auto-render toggle: upgrades batch from "script only" to "one-click full video" (free path) */}
             <label className="flex items-center justify-center gap-2 mb-3 text-sm text-muted-foreground cursor-pointer select-none">
               <input
                 type="checkbox"

@@ -1,15 +1,17 @@
 /**
- * NASA 图像/视频库素材源 —— images.nasa.gov 公共领域影像（地球/太空/科学实拍），免 Key。
+ * NASA Image and Video Library media source — public-domain imagery from images.nasa.gov (Earth/space/science footage), no API key required.
  *
- * 两步取材：search 返回条目列表 + 预览图；每条的 collection.json 再列出真实可下载文件（挑 mp4/大图）。
- * NASA 影像绝大多数为公共领域（少数含标识/可辨识人物有限制），作 B-roll 用足够；署名建议保留 "NASA"。
+ * Two-step retrieval: the search endpoint returns a list of items with preview images; each item's collection.json
+ * then lists the actual downloadable files (pick mp4 / largest image).
+ * Most NASA imagery is public domain (a few items with identifiable logos/faces have restrictions);
+ * sufficient for B-roll use — retaining "NASA" attribution is recommended.
  */
 
 import { fetchWithTimeout, type StockCandidate, type StockMediaType } from "./stock-types";
 
 const NASA_SEARCH = "https://images-api.nasa.gov/search";
 
-/** 从 collection.json 的文件 URL 列表挑一个合适的 mp4（中等清晰度，避开 ~orig.mov），并升级到 https。纯函数。 */
+/** Pick a suitable mp4 from the file URL list in collection.json (prefer medium quality, avoid ~orig.mov), and upgrade to https. Pure function. */
 export function pickNasaVideoUrl(urls: string[]): string | null {
   const mp4 = urls.filter((u) => u.toLowerCase().endsWith(".mp4"));
   const byTag = (tag: string) => mp4.find((u) => u.includes(`~${tag}.mp4`));
@@ -17,7 +19,7 @@ export function pickNasaVideoUrl(urls: string[]): string | null {
   return pick ? pick.replace(/^http:/, "https:") : null;
 }
 
-/** 从 collection.json 的文件 URL 列表挑一张合适大小的图片，并升级到 https。纯函数。 */
+/** Pick an appropriately sized image from the file URL list in collection.json, and upgrade to https. Pure function. */
 export function pickNasaImageUrl(urls: string[]): string | null {
   const img = urls.filter((u) => /\.(jpe?g|png)$/i.test(u));
   const byTag = (tag: string) => img.find((u) => u.includes(`~${tag}.`));

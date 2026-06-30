@@ -1,26 +1,26 @@
-/** 多语言配置：中文为默认/主语言，English 为可切换的全球语 */
+/** Locale configuration: Chinese is the default/primary language; English is the globally switchable alternative */
 export const LOCALES = ["zh", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 
-/** 默认语言：中文优先 */
+/** Default locale: Chinese first */
 export const DEFAULT_LOCALE: Locale = "zh";
 
-/** 语言切换器上显示的名字 */
+/** Labels shown in the language switcher */
 export const LOCALE_LABELS: Record<Locale, string> = {
   zh: "中文",
   en: "English",
 };
 
-/** 一个命名空间（一个页面/模块）的双语词条 */
+/** Bilingual message entries for a single namespace (one page/module) */
 export interface NamespaceMessages {
   zh: Record<string, string>;
   en: Record<string, string>;
 }
 
 /**
- * 按用户系统/浏览器语言自动判定界面语言。
- * 中文系统（zh / zh-CN / zh-TW…）→ zh；其余一律 → en（英语作为全球通用语兜底）。
- * 在无 navigator 的环境（SSR）返回默认语言。
+ * Auto-detects the UI locale from the user's system/browser language.
+ * Chinese systems (zh / zh-CN / zh-TW…) → zh; everything else → en (English as the global fallback).
+ * Returns the default locale in environments without navigator (SSR).
  */
 export function detectBrowserLocale(): Locale {
   if (typeof navigator === "undefined") return DEFAULT_LOCALE;
@@ -30,7 +30,7 @@ export function detectBrowserLocale(): Locale {
   for (const l of langs) {
     if (!l) continue;
     if (l.toLowerCase().startsWith("zh")) return "zh";
-    // 命中任何明确语言即采用英语兜底（我们仅提供 zh/en）
+    // Any explicit non-Chinese language match falls back to English (we only support zh/en)
     return "en";
   }
   return DEFAULT_LOCALE;

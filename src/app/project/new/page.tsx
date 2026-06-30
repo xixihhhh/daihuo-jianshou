@@ -26,7 +26,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { friendlyError } from "@/lib/friendly-error";
 import { LanguageToggle } from "@/components/language-toggle";
 
-// 商品品类选项（label 改为 i18n key，渲染时经 t() 转换）
+// product category options (label changed to i18n key, converted via t() at render time)
 const categoryOptions = [
   { value: "beauty", labelKey: "categoryBeauty" },
   { value: "food", labelKey: "categoryFood" },
@@ -36,14 +36,14 @@ const categoryOptions = [
   { value: "other", labelKey: "categoryOther" },
 ];
 
-// 目标时长选项（label 为纯单位文案，无需翻译）
+// target duration options (label is a plain unit string, no translation needed)
 const durationOptions = [
   { value: "15", label: "15s" },
   { value: "30", label: "30s" },
   { value: "60", label: "60s" },
 ];
 
-// 脚本风格选项（label/desc 改为 i18n key，渲染时经 t() 转换）
+// script style options (label/desc changed to i18n keys, converted via t() at render time)
 const styleOptions = [
   { value: "pain-point", labelKey: "stylePainPointLabel", descKey: "stylePainPointDesc" },
   { value: "scenario", labelKey: "styleScenarioLabel", descKey: "styleScenarioDesc" },
@@ -58,12 +58,12 @@ export default function NewProjectPage() {
   const tc = useT("common");
   const locale = useLocale();
 
-  // 检查 LLM API 配置状态
+  // check LLM API configuration status
   const { llm, providers } = useSettingsStore();
   const isLLMConfigured = llm.apiKey.length > 0;
   const hasProvider = Object.values(providers).some((p: { enabled: boolean; apiKey: string }) => p.enabled && p.apiKey.length > 0);
 
-  // 表单状态
+  // form state
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState<string>("");
   const [sellingPoints, setSellingPoints] = useState("");
@@ -72,13 +72,13 @@ export default function NewProjectPage() {
   const [videoMode, setVideoMode] = useState<string>("product_closeup");
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
 
-  // 新增字段状态
+  // additional field state
   const [priceRange, setPriceRange] = useState<string>("");
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
   const [platforms, setPlatforms] = useState<string[]>(["douyin"]);
   const [usageAdvantage, setUsageAdvantage] = useState("");
 
-  // 多选切换辅助函数
+  // multi-select toggle helpers
   const toggleAudience = (tag: string) => {
     setTargetAudience(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
@@ -86,25 +86,25 @@ export default function NewProjectPage() {
     setPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
   };
 
-  // 模板库
+  // template library
   const { templates, incrementUseCount } = useTemplateStore();
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
-  // 人物库
+  // character library
   const { characters } = useCharacterStore();
 
-  // 商品库（用于「做视频」从商品库带入预填）
+  // product library (used to pre-fill from the library when "make video" is triggered)
   const { products: libraryProducts } = useProductLibraryStore();
 
-  // 图片上传状态（本地模拟）
+  // image upload state (local)
   const [images, setImages] = useState<{ id: string; url: string; file: File }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 提交状态
+  // submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 粘贴商品链接一键导入（2026 带货标准入口）
+  // paste product link for one-click import (standard 2026 commerce entry point)
   const [ingestUrl, setIngestUrl] = useState("");
   const [ingesting, setIngesting] = useState(false);
   const [ingestError, setIngestError] = useState("");
@@ -114,7 +114,7 @@ export default function NewProjectPage() {
     message: string;
   } | null>(null);
 
-  // 处理图片选择
+  // handle image selection
   const handleFiles = useCallback(
     (files: FileList | null) => {
       if (!files) return;
@@ -135,7 +135,7 @@ export default function NewProjectPage() {
     [images.length]
   );
 
-  // 拖拽事件处理
+  // drag event handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -155,7 +155,7 @@ export default function NewProjectPage() {
     [handleFiles]
   );
 
-  // 删除图片
+  // remove an image
   const removeImage = useCallback((id: string) => {
     setImages((prev) => {
       const target = prev.find((img) => img.id === id);
@@ -164,7 +164,7 @@ export default function NewProjectPage() {
     });
   }, []);
 
-  // 一键填充示例商品（含真实示例图），方便新手零门槛试用
+  // one-click fill with example product (including a real sample image) to let beginners try without any setup
   const fillExample = useCallback(async (ex: ExampleProduct) => {
     setProductName(ex.name);
     setCategory(ex.category);
@@ -173,23 +173,23 @@ export default function NewProjectPage() {
       const res = await fetch(ex.image);
       const blob = await res.blob();
       const file = new File([blob], `${ex.id}.png`, { type: blob.type || "image/png" });
-      // 释放旧的预览 URL，避免内存泄漏
+      // revoke old preview URLs to avoid memory leaks
       setImages((prev) => {
         prev.forEach((img) => URL.revokeObjectURL(img.url));
         return [{ id: crypto.randomUUID(), url: URL.createObjectURL(file), file }];
       });
     } catch {
-      // 取示例图失败也无妨，文字已填好，用户可自行上传
+      // fetching the example image is non-fatal; the text fields are already filled and the user can upload manually
     }
   }, []);
 
-  // 商品库「做视频」带入：按 productId 预填商品名/品类/卖点，并尽力把商品图拉成 File
+  // product library "make video" pre-fill: populate product name / category / selling points by productId, and attempt to fetch product images as File objects
   const prefillFromProduct = useCallback(async (product: ProductItem) => {
     setProductName(product.name);
-    // 商品库的 tech 品类对应本页的 digital，其余取值一致
+    // the product library's "tech" category maps to "digital" on this page; all other values are the same
     setCategory(product.category === "tech" ? "digital" : product.category);
     if (product.description) setSellingPoints(product.description);
-    // 拉商品图为 File：示例/服务器图可成功；本地 blob 图跨页失效则跳过（文案已填好，用户可自行补传）
+    // fetch product images as File objects: works for example/server images; local blob URLs expire across pages so skip those (text is already filled, user can upload manually)
     const files: { id: string; url: string; file: File }[] = [];
     for (const [i, src] of product.images.slice(0, 5).entries()) {
       try {
@@ -198,7 +198,7 @@ export default function NewProjectPage() {
         const file = new File([blob], `product-${i}.png`, { type: blob.type || "image/png" });
         files.push({ id: crypto.randomUUID(), url: URL.createObjectURL(file), file });
       } catch {
-        // 图取不到无妨
+        // non-fatal if the image cannot be fetched
       }
     }
     if (files.length) {
@@ -209,7 +209,7 @@ export default function NewProjectPage() {
     }
   }, []);
 
-  // 落地时若带了 ?productId，从商品库取该商品预填一次（store 水合后 products 才有值，故依赖它）
+  // on mount, if ?productId is present, pre-fill once from the product library (products are only available after the store hydrates, hence the dependency)
   const prefilledRef = useRef(false);
   useEffect(() => {
     if (prefilledRef.current) return;
@@ -222,11 +222,11 @@ export default function NewProjectPage() {
     }
   }, [libraryProducts, prefillFromProduct]);
 
-  // 表单校验
+  // form validation
   const isValid = productName.trim().length > 0 && images.length >= 1;
 
-  // 提交处理
-  // 粘贴商品链接 → 后端抓取解析（标题/价/图）+ 建带货项目下图 → 直达脚本页
+  // submission handler
+  // paste product link → backend scrapes and parses (title / price / images) + creates a commerce project → navigate directly to the script page
   const handleIngest = async () => {
     const url = ingestUrl.trim();
     if (!/^https?:\/\/.+/i.test(url)) {
@@ -257,7 +257,7 @@ export default function NewProjectPage() {
     setError(null);
 
     try {
-      // 第1步：创建项目（先拿到 projectId）
+      // step 1: create the project (get projectId first)
       setProgress({ step: "creating", percent: 15, message: t("progressCreating") });
       const projectRes = await fetch("/api/project", {
         method: "POST",
@@ -273,7 +273,7 @@ export default function NewProjectPage() {
       if (!projectRes.ok) throw new Error(t("errorCreateFailed"));
       const project = await projectRes.json();
 
-      // 第2步：上传图片（携带 projectId）
+      // step 2: upload images (with projectId)
       setProgress({ step: "uploading", percent: 35, message: t("progressUploading") });
       const formData = new FormData();
       images.forEach((img) => formData.append("files", img.file));
@@ -285,21 +285,21 @@ export default function NewProjectPage() {
       }
       const { paths } = await uploadRes.json();
 
-      // 第2.5步：更新项目的图片路径
+      // step 2.5: update the project's image paths
       await fetch(`/api/project/${project.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productImages: paths }),
       });
 
-      // 第3步：生成脚本
+      // step 3: generate the script
       setProgress({ step: "generating", percent: 60, message: t("progressGenerating") });
-      // 如果选了出镜人物，附带人物信息
+      // if a presenter character was selected, include their info
       const selectedCharacter = selectedCharacterId
         ? characters.find((c) => c.id === selectedCharacterId)
         : null;
 
-      // 套用模板：把选中模板的分镜结构拼成参考结构，让 AI 据此生成（真正消费模板，而非装饰）
+      // apply template: serialize the selected template's shot structure as a reference for the AI to follow (actually consuming the template, not just decorative)
       const selectedTemplate = selectedTemplateId
         ? templates.find((t) => t.id === selectedTemplateId)
         : null;
@@ -331,7 +331,7 @@ export default function NewProjectPage() {
           targetAudience: targetAudience.join(","),
           platforms: platforms.join(","),
           usageAdvantage,
-          // 传入选中的模板 ID + 模板结构（让 AI 真正套用模板节奏）
+          // pass the selected template ID + structure (so the AI genuinely follows the template rhythm)
           ...(selectedTemplateId && { templateId: selectedTemplateId }),
           ...(referenceStructure && { referenceStructure }),
           ...(selectedCharacter && {
@@ -345,13 +345,13 @@ export default function NewProjectPage() {
         }),
       });
 
-      // 使用了模板时递增使用次数
+      // increment use count when a template was applied
       if (selectedTemplateId) {
         incrementUseCount(selectedTemplateId);
       }
       if (!scriptRes.ok) throw new Error(t("errorScriptFailed"));
 
-      // 第4步：完成
+      // step 4: done
       setProgress({ step: "done", percent: 100, message: t("progressDone") });
       await new Promise((r) => setTimeout(r, 800));
       router.push(`/project/${project.id}/script`);
@@ -364,11 +364,11 @@ export default function NewProjectPage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* 顶部导航 */}
+      {/* top navigation */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            {/* 返回按钮 */}
+            {/* back button */}
             <Link href="/">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground -ml-2">
                 <LuArrowLeft className="w-4 h-4" />
@@ -376,7 +376,7 @@ export default function NewProjectPage() {
               </Button>
             </Link>
             <div className="h-5 w-px bg-border/50" />
-            {/* Logo */}
+            {/* logo */}
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-md brand-gradient">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -392,7 +392,7 @@ export default function NewProjectPage() {
       </header>
 
       <main className="mx-auto max-w-2xl px-6 py-10">
-        {/* 页面标题 */}
+        {/* page title */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight">
             {t("pageTitlePrefix")}<span className="brand-gradient-text">{t("pageTitleAccent")}</span>
@@ -402,7 +402,7 @@ export default function NewProjectPage() {
           </p>
         </div>
 
-        {/* LLM 未配置警告 */}
+        {/* LLM not configured warning */}
         {!isLLMConfigured && (
           <Link href="/settings">
             <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 cursor-pointer hover:bg-amber-100 transition-colors">
@@ -416,7 +416,7 @@ export default function NewProjectPage() {
         )}
 
         <div className="space-y-6">
-          {/* 快速开始：示例商品一键填充（新手零门槛试用） */}
+          {/* quick start: one-click fill with example product (zero-barrier trial for beginners) */}
           <Card className="glass-card border-primary/20">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-1">
@@ -445,7 +445,7 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          {/* 粘贴商品链接一键导入（2026 带货标准入口：贴链接 → 自动抓取标题/价/图 → 直接建项目） */}
+          {/* paste product link for one-click import (standard 2026 commerce entry: paste link → auto-scrape title/price/images → create project) */}
           <Card className="glass-card border-primary/20">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-1">
@@ -472,7 +472,7 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          {/* 商品图片上传区域 */}
+          {/* product image upload area */}
           <Card className="glass-card">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -489,7 +489,7 @@ export default function NewProjectPage() {
                 </span>
               </div>
 
-              {/* 拖拽上传区域 */}
+              {/* drag-and-drop upload zone */}
               {images.length < 5 && (
                 <div
                   className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
@@ -530,7 +530,7 @@ export default function NewProjectPage() {
                 </div>
               )}
 
-              {/* 已上传图片预览网格 */}
+              {/* uploaded image preview grid */}
               {images.length > 0 && (
                 <div className={`grid grid-cols-3 sm:grid-cols-5 gap-3 ${images.length < 5 ? "mt-4" : ""}`}>
                   {images.map((img) => (
@@ -544,14 +544,14 @@ export default function NewProjectPage() {
                         alt={t("imageAlt")}
                         className="h-full w-full object-cover"
                       />
-                      {/* 删除按钮 */}
+                      {/* delete button */}
                       <button
                         onClick={() => removeImage(img.id)}
                         className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
                       >
                         <LuX className="w-3 h-3" />
                       </button>
-                      {/* 悬停遮罩 */}
+                      {/* hover overlay */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                     </div>
                   ))}
@@ -560,14 +560,14 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          {/* 商品信息表单 */}
+          {/* product info form */}
           <Card className="glass-card">
             <CardContent className="p-5 space-y-5">
               <div className="flex items-center gap-2 mb-4">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
                 <span className="text-sm font-semibold">{t("stepInfoTitle")}</span>
               </div>
-              {/* 商品名称 */}
+              {/* product name */}
               <div className="space-y-2">
                 <Label htmlFor="productName" className="text-sm font-medium">
                   {t("productNameLabel")}
@@ -582,12 +582,12 @@ export default function NewProjectPage() {
                 />
               </div>
 
-              {/* 商品品类 */}
+              {/* product category */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t("categoryLabel")}</Label>
                 <Select value={category} onValueChange={(val) => setCategory(val ?? "")}>
                   <SelectTrigger className="w-full bg-muted/30 border-border/50">
-                    {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                    {/* Base UI's Select.Value shows the raw value by default; use a function child to map it to the translated label */}
                     <SelectValue>
                       {(value: string) => {
                         const opt = categoryOptions.find((o) => o.value === value);
@@ -605,7 +605,7 @@ export default function NewProjectPage() {
                 </Select>
               </div>
 
-              {/* 商品卖点 */}
+              {/* product selling points */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="sellingPoints" className="text-sm font-medium">
@@ -623,7 +623,7 @@ export default function NewProjectPage() {
                 />
               </div>
 
-              {/* 价格定位 */}
+              {/* price range */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t("priceLabel")}</Label>
                 <div className="grid grid-cols-4 gap-2">
@@ -648,12 +648,12 @@ export default function NewProjectPage() {
                 </div>
               </div>
 
-              {/* 目标人群（多选标签） */}
+              {/* target audience (multi-select tags) */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t("audienceLabel")}</Label>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    // value 为传给 API 的原始标签（不翻译），labelKey 仅用于展示
+                    // value is the raw tag sent to the API (not translated); labelKey is used only for display
                     { value: "学生党", labelKey: "audienceStudent" },
                     { value: "上班族", labelKey: "audienceWorker" },
                     { value: "宝妈", labelKey: "audienceMom" },
@@ -678,7 +678,7 @@ export default function NewProjectPage() {
                 </div>
               </div>
 
-              {/* 投放平台（多选） */}
+              {/* target platforms (multi-select) */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t("platformLabel")}</Label>
                 <div className="grid grid-cols-3 gap-2">
@@ -703,7 +703,7 @@ export default function NewProjectPage() {
                 </div>
               </div>
 
-              {/* 用法与优势 */}
+              {/* usage and advantages */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="usageAdvantage" className="text-sm font-medium">{t("usageLabel")}</Label>
@@ -721,7 +721,7 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          {/* 视频配置（目标时长 + 视频模式） */}
+          {/* video configuration (target duration + video mode) */}
           <Card className="glass-card">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -729,7 +729,7 @@ export default function NewProjectPage() {
                 <span className="text-sm font-semibold">{t("stepConfigTitle")}</span>
               </div>
 
-              {/* 目标时长 */}
+              {/* target duration */}
               <Label className="text-sm font-medium mb-3 block">{t("durationLabel")}</Label>
               <div className="grid grid-cols-3 gap-3">
                 {durationOptions.map((opt) => (
@@ -743,7 +743,7 @@ export default function NewProjectPage() {
                     }`}
                   >
                     {opt.label}
-                    {/* 选中指示器 */}
+                    {/* selected indicator */}
                     {duration === opt.value && (
                       <div className="absolute -top-px -right-px h-4 w-4 flex items-center justify-center">
                         <div className="h-2 w-2 rounded-full brand-gradient" />
@@ -753,10 +753,10 @@ export default function NewProjectPage() {
                 ))}
               </div>
 
-              {/* 分隔线 */}
+              {/* divider */}
               <div className="my-5 border-t border-border/40" />
 
-              {/* 视频模式 */}
+              {/* video mode */}
               <Label className="text-sm font-medium mb-3 block">{t("videoModeLabel")}</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
@@ -771,7 +771,7 @@ export default function NewProjectPage() {
                       key={opt.value}
                       onClick={() => {
                         setVideoMode(opt.value);
-                        // 非真人出镜模式，清除人物选择
+                        // non-presenter mode: clear the character selection
                         if (opt.value !== "live_presenter") {
                           setSelectedCharacterId(null);
                         }
@@ -801,7 +801,7 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          {/* 使用爆款模板（仅在有模板时显示） */}
+          {/* use a viral template (shown only when templates exist) */}
           {templates.length > 0 && (
             <Card className="glass-card">
               <CardContent className="p-5">
@@ -815,7 +815,7 @@ export default function NewProjectPage() {
                   </p>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-                  {/* 不使用模板 */}
+                  {/* no template */}
                   <button
                     onClick={() => setSelectedTemplateId(null)}
                     className={`shrink-0 flex flex-col items-start p-3 rounded-lg border text-left transition-all min-w-[140px] ${
@@ -829,7 +829,7 @@ export default function NewProjectPage() {
                     </span>
                     <span className="text-[11px] text-muted-foreground mt-0.5">{t("templateNoneDesc")}</span>
                   </button>
-                  {/* 模板列表 */}
+                  {/* template list */}
                   {templates.map((tpl) => (
                     <button
                       key={tpl.id}
@@ -853,7 +853,7 @@ export default function NewProjectPage() {
             </Card>
           )}
 
-          {/* 脚本风格 */}
+          {/* script style */}
           <Card className="glass-card">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -882,7 +882,7 @@ export default function NewProjectPage() {
                     <span className="text-xs text-muted-foreground mt-0.5">
                       {t(opt.descKey)}
                     </span>
-                    {/* 选中指示器 */}
+                    {/* selected indicator */}
                     {scriptStyle === opt.value && (
                       <div className="absolute top-2.5 right-2.5">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-primary">
@@ -897,7 +897,7 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          {/* 出镜人物（仅真人出镜模式显示） */}
+          {/* presenter character (only shown in live presenter mode) */}
           {videoMode === "live_presenter" && characters.length > 0 && (
             <Card className="glass-card">
               <CardContent className="p-5">
@@ -906,7 +906,7 @@ export default function NewProjectPage() {
                   <span className="text-xs text-muted-foreground">{t("characterOptional")}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {/* 不使用人物 */}
+                  {/* no character */}
                   <button
                     onClick={() => setSelectedCharacterId(null)}
                     className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-all ${
@@ -922,7 +922,7 @@ export default function NewProjectPage() {
                     </div>
                   </button>
 
-                  {/* 已有人物 */}
+                  {/* existing characters */}
                   {characters.map((char) => (
                     <button
                       key={char.id}
@@ -949,9 +949,9 @@ export default function NewProjectPage() {
             </Card>
           )}
 
-          {/* 提交按钮 */}
+          {/* submit button */}
           <div className="pt-2 pb-10">
-            {/* 错误提示 */}
+            {/* error message */}
             {error && (
               <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
                 <p className="text-sm text-destructive flex items-center gap-2">
@@ -961,7 +961,7 @@ export default function NewProjectPage() {
               </div>
             )}
 
-            {/* 进度条 */}
+            {/* progress bar */}
             {progress && (
               <div className="mb-4">
                 <div className="h-2 bg-muted/30 rounded-full overflow-hidden">

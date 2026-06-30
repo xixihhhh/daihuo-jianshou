@@ -106,7 +106,7 @@ describe("Pixabay 归一化", () => {
     user: "maxlkt",
     user_id: 8989,
     videos: {
-      large: { url: "", width: 0, height: 0, size: 0 }, // 常见空档
+      large: { url: "", width: 0, height: 0, size: 0 }, // common empty slot
       medium: { url: "https://cdn.pixabay.com/m.mp4", width: 1920, height: 1080, size: 5_000_000, thumbnail: "https://x/m.jpg" },
       small: { url: "https://cdn.pixabay.com/s.mp4", width: 1280, height: 720, size: 2_000_000, thumbnail: "https://x/s.jpg" },
       tiny: { url: "https://cdn.pixabay.com/t.mp4", width: 960, height: 540, size: 800_000, thumbnail: "https://x/t.jpg" },
@@ -161,7 +161,7 @@ describe("Pixabay 归一化", () => {
   });
 });
 
-// ==================== 注册表 ====================
+// ==================== Registry ====================
 
 // ==================== Wikimedia Commons ====================
 
@@ -203,7 +203,7 @@ describe("Wikimedia 归一化", () => {
     expect(c.source).toBe("wikimedia");
     expect(c.mediaType).toBe("video");
     expect(c.downloadUrl).toBe("https://upload.wikimedia.org/x/Ocean_waves.webm");
-    expect(c.durationSec).toBe(13); // 12.6 → 四舍五入
+    expect(c.durationSec).toBe(13); // 12.6 → rounded
     expect(c.author).toBe("Jane Doe");
     expect(c.requiresAttribution).toBe(true);
     expect(c.previewImage).toBe("https://upload.wikimedia.org/x/thumb.jpg");
@@ -229,7 +229,7 @@ describe("Wikimedia 归一化", () => {
     };
     const c = toWikimediaCandidate(page, "audio")!;
     expect(c.mediaType).toBe("audio");
-    expect(c.downloadUrl).toBe("https://upload.wikimedia.org/x/Song.opus"); // 直链，无转码
+    expect(c.downloadUrl).toBe("https://upload.wikimedia.org/x/Song.opus"); // direct link, no transcoding
     expect(c.author).toBe("PeriTune");
     expect(c.durationSec).toBe(60);
   });
@@ -243,7 +243,7 @@ describe("Wikimedia 归一化", () => {
   it("pickWikimediaVideoSrc：选 ≤720p 最高的 webm 转码（240p+480p → 480p）", () => {
     const src = pickWikimediaVideoSrc(
       [
-        { transcodekey: "video/ogg", type: "video/ogg", src: "orig.ogv", height: 1080 }, // 原始非 webm
+        { transcodekey: "video/ogg", type: "video/ogg", src: "orig.ogv", height: 1080 }, // original non-webm
         { transcodekey: "240p.vp9.webm", src: "v240.webm" },
         { transcodekey: "480p.vp9.webm", src: "v480.webm" },
       ],
@@ -287,7 +287,7 @@ describe("Wikimedia 归一化", () => {
     };
     const c = toWikimediaCandidate(page, "video")!;
     expect(c.mediaType).toBe("video");
-    expect(c.downloadUrl).toBe("https://up/Clip.480p.webm"); // 取转码版而非 .ogv 原始
+    expect(c.downloadUrl).toBe("https://up/Clip.480p.webm"); // use transcoded version instead of .ogv original
     expect(c.requiresAttribution).toBe(false); // CC0
   });
 });
@@ -301,9 +301,9 @@ describe("多源注册表", () => {
     expect(ids).toContain("wikimedia");
     expect(STOCK_SOURCES.find((s) => s.id === "openverse")?.keyless).toBe(true);
     const wm = STOCK_SOURCES.find((s) => s.id === "wikimedia")!;
-    expect(wm.keyless).toBe(true); // 免 Key
-    expect(wm.mediaTypes).toContain("video"); // 唯一免 Key 视频源
-    expect(wm.mediaTypes).toContain("audio"); // 免 Key BGM 来源
+    expect(wm.keyless).toBe(true); // no API key required
+    expect(wm.mediaTypes).toContain("video"); // only keyless video source
+    expect(wm.mediaTypes).toContain("audio"); // keyless BGM source
   });
 
   it("wikimedia 无 key 也可用(keyless)", () => {
@@ -330,7 +330,7 @@ describe("多源注册表", () => {
   });
 });
 
-// ==================== 审查修复回归 ====================
+// ==================== Review Fix Regressions ====================
 
 const cand = (over: Partial<StockCandidate>): StockCandidate => ({
   source: "openverse",
@@ -373,7 +373,7 @@ describe("rankStockCandidates（聚合排序）", () => {
     const ranked = rankStockCandidates(
       [
         cand({ source: "wikimedia", mediaType: "video", id: "wiki", width: 1080, height: 1920 }),
-        cand({ source: "local", mediaType: "video", id: "mine" }), // 本地无尺寸，仍应排前
+        cand({ source: "local", mediaType: "video", id: "mine" }), // local has no dimensions but should still rank first
       ],
       "video",
       "portrait",

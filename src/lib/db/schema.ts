@@ -1,91 +1,92 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
-// 项目表
+// Projects table
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   status: text("status", { enum: ["draft", "scripting", "assets", "video", "composing", "done"] }).notNull().default("draft"),
-  // 内容类型：product=带货（围绕商品），topic=主题成片（无商品，一句话主题→旁白脚本→免费素材自动配画面）
+  // Content type: product=commerce (product-centred), topic=topic-based video (no product; one-sentence topic → narration script → auto-matched free footage)
   contentType: text("content_type", { enum: ["product", "topic"] }).default("product"),
-  // topic 模式下用户输入的一句话主题（如"在家如何泡一杯手冲咖啡"）
+  // One-sentence topic entered by the user in topic mode (e.g. "在家如何泡一杯手冲咖啡")
   topic: text("topic"),
   productName: text("product_name"),
   productCategory: text("product_category"),
   productDescription: text("product_description"),
-  productPrice: text("product_price"), // 商品价格文案（如「¥39.9」「£63.00」，主要来自链接 ingest，用于商品卡贴片）
+  productPrice: text("product_price"), // Product price display text (e.g. "¥39.9" / "£63.00", mainly sourced from link ingest, used for product-card overlays)
   productImages: text("product_images", { mode: "json" }).$type<string[]>().default([]),
-  productAnalysis: text("product_analysis"), // LLM 视觉分析结果
-  productId: text("product_id"), // 关联商品库（可选，也可直接填写）
-  brandId: text("brand_id"), // 关联品牌设置
-  templateId: text("template_id"), // 使用的脚本模板
-  videoMode: text("video_mode", { enum: ["product_closeup", "graphic_montage", "scene_demo", "live_presenter"] }).default("product_closeup"), // 视频模式
-  sourceType: text("source_type", { enum: ["manual", "clone"] }).default("manual"), // manual=手动创建, clone=爆款复刻
-  sourceVideoUrl: text("source_video_url"), // 爆款复刻来源视频 URL
-  characterId: text("character_id"), // 项目绑定的出镜人物（仅 live_presenter 模式）
+  productAnalysis: text("product_analysis"), // LLM visual analysis result
+  productId: text("product_id"), // Linked product library entry (optional; can also be filled in directly)
+  brandId: text("brand_id"), // Linked brand settings
+  templateId: text("template_id"), // Script template in use
+  videoMode: text("video_mode", { enum: ["product_closeup", "graphic_montage", "scene_demo", "live_presenter"] }).default("product_closeup"), // Video mode
+  sourceType: text("source_type", { enum: ["manual", "clone"] }).default("manual"), // manual=created by hand, clone=viral-video remake
+  sourceVideoUrl: text("source_video_url"), // Source video URL for viral-video remakes
+  characterId: text("character_id"), // On-screen character bound to the project (live_presenter mode only)
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 脚本表
+// Scripts table
 export const scripts = sqliteTable("scripts", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   version: integer("version").notNull().default(1),
   styleType: text("style_type", { enum: ["pain_point", "scene", "comparison", "story", "custom"] }).notNull(),
   title: text("title"),
-  totalDuration: integer("total_duration"), // 总时长（秒）
+  totalDuration: integer("total_duration"), // Total duration in seconds
   shots: text("shots", { mode: "json" }).$type<Shot[]>().default([]),
   selected: integer("selected", { mode: "boolean" }).default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 效果回流：发布后人工录入的各条投放数据。录入时定格 style/category/platform，
-// 便于按风格聚合「哪种更能卖」（项目后续改了也不污染历史样本）。
+// Performance feedback: manually entered placement data recorded after publishing.
+// style/category/platform are snapshotted at entry time so historical samples are not
+// polluted if the project is later modified — enables per-style aggregation of "what sells best".
 export const publishMetrics = sqliteTable("publish_metrics", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
-  style: text("style").notNull(), // 脚本风格 key：pain_point/scene/comparison/story/custom
-  hookId: text("hook_id"), // 钩子机制 id（= HookPattern.id），钩子 A/B 回流用，可空
-  category: text("category"), // 品类（定格）
+  style: text("style").notNull(), // Script style key: pain_point/scene/comparison/story/custom
+  hookId: text("hook_id"), // Hook mechanism id (= HookPattern.id), used for hook A/B feedback, nullable
+  category: text("category"), // Product category (snapshotted)
   platform: text("platform"), // douyin/tiktok/kuaishou/xiaohongshu/...
   views: integer("views").notNull().default(0),
   likes: integer("likes").notNull().default(0),
   comments: integer("comments").notNull().default(0),
   shares: integer("shares").notNull().default(0),
-  orders: integer("orders").notNull().default(0), // 成交单数
+  orders: integer("orders").notNull().default(0), // Number of orders placed
   note: text("note"),
   publishedAt: integer("published_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 素材表
+// Assets table
 export const assets = sqliteTable("assets", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
-  shotId: integer("shot_id").notNull(), // 对应分镜序号
-  // stock_footage = 版权素材库（如 Pexels）检索下载的免费可商用视频/图片
+  shotId: integer("shot_id").notNull(), // Corresponding shot index
+  // stock_footage = free commercial-use video/images fetched from a stock library (e.g. Pexels)
   type: text("type", { enum: ["ai_generated", "product_image", "user_upload", "stock_footage"] }).notNull(),
   filePath: text("file_path"),
   thumbnailPath: text("thumbnail_path"),
   provider: text("provider"),
   model: text("model"),
   prompt: text("prompt"),
-  // 素材来源信息（stock_footage 合规必需：留存出处链接/作者/授权，导出时生成 credits）
-  sourceUrl: text("source_url"), // 素材来源页 URL（如 Pexels 视频详情页）
-  author: text("author"), // 素材作者（署名用）
-  license: text("license"), // 授权类型，如 "Pexels"
+  // Asset provenance (required for stock_footage compliance: retain source link/author/license; generate credits on export)
+  sourceUrl: text("source_url"), // Source page URL (e.g. Pexels video detail page)
+  author: text("author"), // Asset author (for attribution)
+  license: text("license"), // License type, e.g. "Pexels"
   status: text("status", { enum: ["pending", "generating", "done", "failed"] }).notNull().default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 视频片段表
+// Video clips table
 export const videoClips = sqliteTable("video_clips", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   shotId: integer("shot_id").notNull(),
   assetId: text("asset_id").references(() => assets.id),
   filePath: text("file_path"),
-  duration: integer("duration"), // 毫秒
+  duration: integer("duration"), // Milliseconds
   provider: text("provider"),
   model: text("model"),
   transitionType: text("transition_type", { enum: ["ai_start_end", "ai_reference", "direct_concat", "ffmpeg_fade"] }).default("ai_start_end"),
@@ -93,14 +94,14 @@ export const videoClips = sqliteTable("video_clips", {
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 合成输出表
+// Compositions table
 export const compositions = sqliteTable("compositions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   outputPath: text("output_path"),
   resolution: text("resolution", { enum: ["720p", "1080p"] }).default("1080p"),
-  aspectRatio: text("aspect_ratio", { enum: ["9:16", "16:9", "1:1"] }).default("9:16"), // 竖屏为主
-  duration: integer("duration"), // 毫秒
+  aspectRatio: text("aspect_ratio", { enum: ["9:16", "16:9", "1:1"] }).default("9:16"), // Portrait-first
+  duration: integer("duration"), // Milliseconds
   bgmPath: text("bgm_path"),
   ttsEnabled: integer("tts_enabled", { mode: "boolean" }).default(false),
   subtitleStyle: text("subtitle_style", { mode: "json" }).$type<SubtitleStyle>(),
@@ -108,121 +109,121 @@ export const compositions = sqliteTable("compositions", {
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 商品库表 — 跨项目复用的商品信息
+// Products table — product information reused across projects
 export const products = sqliteTable("products", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(), // 商品名称
+  name: text("name").notNull(), // Product name
   category: text("category", { enum: ["beauty", "food", "home", "fashion", "tech", "other"] }).notNull(),
-  description: text("description"), // 卖点描述
-  images: text("images", { mode: "json" }).$type<string[]>().default([]), // 商品图 URL 列表
-  price: text("price"), // 价格信息（如"59.9元"、"199-299元"）
-  targetAudience: text("target_audience"), // 目标人群
-  analysis: text("analysis"), // LLM 视觉分析结果（缓存）
-  videoCount: integer("video_count").default(0), // 已生成的视频数量
+  description: text("description"), // Selling-point description
+  images: text("images", { mode: "json" }).$type<string[]>().default([]), // List of product image URLs
+  price: text("price"), // Price info (e.g. "59.9元", "199-299元")
+  targetAudience: text("target_audience"), // Target audience
+  analysis: text("analysis"), // LLM visual analysis result (cached)
+  videoCount: integer("video_count").default(0), // Number of videos generated
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 品牌设置表 — 统一的品牌视觉标识
+// Brand settings table — unified brand visual identity
 export const brandSettings = sqliteTable("brand_settings", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(), // 品牌/店铺名
-  logoPath: text("logo_path"), // logo 图片路径
-  primaryColor: text("primary_color"), // 品牌主色（hex）
-  secondaryColor: text("secondary_color"), // 品牌辅色
-  fontFamily: text("font_family"), // 首选字体
-  watermark: text("watermark", { mode: "json" }).$type<WatermarkConfig>(), // 水印配置
-  introTemplatePath: text("intro_template_path"), // 片头模板路径
-  outroTemplatePath: text("outro_template_path"), // 片尾模板路径
+  name: text("name").notNull(), // Brand / store name
+  logoPath: text("logo_path"), // Logo image path
+  primaryColor: text("primary_color"), // Brand primary color (hex)
+  secondaryColor: text("secondary_color"), // Brand secondary color
+  fontFamily: text("font_family"), // Preferred font family
+  watermark: text("watermark", { mode: "json" }).$type<WatermarkConfig>(), // Watermark configuration
+  introTemplatePath: text("intro_template_path"), // Intro template path
+  outroTemplatePath: text("outro_template_path"), // Outro template path
   isDefault: integer("is_default", { mode: "boolean" }).default(true),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 脚本模板表 — 用户保存的成功脚本模板
+// Script templates table — user-saved high-performing script templates
 export const scriptTemplates = sqliteTable("script_templates", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(), // 模板名称
-  description: text("description"), // 模板描述
-  category: text("category"), // 适用品类
-  videoMode: text("video_mode"), // 适用视频模式
-  styleType: text("style_type"), // 脚本风格
-  shots: text("shots", { mode: "json" }).$type<Shot[]>().default([]), // 脚本结构（shot 的 prompt 会被替换）
-  sourceProjectId: text("source_project_id"), // 来源项目
-  useCount: integer("use_count").default(0), // 被使用次数
+  name: text("name").notNull(), // Template name
+  description: text("description"), // Template description
+  category: text("category"), // Applicable product category
+  videoMode: text("video_mode"), // Applicable video mode
+  styleType: text("style_type"), // Script style
+  shots: text("shots", { mode: "json" }).$type<Shot[]>().default([]), // Script structure (shot prompts will be replaced on use)
+  sourceProjectId: text("source_project_id"), // Source project
+  useCount: integer("use_count").default(0), // Times used
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 人物/角色表 — 跨项目复用的出镜人物
+// Characters table — on-screen presenters reused across projects
 export const characters = sqliteTable("characters", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(), // 人物名称，如"小美"
-  description: text("description"), // 简短描述，如"25岁女生，活泼开朗"
-  appearance: text("appearance"), // 外貌特征（用于注入 AI prompt）
-  referenceImages: text("reference_images", { mode: "json" }).$type<string[]>().default([]), // 参考图 URL 列表
-  voiceProfile: text("voice_profile", { mode: "json" }).$type<CharacterVoiceProfile>(), // 声音偏好
-  isDefault: integer("is_default", { mode: "boolean" }).default(false), // 是否为默认出镜人物
+  name: text("name").notNull(), // Character name, e.g. "小美"
+  description: text("description"), // Short description, e.g. "25岁女生，活泼开朗"
+  appearance: text("appearance"), // Appearance traits (injected into AI prompts)
+  referenceImages: text("reference_images", { mode: "json" }).$type<string[]>().default([]), // List of reference image URLs
+  voiceProfile: text("voice_profile", { mode: "json" }).$type<CharacterVoiceProfile>(), // Voice preferences
+  isDefault: integer("is_default", { mode: "boolean" }).default(false), // Whether this is the default on-screen presenter
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// 设置表
+// Settings table
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value", { mode: "json" }),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// ===== 类型定义 =====
+// ===== Type definitions =====
 
-/** 视频模式：决定素材生成策略 */
+/** Video mode: determines the asset generation strategy */
 export type VideoMode =
-  | "product_closeup"   // 产品特写：商品原图 + 运动特效，真实感最高
-  | "graphic_montage"   // 图文混剪：商品图 + 文字卡片 + 转场动画
-  | "scene_demo"        // 场景演示：AI 生成使用场景（不含人脸）
-  | "live_presenter";   // 真人出镜：人物出镜讲解（需要角色或用户上传素材）
+  | "product_closeup"   // Product close-up: original product image + motion effects, highest realism
+  | "graphic_montage"   // Graphic montage: product image + text cards + transition animations
+  | "scene_demo"        // Scene demo: AI-generated usage scenario (no faces)
+  | "live_presenter";   // Live presenter: on-screen character explains the product (requires a character or user-uploaded footage)
 
 export interface Shot {
   shotId: number;
   type: "hook" | "pain_point" | "product_reveal" | "demo" | "social_proof" | "cta";
-  duration: number; // 秒
-  description: string; // 画面描述
-  camera: string; // 镜头运动
+  duration: number; // Seconds
+  description: string; // Scene description
+  camera: string; // Camera movement
   visualSource: "ai_generate" | "product_image" | "user_upload";
   transition: "ai_start_end" | "ai_reference" | "direct_concat" | "ffmpeg_fade";
-  voiceover: string; // 配音文案
-  prompt?: string; // AI 生图/生视频 prompt
-  /** 该分镜的英文素材检索词（1-3 个），用于从免费素材库自动配画面（无商品主题成片的关键） */
+  voiceover: string; // Voiceover copy
+  prompt?: string; // AI image/video generation prompt
+  /** English stock-footage keywords for this shot (1-3), used to auto-match footage from free libraries (key for topic-based videos without a product) */
   stockKeywords?: string[];
-  /** 出镜人物 ID，关联 characters 表（可选） */
+  /** On-screen character ID, references the characters table (optional) */
   characterId?: string;
-  /** 运动效果，仅 product_image 类型使用 */
+  /** Motion effect, only used for the product_image type */
   motion?: "zoom_in_slow" | "pan_left" | "pan_right" | "ken_burns" | "static";
-  /** 文字叠加层（图文混剪模式） */
+  /** Text overlay (graphic montage mode) */
   textOverlay?: {
     text: string;
     style: "title" | "subtitle" | "highlight" | "price";
   };
 }
 
-/** 人物声音偏好 */
+/** Character voice preferences */
 export interface CharacterVoiceProfile {
-  /** 声音风格描述，如"温柔女声"、"专业男声" */
+  /** Voice style description, e.g. "温柔女声" / "专业男声" */
   style: string;
-  /** 语速偏好 0.8-1.5 */
+  /** Speech-rate preference 0.8–1.5 */
   speed?: number;
-  /** 情感倾向 */
+  /** Emotional tone */
   emotion?: "neutral" | "happy" | "serious" | "energetic";
 }
 
-/** 水印配置 */
+/** Watermark configuration */
 export interface WatermarkConfig {
-  /** 是否启用 */
+  /** Whether the watermark is enabled */
   enabled: boolean;
-  /** 位置 */
+  /** Position */
   position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
-  /** 透明度 0-1 */
+  /** Opacity 0–1 */
   opacity: number;
-  /** 缩放比例 0.1-0.5 */
+  /** Scale 0.1–0.5 */
   scale: number;
 }
 

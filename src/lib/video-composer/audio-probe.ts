@@ -1,14 +1,17 @@
 /**
- * 音轨「可听见」判定 —— 从 ffmpeg volumedetect 的输出区分「真有声」与「静音/空轨」。
+ * Audio track "audible" detection — distinguishes "truly audible" from "silent/empty track"
+ * using ffmpeg volumedetect output.
  *
- * 背景：部分免费素材（如 Wikimedia 的某些视频）带一条**静音**音轨。仅凭「有无音频流」判断会误判为
- *      「自带语音」，从而跳过免费 TTS 旁白，导致该分镜没有解说。用 volumedetect 的 max_volume 兜底。
+ * Background: some free stock clips (e.g. certain Wikimedia videos) carry a **silent** audio track.
+ * Relying solely on "has audio stream" would incorrectly treat them as having voice-over,
+ * skipping the free TTS narration and leaving the scene with no commentary.
+ * volumedetect's max_volume is used as a fallback check.
  */
 
 /**
- * 解析 volumedetect 的 stderr，判断音轨是否可听见。
- * - max_volume 低于阈值（默认 -50dB）或为 -inf → 静音（false，让 TTS 旁白接管）；
- * - 解析不到 max_volume → 保守返回 true（避免误吞模型自带的真实语音/音效）。
+ * Parse volumedetect stderr and determine whether the audio track is audible.
+ * - max_volume below threshold (default -50dB) or equals -inf → silent (return false, let TTS narration take over);
+ * - max_volume not found → conservatively return true (avoid accidentally suppressing genuine model voice/sfx).
  */
 export function isAudibleFromVolumedetect(stderr: string, thresholdDb = -50): boolean {
   const m = /max_volume:\s*(-?(?:inf|\d+(?:\.\d+)?))\s*dB/i.exec(stderr || "");

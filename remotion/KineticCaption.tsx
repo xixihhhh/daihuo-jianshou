@@ -2,8 +2,8 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, spring, interpolate } from "remotion";
 
 /**
- * 逐字动态字幕：每个词依次 spring 弹入 + 上浮 + 缩放，渐变底 + 辉光。
- * 比 libass 卡拉OK 更"动"，作可选动效字幕元素。
+ * Word-by-word kinetic captions: each word springs in sequentially with bounce + float + scale, gradient background + glow.
+ * More animated than libass karaoke — used as an optional motion caption element.
  */
 export const KineticCaption: React.FC<{ text: string }> = ({ text }) => {
   const frame = useCurrentFrame();

@@ -1,19 +1,21 @@
 /**
- * ffmpeg / ffprobe 二进制路径解析 —— 让命令可指向随包二进制，支撑 Electron 打包
+ * ffmpeg / ffprobe binary path resolution — allows commands to target the bundled binary,
+ * supporting Electron packaging.
  *
- * 开发态：回退到系统 PATH 里的 `ffmpeg` / `ffprobe`（行为与原来一致）。
- * Electron 打包：主进程把 ffmpeg-static / @ffprobe-installer 解包后的绝对路径注入
- * FFMPEG_PATH / FFPROBE_PATH 环境变量，用户机无需自行安装 ffmpeg。
+ * Development: falls back to `ffmpeg` / `ffprobe` on the system PATH (same behaviour as before).
+ * Electron package: the main process injects the absolute paths extracted from ffmpeg-static /
+ * @ffprobe-installer into FFMPEG_PATH / FFPROBE_PATH, so users don't need to install ffmpeg themselves.
  *
- * 注意：返回值会被拼进 shell 命令字符串，路径可能含空格，调用处用双引号包裹。
+ * Note: return values are interpolated into shell command strings; paths may contain spaces —
+ * callers must wrap them in double quotes.
  */
 
-/** ffmpeg 可执行文件路径（含空格时调用方需加引号） */
+/** Path to the ffmpeg executable (callers must quote it if it contains spaces) */
 export function ffmpegBin(): string {
   return process.env.FFMPEG_PATH || "ffmpeg";
 }
 
-/** ffprobe 可执行文件路径（含空格时调用方需加引号） */
+/** Path to the ffprobe executable (callers must quote it if it contains spaces) */
 export function ffprobeBin(): string {
   return process.env.FFPROBE_PATH || "ffprobe";
 }

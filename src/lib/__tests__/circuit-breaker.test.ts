@@ -6,9 +6,9 @@ describe("CircuitBreaker", () => {
     const b = new CircuitBreaker(2, 1000);
     expect(b.isOpen()).toBe(false);
     b.recordFailure();
-    expect(b.isOpen()).toBe(false); // 1 次未到阈值
+    expect(b.isOpen()).toBe(false); // 1 failure, threshold not reached
     b.recordFailure();
-    expect(b.isOpen()).toBe(true); // 第 2 次到阈值 → 打开
+    expect(b.isOpen()).toBe(true); // 2nd failure hits threshold → open
   });
 
   it("一次成功即复位（清零失败计数与开断）", () => {
@@ -16,7 +16,7 @@ describe("CircuitBreaker", () => {
     b.recordFailure();
     b.recordSuccess();
     b.recordFailure();
-    expect(b.isOpen()).toBe(false); // 复位后只累计了 1 次，未到阈值
+    expect(b.isOpen()).toBe(false); // after reset only 1 failure accumulated, threshold not reached
   });
 
   it("冷却期后自动半开（注入时钟）", () => {
@@ -27,6 +27,6 @@ describe("CircuitBreaker", () => {
     t = 999;
     expect(b.isOpen()).toBe(true);
     t = 1001;
-    expect(b.isOpen()).toBe(false); // 冷却到期 → 半开放行
+    expect(b.isOpen()).toBe(false); // cooldown expired → half-open, allow through
   });
 });

@@ -19,7 +19,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { friendlyError } from "@/lib/friendly-error";
 import { LanguageToggle } from "@/components/language-toggle";
 
-// 镜头类型标签（label 改为词条 key，渲染时按语言取）
+// shot type labels (label changed to i18n key, resolved per locale at render time)
 const shotTypeLabels: Record<Shot["type"], { labelKey: string; color: string }> = {
   hook: { labelKey: "shotTypeHook", color: "bg-red-500/20 text-red-400" },
   pain_point: { labelKey: "shotTypePainPoint", color: "bg-orange-500/20 text-orange-400" },
@@ -29,7 +29,7 @@ const shotTypeLabels: Record<Shot["type"], { labelKey: string; color: string }> 
   cta: { labelKey: "shotTypeCta", color: "bg-amber-500/20 text-amber-400" },
 };
 
-// 脚本风格 → 词条 key（渲染时按语言取）
+// script style → i18n key (resolved per locale at render time)
 const styleLabelKeys: Record<string, string> = {
   pain_point: "stylePainPoint",
   scene: "styleScene",
@@ -37,7 +37,7 @@ const styleLabelKeys: Record<string, string> = {
   story: "styleStory",
 };
 
-// 后端 scripts 表返回的脚本结构
+// structure of a script row returned from the backend scripts table
 interface DbScript {
   id: string;
   title: string | null;
@@ -58,7 +58,7 @@ export default function ScriptPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [projectName, setProjectName] = useState("");
-  // 项目元信息：空态「重新生成脚本」时复用
+  // project metadata: reused when re-generating the script from the empty state
   const [projectMeta, setProjectMeta] = useState<{
     productName: string;
     category: string;
@@ -72,7 +72,7 @@ export default function ScriptPage() {
   const [genError, setGenError] = useState("");
   const { llm } = useSettingsStore();
 
-  // 按 projectId 拉取真实脚本（落库于 scripts 表）
+  // fetch real scripts by projectId (stored in the scripts table)
   const loadScripts = async () => {
     setLoading(true);
     try {
@@ -107,9 +107,9 @@ export default function ScriptPage() {
         const selIdx = dbScripts.findIndex((s) => s.selected);
         setSelectedScript(selIdx >= 0 ? selIdx : 0);
       } else {
-        // 无真实脚本：保持空，由渲染层显示「去生成」空态
-        // （修复 issue #3：旧逻辑回退到德宝示例数据，导致用户进自己项目却看到别人的 demo，
-        //  误以为「找不到我自己创建的任务」）
+        // no real scripts: stay empty so the render layer shows the "generate" empty state
+        // (fixes issue #3: old logic fell back to the Debao demo data, so users opening their own
+        //  projects saw someone else's demo and thought "I can't find the task I created")
         setScripts([]);
       }
     } catch {
@@ -119,7 +119,7 @@ export default function ScriptPage() {
     }
   };
 
-  // 空态点击「生成脚本」：topic 主题项目走去商品化脚本引擎，带货项目走商品脚本引擎
+  // empty-state "generate script" click: topic projects use the de-commercialized script engine, commerce projects use the product script engine
   const handleGenerate = async () => {
     if (!projectMeta) return;
     if (!llm.apiKey) {
@@ -130,7 +130,7 @@ export default function ScriptPage() {
     setGenError("");
     try {
       const isTopic = projectMeta.contentType === "topic";
-      // topic 项目用 /api/topic/script（无需商品）；否则用带货脚本引擎
+      // topic projects use /api/topic/script (no product needed); otherwise use the commerce script engine
       const endpoint = isTopic ? "/api/topic/script" : "/api/llm/script";
       const payload = isTopic
         ? {
@@ -208,13 +208,13 @@ export default function ScriptPage() {
               shots: s.shots ?? [],
             }))
           );
-          // 默认选中已标记 selected 的方案
+          // default to the script marked as selected
           const selIdx = dbScripts.findIndex((s) => s.selected);
           setSelectedScript(selIdx >= 0 ? selIdx : 0);
         } else {
-          // 无真实脚本：保持空，由渲染层显示「去生成」空态
-          // （修复 issue #3：旧逻辑回退到德宝示例数据，导致用户进自己项目却看到别人的 demo，
-          //  误以为「找不到我自己创建的任务」）
+          // no real scripts: stay empty so the render layer shows the "generate" empty state
+          // (fixes issue #3: old logic fell back to the Debao demo data, so users opening their own
+          //  projects saw someone else's demo and thought "I can't find the task I created")
           setScripts([]);
         }
       } catch {
@@ -229,32 +229,32 @@ export default function ScriptPage() {
   }, [id]);
 
   const currentScript = scripts[selectedScript];
-  // 出片前广告法合规扫描：对当前脚本旁白+贴片做规则校验，命中风险词则警示（不拦截）
+  // pre-render ad compliance scan: rule-check the current script's voiceover and text overlays; warn on risky terms (non-blocking)
   const adViolations = useMemo(
     () => (currentScript ? checkScriptCompliance(currentScript.shots as { voiceover?: string; textOverlay?: { text?: string } | null }[]) : []),
     [currentScript]
   );
-  // 发布前限流自检：违禁词/钩子/时长/字幕/CTA/三段式 逐项体检（AIGC 标签项交由合成页，这里不检）
+  // pre-publish readiness check: inspect banned words / hook / duration / subtitles / CTA / three-act structure item by item (AIGC label is handled by the compose page, not checked here)
   const readiness = useMemo(
     () => (currentScript ? checkPublishReadiness(currentScript.shots as Shot[], currentScript.totalDuration, { locale }) : null),
     [currentScript, locale]
   );
 
-  // 模板相关状态
+  // template-related state
   const { addTemplate } = useTemplateStore();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [templateName, setTemplateName] = useState("");
-  // 重新生成会删库重建（route 先 delete 旧脚本），不可恢复——已有脚本时先二次确认，防误点丢稿
+  // regeneration deletes and rebuilds from scratch (the route deletes old scripts first) and is irreversible — show a confirmation dialog when scripts already exist to prevent accidental loss
   const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
   const [savedTip, setSavedTip] = useState(false);
 
-  /** 点击"存为模板"按钮 */
+  /** click the "save as template" button */
   const handleSaveAsTemplate = () => {
     setTemplateName("");
     setShowSaveDialog(true);
   };
 
-  /** 确认保存模板 */
+  /** confirm and save the template */
   const doSaveTemplate = () => {
     if (!templateName.trim() || !currentScript) return;
     addTemplate({
@@ -271,7 +271,7 @@ export default function ScriptPage() {
     setTimeout(() => setSavedTip(false), 3000);
   };
 
-  // 顶部导航（空态/正常态共用）
+  // top navigation bar (shared by empty state and normal state)
   const headerBar = (
     <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
@@ -293,7 +293,7 @@ export default function ScriptPage() {
     </header>
   );
 
-  // 加载中：骨架屏（模拟脚本卡片布局，比纯转圈更显「秒开」、降低等待焦虑）
+  // loading: skeleton screen (mimics the script card layout; feels faster than a spinner and reduces perceived wait)
   if (loading) {
     return (
       <div className="min-h-screen grid-bg">
@@ -320,7 +320,7 @@ export default function ScriptPage() {
     );
   }
 
-  // 空态：该项目还没有真实脚本（修复 #3：不再展示德宝示例，给出可恢复的「生成脚本」入口）
+  // empty state: this project has no real scripts yet (fixes #3: no longer shows the Debao demo; provides a recoverable "generate script" entry point)
   if (scripts.length === 0) {
     return (
       <div className="min-h-screen grid-bg">
@@ -361,7 +361,7 @@ export default function ScriptPage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* 顶部导航 */}
+      {/* top navigation */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-4">
@@ -378,9 +378,9 @@ export default function ScriptPage() {
             <span className="text-sm text-muted-foreground truncate max-w-[40vw] sm:max-w-xs">{projectName || t("defaultProjectName")}</span>
           </div>
 
-          {/* 步骤进度 */}
+          {/* step progress */}
           <div className="flex items-center gap-1">
-            {/* 步骤胶囊在窄屏放不下，移动端隐藏（仅进度展示、非导航） */}
+            {/* step pills don't fit on narrow screens, hidden on mobile (progress display only, not navigation) */}
             <div className="hidden sm:flex items-center gap-1">
             {[t("stepScript"), t("stepAssets"), t("stepVideo"), t("stepExport")].map((step, i) => (
               <div key={step} className="flex items-center">
@@ -401,7 +401,7 @@ export default function ScriptPage() {
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 左侧：脚本方案选择 */}
+          {/* left panel: script option selection */}
           <div className="lg:col-span-1">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold">{t("scriptOptions")}</h2>
@@ -438,7 +438,7 @@ export default function ScriptPage() {
                       <span>{t("shotCount", { n: script.shots.length })}</span>
                       <span>{script.totalDuration}s</span>
                     </div>
-                    {/* 镜头类型预览条 */}
+                    {/* shot type preview bar */}
                     <div className="mt-3 flex gap-0.5 h-1.5 rounded-full overflow-hidden">
                       {script.shots.map((shot) => {
                         const colors: Record<string, string> = {
@@ -461,7 +461,7 @@ export default function ScriptPage() {
             </div>
           </div>
 
-          {/* 右侧：分镜详情编辑 */}
+          {/* right panel: shot detail editing */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="timeline" className="w-full">
               <div className="flex items-center justify-between mb-4">
@@ -565,13 +565,13 @@ export default function ScriptPage() {
                       <Card key={shot.shotId} className="glass-card overflow-hidden">
                         <CardContent className="p-0">
                           <div className="flex">
-                            {/* 左侧序号和类型 */}
+                            {/* left-side index and type */}
                             <div className="flex flex-col items-center justify-center w-16 py-4 border-r border-border/50 shrink-0">
                               <span className="text-lg font-bold text-muted-foreground/50">{String(index + 1).padStart(2, "0")}</span>
                               <Badge className={`${typeInfo.color} border-0 text-[10px] mt-1`}>{t(typeInfo.labelKey)}</Badge>
                               <span className="text-[10px] text-muted-foreground mt-1">{shot.duration}s</span>
                             </div>
-                            {/* 右侧内容 */}
+                            {/* right-side content */}
                             <div className="flex-1 p-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1">
@@ -586,7 +586,7 @@ export default function ScriptPage() {
                                     </span>
                                   </div>
                                 </div>
-                                {/* 画面预览区：商品原图分镜直接显示已上传的商品图，让小白第一眼就看到画面；AI 分镜此阶段尚未出图 */}
+                                {/* visual preview: product image shots show the uploaded product photo immediately so users see a visual right away; AI shots have no image yet at this stage */}
                                 <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 overflow-hidden flex items-center justify-center border border-border/30 relative">
                                   {shot.visualSource === "product_image" && projectMeta?.productImages?.[0] ? (
                                     // eslint-disable-next-line @next/next/no-img-element
@@ -602,7 +602,7 @@ export default function ScriptPage() {
                                   )}
                                 </div>
                               </div>
-                              {/* 配音文案 */}
+                              {/* voiceover copy */}
                               {shot.voiceover && (
                                 <div className="mt-3 p-2.5 bg-muted/30 rounded-md">
                                   <p className="text-xs text-muted-foreground leading-relaxed">
@@ -640,7 +640,7 @@ export default function ScriptPage() {
         </div>
       </main>
 
-      {/* 保存模板弹窗 */}
+      {/* save template dialog */}
       {showSaveDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <Card className="glass-card w-full max-w-md mx-4">
@@ -661,7 +661,7 @@ export default function ScriptPage() {
         </div>
       )}
 
-      {/* 重新生成二次确认：删旧脚本不可逆，防误点 */}
+      {/* regeneration confirmation dialog: deleting old scripts is irreversible, guard against accidental clicks */}
       {regenConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <Card className="glass-card w-full max-w-md mx-4">

@@ -2,8 +2,8 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, spring, interpolate } from "remotion";
 
 /**
- * 动效片头标题卡：标题 spring 缩放+上浮入场、副标题随后淡入，渐变底 + 辉光。
- * FFmpeg drawtext 做不出的平滑动效——作可选片头元素，渲成透明/独立片段后合进现有管线。
+ * Animated intro title card: title enters with spring scale + float, subtitle fades in after, gradient background + glow.
+ * Smooth motion that FFmpeg drawtext cannot produce — used as an optional intro element, rendered as a transparent/standalone clip and composited into the existing pipeline.
  */
 export const TitleCard: React.FC<{ text: string; subtitle?: string }> = ({ text, subtitle }) => {
   const frame = useCurrentFrame();

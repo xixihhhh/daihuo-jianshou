@@ -1,17 +1,20 @@
 /**
- * 热点选题 —— 拉某地区的每日热搜，建议「该做什么主题」，再喂给一句话成片。
+ * Trending topics — fetches daily trending searches for a region, suggests "what to make a video about",
+ * and feeds the result into one-shot video generation.
  *
- * 解决创作者的「不知道做什么」：免 Key 取 Google Trends 每日热搜 RSS（含热度 + 相关新闻标题做背景），
- * 列成可直接当 topic 的候选。纯解析可单测，网络部分超时兜底。
- * 注：Google Trends 为非官方端点、按地区覆盖（en 系国家最全；中国数据有限，出海/全球题材更合适）。
+ * Solves the creator's "I don't know what to make" problem: fetches Google Trends daily trending RSS
+ * without an API key (includes traffic estimates + related news headlines as context), and returns a
+ * list of ready-to-use topic candidates. Parsing is pure/unit-testable; network calls have timeout guards.
+ * Note: Google Trends is an unofficial endpoint with regional coverage (English-speaking countries are
+ * most complete; China data is limited — content aimed at overseas/global audiences works best).
  */
 
 export interface TrendTopic {
-  /** 热搜词，可直接当一句话主题 */
+  /** Trending keyword, can be used directly as a one-sentence topic */
   title: string;
-  /** 大致热度（如 "2000+"），可空 */
+  /** Approximate traffic (e.g. "2000+"), optional */
   traffic?: string;
-  /** 一条相关新闻标题做背景，帮助理解这个词为什么热，可空 */
+  /** A related news headline providing context for why this term is trending, optional */
   context?: string;
 }
 
@@ -30,16 +33,16 @@ function decodeXml(s: string): string {
     .replace(/&quot;/g, '"');
 }
 
-/** 取一个 XML 片段里某标签的首个文本（处理 CDATA + 实体）。tag 可含冒号（如 ht:approx_traffic）。 */
+/** Get the first text content of a tag in an XML fragment (handles CDATA + entities). Tag may contain a colon (e.g. ht:approx_traffic). */
 function firstTag(xml: string, tag: string): string | null {
   const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i");
   const m = xml.match(re);
   return m ? decodeXml(stripCdata(m[1])).trim() : null;
 }
 
-/** 解析 Google Trends 每日热搜 RSS → 候选主题（跳过 channel 头部标题，只取 <item>）。纯函数。 */
+/** Parse Google Trends daily trending RSS → topic candidates (skip channel header, only process <item> entries). Pure function. */
 export function parseTrendsRss(xml: string): TrendTopic[] {
-  const blocks = xml.split(/<item>/i).slice(1); // 第一段是 channel 头，丢弃
+  const blocks = xml.split(/<item>/i).slice(1); // first segment is the channel header, discard it
   const out: TrendTopic[] = [];
   for (const block of blocks) {
     const body = block.split(/<\/item>/i)[0];
@@ -54,7 +57,7 @@ export function parseTrendsRss(xml: string): TrendTopic[] {
   return out;
 }
 
-/** 拉某地区热搜候选主题；地区非法回退 US，网络失败返回 []（不阻断调用方）。 */
+/** Fetch trending topic candidates for a region; falls back to US for invalid regions, returns [] on network failure (non-blocking). */
 export async function fetchTrendingTopics(geo = "US", opts: { limit?: number } = {}): Promise<TrendTopic[]> {
   const g = /^[a-z]{2}$/i.test(geo) ? geo.toUpperCase() : "US";
   const ctrl = new AbortController();
@@ -71,7 +74,7 @@ export async function fetchTrendingTopics(geo = "US", opts: { limit?: number } =
   }
 }
 
-/** 归一化地区码（非法回退 US）。 */
+/** Normalize a region code (falls back to US for invalid values). */
 export function normalizeGeo(geo: string | null | undefined): string {
   return geo && /^[a-z]{2}$/i.test(geo) ? geo.toUpperCase() : "US";
 }

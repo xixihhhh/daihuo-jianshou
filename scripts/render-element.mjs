@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 /**
- * 可选动效元素渲染 —— 用 Remotion 渲一个动效片头标题卡 / 逐字动态字幕成 mp4，
- * 用于 FFmpeg drawtext 做不出的平滑动效（弹入/缩放/辉光）。渲出的片段可放进项目素材池或片头/片尾。
+ * Optional motion-element renderer — uses Remotion to render an animated title card or
+ * word-by-word kinetic caption into an mp4, for smooth effects (spring-in / scale / glow)
+ * that FFmpeg drawtext cannot produce. The rendered clip can be added to the project asset
+ * pool or used as an intro / outro.
  *
- * opt-in：默认不带 Remotion 依赖（避免给所有人加 ~300MB）。启用前先装：
+ * opt-in: Remotion dependencies are not included by default (avoids adding ~300 MB for everyone).
+ * Install before use:
  *   npm i remotion @remotion/cli react react-dom
  *
- * 用法：
+ * Usage:
  *   node scripts/render-element.mjs --kind title --text "在家手冲 三步搞定" --subtitle "COFFEE" --out intro.mp4
  *   node scripts/render-element.mjs --kind caption --text "买它 真的 好用" --aspect 9:16 --duration 3 --out cap.mp4
- *   [--aspect 9:16|16:9|1:1] [--duration 秒]
+ *   [--aspect 9:16|16:9|1:1] [--duration seconds]
  */
 import { execFileSync } from "child_process";
 import { writeFileSync, mkdtempSync } from "fs";

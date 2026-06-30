@@ -3,7 +3,7 @@ import { shotsToCues, formatSrtTime, formatVttTime, buildSrt, buildVtt, shotsToS
 
 const shots = [
   { duration: 3, voiceover: "第一句" },
-  { duration: 2, voiceover: "" }, // 空白：占 2s 时间轴但不出 cue
+  { duration: 2, voiceover: "" }, // blank: occupies 2s on the timeline but produces no cue
   { duration: 4, voiceover: "第三句" },
 ];
 
@@ -12,7 +12,7 @@ describe("shotsToCues", () => {
     const cues = shotsToCues(shots);
     expect(cues.length).toBe(2);
     expect(cues[0]).toMatchObject({ index: 1, startMs: 0, endMs: 3000, text: "第一句" });
-    // 第三句开始 = 3000 + 2000(空白占位) = 5000
+    // third sentence starts at 3000 + 2000 (blank placeholder) = 5000
     expect(cues[1]).toMatchObject({ index: 2, startMs: 5000, endMs: 9000, text: "第三句" });
   });
   it("时长 0 但有文案 → 给最小可见时长", () => {
@@ -30,7 +30,7 @@ describe("shotsToCues", () => {
       [200, 400],
       [400, 600],
     ]);
-    // 逐对断言无重叠
+    // assert no overlap between consecutive pairs
     for (let i = 1; i < cues.length; i++) expect(cues[i - 1].endMs).toBeLessThanOrEqual(cues[i].startMs);
   });
   it("全空 → 空数组", () => {

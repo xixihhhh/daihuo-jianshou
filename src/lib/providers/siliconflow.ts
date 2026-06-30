@@ -1,7 +1,7 @@
 /**
- * 硅基流动 Provider 实现
- * 支持多种开源图片和视频生成模型
- * 文档参考: https://docs.siliconflow.cn
+ * SiliconFlow Provider implementation
+ * Supports multiple open-source image and video generation models
+ * API docs: https://docs.siliconflow.cn
  */
 
 import { BaseProvider, ProviderError } from './base'
@@ -17,7 +17,7 @@ import type {
   MediaType,
 } from './types'
 
-// ==================== 硅基流动 API 响应类型 ====================
+// ==================== SiliconFlow API response types ====================
 
 interface SFImageResponse {
   images: Array<{
@@ -49,7 +49,7 @@ interface SFVideoStatusResponse {
   [key: string]: unknown
 }
 
-// ==================== Provider 实现 ====================
+// ==================== Provider implementation ====================
 
 export class SiliconFlowProvider extends BaseProvider {
   readonly name = 'siliconflow'
@@ -63,8 +63,8 @@ export class SiliconFlowProvider extends BaseProvider {
   }
 
   /**
-   * 生成图片
-   * 硅基流动的图片生成是同步接口，直接返回结果
+   * Generate an image
+   * SiliconFlow's image generation is a synchronous API that returns the result directly
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
     const body = {
@@ -78,7 +78,7 @@ export class SiliconFlowProvider extends BaseProvider {
       guidance_scale: options.guidanceScale,
       batch_size: options.count ?? 1,
       seed: options.seed,
-      // image-to-image 模式
+      // image-to-image mode
       ...(options.referenceImageUrl && {
         image: options.referenceImageUrl,
       }),
@@ -90,11 +90,11 @@ export class SiliconFlowProvider extends BaseProvider {
       {
         method: 'POST',
         body,
-        timeout: 120000, // 图片生成可能较慢，超时设置为 2 分钟
+        timeout: 120000, // image generation can be slow; timeout set to 2 minutes
       }
     )
 
-    // 守卫：API 偶发 200 但 images 缺失/为空（限流/错误体），直接 .map 会崩 TypeError，给出清晰 ProviderError
+    // guard: the API occasionally returns HTTP 200 but with a missing or empty images array (rate-limited / error body); calling .map directly would throw a TypeError, so surface a clear ProviderError instead
     if (!Array.isArray(response.images) || response.images.length === 0) {
       throw new ProviderError('未返回图片结果', 'NO_IMAGES', this.name)
     }
@@ -108,8 +108,8 @@ export class SiliconFlowProvider extends BaseProvider {
   }
 
   /**
-   * 生成视频
-   * 硅基流动的视频生成是异步接口，需要轮询
+   * Generate a video
+   * SiliconFlow's video generation is an asynchronous API that requires polling
    */
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
     const body = {
@@ -120,7 +120,7 @@ export class SiliconFlowProvider extends BaseProvider {
         ? `${options.width}x${options.height}`
         : undefined,
       seed: options.seed,
-      // image-to-video 模式
+      // image-to-video mode
       ...(options.firstFrameUrl && {
         image: options.firstFrameUrl,
       }),
@@ -132,23 +132,23 @@ export class SiliconFlowProvider extends BaseProvider {
       { method: 'POST', body }
     )
 
-    // 守卫：submit 偶发不返回 requestId，否则会拿 undefined 去轮询 /video/status/undefined、延迟到轮询超时才暴露
+    // guard: submit occasionally does not return a requestId; without this check, undefined would be used to poll /video/status/undefined and the error would only surface after the polling timeout
     if (!response.requestId) {
       throw new ProviderError('未返回任务ID', 'NO_REQUEST_ID', this.name)
     }
-    // 轮询等待结果
+    // poll until the result is ready
     const finalStatus = await this.pollTaskStatus(response.requestId, {
       interval: 5000,
     })
 
-    // 状态接口不回显 model，用调用方的 modelId 回填
+    // the status API does not echo back the model; backfill from the caller's modelId
     const result = this.requireResult(finalStatus.result) as VideoResult
     result.modelId = options.modelId
     return result
   }
 
   /**
-   * 查询任务状态
+   * Query task status
    */
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
     const response = await this.request<SFVideoStatusResponse>(
@@ -157,15 +157,15 @@ export class SiliconFlowProvider extends BaseProvider {
 
     const status = this.mapStatus(response.status)
 
-    // 状态接口可能不回显 requestId，统一用入参 taskId 作为任务标识
+    // the status API may not echo back requestId; always use the input taskId as the task identifier
     const taskStatus: TaskStatus = {
       taskId,
       status,
     }
 
-    // 解析视频结果
+    // parse video result
     if (status === 'completed' && response.results) {
-      // 守卫：results 在但 videos 缺失/为空时 .map 会崩，挂死轮询；明确抛错
+      // guard: if results is present but videos is missing or empty, .map would crash and hang the polling loop; throw explicitly
       if (!Array.isArray(response.results.videos) || response.results.videos.length === 0) {
         throw new ProviderError('任务完成但未返回视频', 'NO_VIDEOS', this.name)
       }
@@ -178,7 +178,7 @@ export class SiliconFlowProvider extends BaseProvider {
       }
     }
 
-    // 失败信息
+    // failure details
     if (status === 'failed') {
       taskStatus.error = response.reason ?? '生成失败'
       taskStatus.errorCode = 'GENERATION_FAILED'
@@ -188,14 +188,14 @@ export class SiliconFlowProvider extends BaseProvider {
   }
 
   /**
-   * 获取可用模型列表
+   * Get the list of available models
    */
   async listModels(mediaType?: MediaType): Promise<Model[]> {
-    // 基于硅基流动官方文档和更新公告确认的模型列表（2026-03）
-    // 注意：FLUX.1-schnell/dev/pro、SD 3.5、LTX-Video、Wan2.1 系列已于 2025 年下线
-    // 文档：https://docs.siliconflow.cn
+    // model list confirmed from SiliconFlow official docs and release announcements (2026-03)
+    // note: FLUX.1-schnell/dev/pro, SD 3.5, LTX-Video, and the Wan2.1 series were deprecated in 2025
+    // docs: https://docs.siliconflow.cn
     const models: Model[] = [
-      // ==================== 图片生成 ====================
+      // ==================== image generation ====================
       {
         id: 'Kwai-Kolors/Kolors',
         name: 'Kolors (快手可图)',
@@ -221,9 +221,9 @@ export class SiliconFlowProvider extends BaseProvider {
     return models
   }
 
-  // ==================== 私有方法 ====================
+  // ==================== private methods ====================
 
-  /** 映射硅基流动任务状态 */
+  /** Map SiliconFlow task status to the internal TaskStatusEnum */
   private mapStatus(sfStatus: string): TaskStatusEnum {
     const statusMap: Record<string, TaskStatusEnum> = {
       Pending: 'pending',

@@ -1,10 +1,11 @@
 /**
- * 把底层报错归类成「可操作」的用户提示（纯函数、可单测、跟随 locale）。
- * 前端 catch 里直接 setError(friendlyError(e, locale))，别把 "Failed to fetch"/"401" 这类裸串甩给用户。
+ * Classifies low-level errors into actionable user-facing messages (pure function, unit-testable, locale-aware).
+ * In frontend catch blocks, call setError(friendlyError(e, locale)) directly — never expose raw strings
+ * like "Failed to fetch" or "401" to the user.
  */
 export type ErrorKind = "network" | "auth" | "ratelimit" | "server" | "unknown";
 
-/** 仅做分类（便于单测分类逻辑，与文案解耦） */
+/** Classification only (makes unit-testing the classification logic easier, decoupled from copy) */
 export function classifyError(e: unknown): ErrorKind {
   const raw = (e instanceof Error ? e.message : String(e ?? "")).toLowerCase();
   if (/failed to fetch|networkerror|econnrefused|fetch failed|network request failed|aborted|timeout|etimedout/.test(raw)) return "network";
@@ -25,7 +26,7 @@ const MESSAGES: Record<ErrorKind, { zh: string; en: string }> = {
 export function friendlyError(e: unknown, locale: "zh" | "en" = "zh"): string {
   const kind = classifyError(e);
   if (kind !== "unknown") return MESSAGES[kind][locale];
-  // 未知错误：保留原始信息（仍优于空），实在没有给通用兜底
+  // Unknown error: preserve the raw message (still better than nothing); fall back to a generic message if empty
   const raw = e instanceof Error ? e.message : String(e ?? "");
   return raw || (locale === "en" ? "Something went wrong — please retry." : "出错了，请重试。");
 }

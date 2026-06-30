@@ -1,12 +1,12 @@
-// 商品原图运动效果 - 基于 FFmpeg zoompan 滤镜
-// 用于商品展示镜头，不让 AI 碰商品图，用运动模板代替
+// product image camera motion effects — based on the FFmpeg zoompan filter
+// used for product showcase shots; keeps AI away from product images by substituting motion templates
 import { interpolate } from "./easing";
 
 export interface MotionConfig {
   name: string;
   label: string;
   description: string;
-  // FFmpeg zoompan 滤镜参数
+  // FFmpeg zoompan filter parameters
   getFilter: (width: number, height: number, duration: number) => string;
 }
 
@@ -18,7 +18,7 @@ export const MOTIONS: Record<string, MotionConfig> = {
     getFilter: (w, h, d) => {
       const fps = 30;
       const frames = d * fps;
-      const z = interpolate("on", frames, 1, 1.5, "easeOut"); // 缓出放大，减速到位，比匀速更有导演感
+      const z = interpolate("on", frames, 1, 1.5, "easeOut"); // ease-out zoom in, decelerates to rest — more cinematic than linear
       return `zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
     },
   },
@@ -29,7 +29,7 @@ export const MOTIONS: Record<string, MotionConfig> = {
     getFilter: (w, h, d) => {
       const fps = 30;
       const frames = d * fps;
-      const z = interpolate("on", frames, 1.5, 1, "easeOut"); // 缓出缩小
+      const z = interpolate("on", frames, 1.5, 1, "easeOut"); // ease-out zoom out
       return `zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
     },
   },
@@ -60,7 +60,7 @@ export const MOTIONS: Record<string, MotionConfig> = {
     getFilter: (w, h, d) => {
       const fps = 30;
       const frames = d * fps;
-      const z = interpolate("on", frames, 1, 1.3, "easeOut"); // 缓出放大 + 轻微平移
+      const z = interpolate("on", frames, 1, 1.3, "easeOut"); // ease-out zoom in + gentle pan
       return `zoompan=z='${z}':x='iw/2-(iw/zoom/2)+on*0.5':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
     },
   },
@@ -74,7 +74,7 @@ export const MOTIONS: Record<string, MotionConfig> = {
       return `zoompan=z='if(lt(on,${Math.floor(frames * 0.3)}),1+on*0.02,if(lt(on,${Math.floor(frames * 0.5)}),1.6-(on-${Math.floor(frames * 0.3)})*0.01,1.4))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${w}x${h}:fps=${fps}`;
     },
   },
-  // 静止：不做运镜，仅按时长定格画面（输出格式与其它运镜一致，保证可与运镜片段拼接）
+  // static: no camera motion, just hold the frame for the given duration (output format matches other motion effects so it can be concatenated with them)
   static: {
     name: "static",
     label: "静止",
@@ -87,10 +87,10 @@ export const MOTIONS: Record<string, MotionConfig> = {
   },
 };
 
-// 默认运镜：当指定的运镜键无效时回退，避免片段被静默丢弃
+// default motion: fallback when the specified motion key is invalid, preventing the clip from being silently dropped
 export const DEFAULT_MOTION = "ken_burns";
 
-// 获取运动效果列表
+// get the list of available motion effects
 export function getMotionList(): MotionConfig[] {
   return Object.values(MOTIONS);
 }

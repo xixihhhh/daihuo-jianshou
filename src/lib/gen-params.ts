@@ -1,59 +1,62 @@
 /**
- * 图/视频生成的「自定义参数」+「自定义模型接入点」纯逻辑层（前后端通用，无 server-only 依赖）。
+ * Pure logic layer for image/video generation "custom parameters" + "custom model endpoints"
+ * (shared between frontend and backend, no server-only dependencies).
  *
- * - 自定义模型：用户在已有平台（atlas-cloud / fal-ai / replicate…）上挂任意 model id，
- *   后端 /api/ai/image|video 本就把 model 透传给 provider，所以加一条就能立刻在下拉里选用。
- * - 自定义参数：把设置里的全局默认（比例/分辨率/步数/引导/时长/帧率/种子/反向词）映射成
- *   provider 认识的 ImageOptions/VideoOptions 字段，由生成请求的 options 带上。
+ * - Custom models: users can attach any model id on an existing platform (atlas-cloud / fal-ai / replicate…).
+ *   The backend /api/ai/image|video already forwards the model to the provider as-is, so adding one entry
+ *   makes it immediately selectable from the dropdown.
+ * - Custom parameters: maps global defaults from Settings (aspect ratio / resolution / steps / guidance /
+ *   duration / fps / seed / negative prompt) into the ImageOptions/VideoOptions fields that providers understand,
+ *   and attaches them to generation request options.
  */
 
 export type GenAspectRatio = "9:16" | "16:9" | "1:1";
 export type GenResolution = "720p" | "1080p";
 export type GenMediaType = "image" | "video";
 
-/** 用户自定义模型（挂在某个已有平台上的任意 model id） */
+/** User-defined custom model (any model id mounted on an existing platform) */
 export interface CustomModel {
-  /** 本地唯一 id */
+  /** Locally unique id */
   id: string;
-  /** 归属平台标识（与 settings.providers 的 key 一致，如 "fal-ai"） */
+  /** Owning platform identifier (matches the key in settings.providers, e.g. "fal-ai") */
   provider: string;
-  /** 真实 model id（透传给后端 / provider） */
+  /** Real model id (forwarded as-is to the backend / provider) */
   modelId: string;
-  /** 显示名 */
+  /** Display name */
   name: string;
   mediaType: GenMediaType;
-  /** 视频模型是否原生带音频（带货可省 TTS） */
+  /** Whether the video model natively includes audio (saves TTS for commerce videos) */
   supportsAudio?: boolean;
 }
 
-/** 图片生成全局默认参数 */
+/** Global default parameters for image generation */
 export interface ImageGenParams {
   aspectRatio: GenAspectRatio;
-  /** 生成数量 */
+  /** Number of images to generate */
   count: number;
-  /** 推理步数（留空=用平台默认） */
+  /** Inference steps (leave empty to use the platform default) */
   steps?: number;
-  /** 引导系数（留空=用平台默认） */
+  /** Guidance scale (leave empty to use the platform default) */
   guidanceScale?: number;
-  /** 随机种子（留空=每次随机） */
+  /** Random seed (leave empty to randomize each time) */
   seed?: number;
-  /** 反向提示词 */
+  /** Negative prompt */
   negativePrompt?: string;
 }
 
-/** 视频生成全局默认参数 */
+/** Global default parameters for video generation */
 export interface VideoGenParams {
   aspectRatio: GenAspectRatio;
   resolution: GenResolution;
-  /** 时长（秒，留空=用平台默认） */
+  /** Duration in seconds (leave empty to use the platform default) */
   duration?: number;
-  /** 帧率（留空=用平台默认） */
+  /** Frame rate (leave empty to use the platform default) */
   fps?: number;
-  /** 运动强度 0~1（留空=用平台默认） */
+  /** Motion strength 0~1 (leave empty to use the platform default) */
   motionStrength?: number;
-  /** 随机种子（留空=每次随机） */
+  /** Random seed (leave empty to randomize each time) */
   seed?: number;
-  /** 反向提示词 */
+  /** Negative prompt */
   negativePrompt?: string;
 }
 
@@ -79,7 +82,7 @@ export const RESOLUTION_OPTIONS: { value: GenResolution; label: string }[] = [
   { value: "1080p", label: "1080p" },
 ];
 
-/** 比例 → 图片宽高（竖屏带货默认更高分辨率） */
+/** Aspect ratio → image dimensions (portrait commerce mode defaults to higher resolution) */
 export function imageSize(aspect: GenAspectRatio): { width: number; height: number } {
   switch (aspect) {
     case "16:9":
@@ -92,7 +95,7 @@ export function imageSize(aspect: GenAspectRatio): { width: number; height: numb
   }
 }
 
-/** 分辨率 + 比例 → 视频宽高 */
+/** Resolution + aspect ratio → video dimensions */
 export function videoSize(resolution: GenResolution, aspect: GenAspectRatio): { width: number; height: number } {
   const long = resolution === "1080p" ? 1920 : 1280;
   const short = resolution === "1080p" ? 1080 : 720;
@@ -107,7 +110,7 @@ export function videoSize(resolution: GenResolution, aspect: GenAspectRatio): { 
   }
 }
 
-/** 把图片参数映射成 /api/ai/image 的 options（字段名对齐 ImageOptions） */
+/** Maps image parameters to the options object expected by /api/ai/image (field names aligned with ImageOptions) */
 export function buildImageOptions(p: ImageGenParams | undefined): Record<string, unknown> {
   const params = p ?? DEFAULT_IMAGE_PARAMS;
   const { width, height } = imageSize(params.aspectRatio);
@@ -122,7 +125,7 @@ export function buildImageOptions(p: ImageGenParams | undefined): Record<string,
   };
 }
 
-/** 把视频参数映射成 /api/ai/video 的 options（字段名对齐 VideoOptions） */
+/** Maps video parameters to the options object expected by /api/ai/video (field names aligned with VideoOptions) */
 export function buildVideoOptions(p: VideoGenParams | undefined): Record<string, unknown> {
   const params = p ?? DEFAULT_VIDEO_PARAMS;
   const { width, height } = videoSize(params.resolution, params.aspectRatio);
@@ -137,7 +140,7 @@ export function buildVideoOptions(p: VideoGenParams | undefined): Record<string,
   };
 }
 
-/** 模型列表项（与 /api/ai/models 返回的 Model 字段对齐的子集；mediaType 对官方列表项可缺省） */
+/** Model list entry (a subset of fields aligned with the Model returned by /api/ai/models; mediaType may be omitted for official list items) */
 export interface ModelLike {
   id: string;
   name: string;
@@ -145,11 +148,11 @@ export interface ModelLike {
   mediaType?: GenMediaType;
   modes?: string[];
   supportsAudio?: boolean;
-  /** 标记为用户自定义（UI 可加徽标 / 区分来源） */
+  /** Marked as user-defined (UI may add a badge / distinguish the source) */
   custom?: boolean;
 }
 
-/** 自定义模型 → 模型列表项（供下拉与生成解析复用平台 Key/baseUrl） */
+/** Custom model → model list entry (reused by the dropdown and generation logic to resolve the platform Key/baseUrl) */
 export function customModelToModelLike(cm: CustomModel): ModelLike {
   return {
     id: cm.modelId,
@@ -163,9 +166,9 @@ export function customModelToModelLike(cm: CustomModel): ModelLike {
 }
 
 /**
- * 把自定义模型并入从 /api/ai/models 拉到的模型列表（按 mediaType 过滤、去重）。
- * 仅保留 provider 已启用的自定义模型，避免选了没 Key 的平台。
- * fetched 用结构化最小类型，兼容各处 { id, name, provider } 形态的官方列表。
+ * Merges custom models into the model list fetched from /api/ai/models (filtered by mediaType, deduplicated).
+ * Only retains custom models whose provider is enabled, to avoid selecting a platform with no API key configured.
+ * fetched uses a minimal structured type, compatible with the { id, name, provider } shape of official lists everywhere.
  */
 export function mergeCustomModels(
   fetched: ReadonlyArray<{ id: string; name: string; provider: string }>,
@@ -177,7 +180,7 @@ export function mergeCustomModels(
     .filter((cm) => cm.mediaType === mediaType)
     .filter((cm) => !enabledProviders || enabledProviders.has(cm.provider))
     .map(customModelToModelLike)
-    // 去掉与官方列表 id 重复的
+    // Remove entries whose id already exists in the official list
     .filter((cm) => !fetched.some((m) => m.id === cm.id));
   return [...fetched, ...extras];
 }

@@ -1,10 +1,10 @@
 /**
- * 多源素材引擎 —— 注册表与统一检索分发
+ * Multi-source media engine — registry and unified search dispatch
  *
- * 对外暴露：
- *  - searchStock(sourceId, query, opts)：单源检索
- *  - searchAllStock(query, opts)：聚合检索（keyless 源始终参与，需 Key 的源缺 Key 自动跳过）
- *  - resolveSourceKey / getAvailableSources：Key 解析与可用源判断
+ * Public API:
+ *  - searchStock(sourceId, query, opts): search a single source
+ *  - searchAllStock(query, opts): aggregate search (keyless sources always participate; sources that require a key are silently skipped when the key is absent)
+ *  - resolveSourceKey / getAvailableSources: key resolution and source availability check
  */
 
 import {
@@ -26,18 +26,18 @@ import { searchArchiveVideos, searchArchiveImages } from "./archive";
 import { TtlCache } from "@/lib/ttl-cache";
 
 export interface StockSearchOptions {
-  /** 各源 Key：{ pexels: "...", pixabay: "..." }；openverse 可选 token */
+  /** Per-source API keys: { pexels: "...", pixabay: "..." }; openverse token is optional */
   apiKeys?: Partial<Record<StockSourceId, string>>;
-  mediaType?: StockMediaType; // 默认 video
+  mediaType?: StockMediaType; // defaults to video
   perPage?: number;
   orientation?: StockOrientation;
   minSec?: number;
   maxSec?: number;
-  /** 本地素材池目录（绝对路径）；设置后 local 源参与检索，否则跳过 */
+  /** Absolute path to the local media pool directory; when set, the local source participates in searches, otherwise it is skipped */
   localDir?: string;
 }
 
-/** 从 opts 或环境变量解析某源的 Key（keyless 源返回空串即可） */
+/** Resolve a source's API key from opts or environment variables (keyless sources simply return an empty string) */
 export function resolveSourceKey(sourceId: StockSourceId, apiKeys?: Partial<Record<StockSourceId, string>>): string {
   const fromOpts = apiKeys?.[sourceId];
   if (fromOpts) return fromOpts;
@@ -46,17 +46,17 @@ export function resolveSourceKey(sourceId: StockSourceId, apiKeys?: Partial<Reco
   return "";
 }
 
-/** 某源在当前 Key 情况下是否可用（keyless 始终可用） */
+/** Whether a source is available given the current keys (keyless sources are always available) */
 export function isSourceAvailable(meta: StockSourceMeta, apiKeys?: Partial<Record<StockSourceId, string>>): boolean {
   return meta.keyless || !!resolveSourceKey(meta.id, apiKeys);
 }
 
-/** 列出当前可用的源（keyless 排前） */
+/** List currently available sources (keyless sources first) */
 export function getAvailableSources(apiKeys?: Partial<Record<StockSourceId, string>>): StockSourceMeta[] {
   return STOCK_SOURCES.filter((s) => isSourceAvailable(s, apiKeys));
 }
 
-/** 单源检索：按 mediaType 调用对应源的检索函数 */
+/** Single-source search: dispatch to the appropriate search function based on mediaType */
 export async function searchStock(
   sourceId: StockSourceId,
   query: string,
@@ -77,28 +77,28 @@ export async function searchStock(
       return searchPixabayVideos(query, { apiKey: key, perPage, orientation, minSec, maxSec });
 
     case "openverse":
-      // Openverse 无视频；请求视频时回退到图片，让"无商品成片"仍有画面
+      // Openverse has no video; fall back to images when video is requested so that footage-free compositions still have visuals
       if (mediaType === "audio") return searchOpenverseAudio(query, { token: key || undefined, perPage });
       return searchOpenverseImages(query, { token: key || undefined, perPage });
 
     case "wikimedia":
-      // Commons 免 Key 的图片+视频+音频源（唯一免 Key 视频；音频直链可下，免 Key BGM 来源）
+      // Commons is the key-free image + video + audio source (the only key-free video source; audio URLs are directly downloadable, making it the key-free BGM source)
       if (mediaType === "audio") return searchWikimediaAudio(query, { perPage });
       if (mediaType === "image") return searchWikimediaImages(query, { perPage });
       return searchWikimediaVideos(query, { perPage });
 
     case "local":
-      // 本地素材池（项目自带 B-roll）：无网络，扫 opts.localDir；未提供目录或请求音频则不参与
+      // local media pool (project-bundled B-roll): no network, scans opts.localDir; skip if no directory provided or if audio is requested
       if (!opts.localDir || mediaType === "audio") return [];
       return scanLocalMaterials(opts.localDir, query, { mediaType, perPage });
 
     case "nasa":
-      // NASA 公共领域影像（两步取材），无音频
+      // NASA public-domain footage (two-step retrieval); no audio
       if (mediaType === "audio") return [];
       return mediaType === "image" ? searchNasaImages(query, { perPage }) : searchNasaVideos(query, { perPage });
 
     case "archive":
-      // Internet Archive 公共领域影像（两步取材，强制 publicdomain），无音频
+      // Internet Archive public-domain footage (two-step retrieval, publicdomain license enforced); no audio
       if (mediaType === "audio") return [];
       return mediaType === "image" ? searchArchiveImages(query, { perPage }) : searchArchiveVideos(query, { perPage });
 
@@ -109,20 +109,20 @@ export async function searchStock(
 
 export interface AggregateResult {
   candidates: StockCandidate[];
-  /** 因缺 Key 被跳过的源 id */
+  /** Source ids skipped due to missing API key */
   skippedSources: StockSourceId[];
-  /** 检索出错的源 id（不阻塞其余） */
+  /** Source ids that errored during search (does not block other sources) */
   erroredSources: StockSourceId[];
 }
 
 /**
- * 聚合检索：对所有支持该 mediaType 且可用的源并发检索，合并候选。
- * keyless 源优先排序；单源失败不影响其余（Promise.allSettled）。
+ * Aggregate search: concurrently searches all sources that support the given mediaType and are available, then merges candidates.
+ * Keyless sources are ranked first; a failure in one source does not block others (Promise.allSettled).
  */
-/** 聚合检索结果缓存：批量配画面逐镜检索时，语义相近的检索词会重复打各源 API（还撞 Pixabay/Openverse 限流）。 */
+/** Aggregate search result cache: when matching footage shot-by-shot in batch, semantically similar queries hit each source's API repeatedly (and trigger Pixabay/Openverse rate limits). */
 const stockCache = new TtlCache<AggregateResult>(5 * 60 * 1000, 64);
 
-/** 缓存键：影响检索结果的参数 + 实际参与的源（源由 apiKeys 决定，故纳入键）。导出便于单测。 */
+/** Cache key: parameters that affect search results + the sources that actually participate (determined by apiKeys, so included in the key). Exported for unit testing. */
 export function stockCacheKey(query: string, opts: StockSearchOptions, sourceIds: string[]): string {
   const { mediaType = "video", orientation, perPage, minSec, maxSec } = opts;
   return [mediaType, orientation || "", perPage || "", minSec || "", maxSec || "", sourceIds.slice().sort().join(","), query.trim().toLowerCase()].join("|");
@@ -133,10 +133,10 @@ export async function searchAllStock(query: string, opts: StockSearchOptions = {
   const skippedSources: StockSourceId[] = [];
   const erroredSources: StockSourceId[] = [];
 
-  // 选出支持该 mediaType 的源（openverse 视频请求时也参与——它会回退图片）
+  // select sources that support the requested mediaType (openverse also participates for video requests — it falls back to images)
   const usable = STOCK_SOURCES.filter((s) => {
-    if (s.id === "local" && !opts.localDir) return false; // 本地源仅在提供素材池目录时参与
-    if (s.aggregate === false) return false; // 档案源（NASA/Archive）不进默认聚合，仅显式选用
+    if (s.id === "local" && !opts.localDir) return false; // local source only participates when a media pool directory is provided
+    if (s.aggregate === false) return false; // archive sources (NASA/Archive) are excluded from default aggregation and must be selected explicitly
     const supports = s.mediaTypes.includes(mediaType) || (s.id === "openverse" && mediaType === "video");
     if (!supports) return false;
     if (!isSourceAvailable(s, opts.apiKeys)) {
@@ -146,7 +146,7 @@ export async function searchAllStock(query: string, opts: StockSearchOptions = {
     return true;
   });
 
-  // 命中缓存直接复用候选池（同 query+参数+可用源，5 分钟内）
+  // serve from cache when available (same query + params + available sources, within 5 minutes)
   const ck = stockCacheKey(query, opts, usable.map((s) => s.id));
   const cached = stockCache.get(ck);
   if (cached) return cached;
@@ -160,15 +160,15 @@ export async function searchAllStock(query: string, opts: StockSearchOptions = {
   });
 
   const result = { candidates: rankStockCandidates(merged, mediaType, opts.orientation), skippedSources, erroredSources };
-  // 只缓存有结果的（空结果多半是瞬时失败/无命中，缓存会挡住重试与「永远有素材」兜底）
+  // only cache non-empty results (empty results are usually transient failures or zero hits; caching them would block retries and the "always find something" fallback)
   if (result.candidates.length > 0) stockCache.set(ck, result);
   return result;
 }
 
 /**
- * 聚合候选排序（纯函数，可单测）。优先级：
- * ① 命中请求媒体类型（真视频 > Openverse 回退图片，避免「要视频却拿到静态图」）
- * ② keyless 源优先 ③ 朝向匹配（竖屏短视频偏好竖向素材，少裁切/黑边）④ 短边分辨率高者
+ * Rank aggregate candidates (pure function, unit-testable). Priority:
+ * 1. Matches requested media type (real video > Openverse fallback image, avoids "asked for video but got a static image")
+ * 2. Keyless sources first  3. Orientation match (vertical content preferred for portrait short videos to minimize cropping/letterboxing)  4. Higher short-side resolution
  */
 export function rankStockCandidates(
   candidates: StockCandidate[],
@@ -182,7 +182,7 @@ export function rankStockCandidates(
     const am = a.mediaType === mediaType ? 0 : 1;
     const bm = b.mediaType === mediaType ? 0 : 1;
     if (am !== bm) return am - bm;
-    // 本地自有素材优先（同媒体类型时）：用户既已上传 B-roll 就先用自己的，免费素材补不足
+    // locally-owned footage takes priority (within the same media type): if the user has uploaded B-roll, use it first; free stock fills the gaps
     const al = a.source === "local" ? 0 : 1;
     const bl = b.source === "local" ? 0 : 1;
     if (al !== bl) return al - bl;

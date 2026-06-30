@@ -1,13 +1,13 @@
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  // schema 文件路径
+  // path to the schema file
   schema: "./src/lib/db/schema.ts",
-  // 迁移文件输出目录
+  // output directory for migration files
   out: "./drizzle",
-  // 使用 SQLite 方言
+  // use the SQLite dialect
   dialect: "sqlite",
-  // 数据库连接配置
+  // database connection config
   dbCredentials: {
     url: "./data/sqlite.db",
   },

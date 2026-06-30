@@ -99,8 +99,8 @@ export function DotPattern({
     (_, i) => {
       const col = i % Math.ceil(dimensions.width / width)
       const row = Math.floor(i / Math.ceil(dimensions.width / width))
-      // 基于索引的确定性伪随机：渲染期不能调用 Math.random（非纯函数），
-      // 用 Math.sin 哈希索引得到稳定值，重渲染时每个点的动画参数保持一致
+      // Deterministic pseudo-random based on index: Math.random cannot be called during rendering (impure),
+      // so Math.sin hashes the index to produce a stable value; each dot's animation params stay consistent across re-renders
       const seeded = (n: number) => {
         const v = Math.sin(n * 12.9898) * 43758.5453
         return v - Math.floor(v)

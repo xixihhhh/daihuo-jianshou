@@ -12,7 +12,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Electron 主进程与构建脚本是 Node CommonJS/ESM 入口，不走 Next 应用的 lint 规则
+    // Electron main process and build scripts are Node CommonJS/ESM entry points, not subject to Next app lint rules
     "electron/**",
     "scripts/**",
     "release/**",

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createProvider } from "@/lib/providers";
 
-// 查询 AI 任务状态（生图/生视频是异步的）
+// Query AI task status (image/video generation is asynchronous)
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { provider: providerName, taskId, apiKey, baseUrl } = body;

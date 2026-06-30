@@ -10,7 +10,7 @@ import type { Shot } from "@/lib/db/schema";
 import { useT, useLocale } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 
-// 镜头类型标签（label 走 showcase 命名空间词条 key，按语言取）
+// Shot type labels (label uses a showcase-namespace i18n key, resolved per language)
 const shotTypeLabels: Record<Shot["type"], { labelKey: string; color: string }> = {
   hook: { labelKey: "shotTypeHook", color: "bg-red-500/20 text-red-400" },
   pain_point: { labelKey: "shotTypePainPoint", color: "bg-orange-500/20 text-orange-400" },
@@ -28,7 +28,7 @@ export default function ShowcasePage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* 顶部导航 */}
+      {/* Top navigation */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
@@ -38,7 +38,7 @@ export default function ShowcasePage() {
                 <span className="ml-1">{tc("back")}</span>
               </Button>
             </Link>
-            {/* 分隔线+标题+徽章在窄屏放不下，移动端隐藏，保留返回与「做同款」CTA */}
+            {/* Divider + title + badge don't fit on narrow screens — hidden on mobile, keeping back button and "make similar" CTA */}
             <div className="hidden sm:block h-5 w-px bg-border/50" />
             <span className="hidden sm:inline text-sm font-semibold">{t("navTitle")}</span>
             <Badge variant="secondary" className="hidden sm:inline-flex text-[10px]">{t("navBadge")}</Badge>
@@ -56,7 +56,7 @@ export default function ShowcasePage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-10">
-        {/* 说明 */}
+        {/* Description */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight mb-2">{sc.title}</h1>
           <p className="text-sm text-muted-foreground">
@@ -66,7 +66,7 @@ export default function ShowcasePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* 左：成片预览 */}
+          {/* Left: finished video preview */}
           <div className="lg:col-span-2">
             <Card className="glass-card neon-glow overflow-hidden">
               <CardContent className="p-0">
@@ -92,12 +92,12 @@ export default function ShowcasePage() {
             </Card>
           </div>
 
-          {/* 右：分镜脚本 */}
+          {/* Right: shot-by-shot script */}
           <div className="lg:col-span-3">
             <h2 className="text-base font-semibold mb-4">{t("scriptTitle")}</h2>
             <div className="space-y-3">
               {sc.shots.map((shot, idx) => {
-                // 纯计算累计时间，避免渲染期改写外层变量
+                // Pure cumulative time calculation — avoids mutating outer variables during render
                 const start = sc.shots.slice(0, idx).reduce((s, sh) => s + sh.duration, 0);
                 const end = start + shot.duration;
                 const meta = shotTypeLabels[shot.type];
@@ -120,7 +120,7 @@ export default function ShowcasePage() {
           </div>
         </div>
 
-        {/* 参考脚本结构 */}
+        {/* Reference script structures */}
         <div className="mt-12">
           <div className="flex items-center gap-2 mb-1">
             <h2 className="text-base font-semibold">{t("templatesTitle")}</h2>
@@ -150,7 +150,7 @@ export default function ShowcasePage() {
           </div>
         </div>
 
-        {/* 底部 CTA */}
+        {/* Bottom CTA */}
         <div className="mt-12 flex justify-center">
           <Link href="/project/new">
             <Button size="lg" className="brand-gradient text-white px-10">

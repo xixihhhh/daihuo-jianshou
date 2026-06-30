@@ -1,10 +1,10 @@
 /**
- * 火山引擎（方舟 Ark）Provider 实现
- * 文档参考（官方）：
- * - 图像（Seedream）同步：POST /api/v3/images/generations  https://www.volcengine.com/docs/82379/1541523
- * - 视频（Seedance）异步：POST /api/v3/contents/generations/tasks + GET /tasks/{id}  https://www.volcengine.com/docs/82379/1366799
- * 鉴权：Authorization: Bearer <ARK_API_KEY>
- * 说明：旧的 visual.volcengineapi.com Visual 服务需 AK/SK 签名，已弃用，统一改走方舟 Ark。
+ * VolcEngine (Ark) provider implementation
+ * Official API docs:
+ * - Image (Seedream) sync: POST /api/v3/images/generations  https://www.volcengine.com/docs/82379/1541523
+ * - Video (Seedance) async: POST /api/v3/contents/generations/tasks + GET /tasks/{id}  https://www.volcengine.com/docs/82379/1366799
+ * Auth: Authorization: Bearer <ARK_API_KEY>
+ * Note: the legacy visual.volcengineapi.com Visual service requires AK/SK signing and is deprecated; all calls now go through Ark.
  */
 
 import { BaseProvider, ProviderError } from './base'
@@ -20,23 +20,23 @@ import type {
   MediaType,
 } from './types'
 
-// ==================== Ark API 响应类型 ====================
+// ==================== Ark API response types ====================
 
-/** 图像生成响应（OpenAI 兼容：data[].url） */
+/** Image generation response (OpenAI-compatible: data[].url) */
 interface ArkImageResponse {
   model?: string
   data?: Array<{ url?: string; b64_json?: string; size?: string }>
-  images?: string[] // 个别文档返回 images 数组，做兼容
+  images?: string[] // some API docs return an images array instead; handled for compatibility
   error?: { code?: string; message?: string }
 }
 
-/** 视频任务创建响应 */
+/** Video task creation response */
 interface ArkTaskCreateResponse {
   id: string
   error?: { code?: string; message?: string }
 }
 
-/** 视频任务查询响应 */
+/** Video task query response */
 interface ArkTaskQueryResponse {
   id: string
   model?: string
@@ -45,7 +45,7 @@ interface ArkTaskQueryResponse {
   error?: { code?: string; message?: string }
 }
 
-/** 把宽高映射为 Ark 视频 ratio */
+/** Map width/height to an Ark video ratio */
 function toRatio(width?: number, height?: number): string {
   const w = width ?? 0
   const h = height ?? 0
@@ -55,12 +55,12 @@ function toRatio(width?: number, height?: number): string {
   return 'adaptive'
 }
 
-/** 把宽高映射为 Ark 图像 size；超出 Ark 像素范围则回退 "2K"（由模型按 prompt 决定比例） */
+/** Map width/height to an Ark image size; falls back to "2K" when outside Ark's pixel range (model picks aspect ratio from prompt) */
 function toImageSize(width?: number, height?: number): string {
   const w = width ?? 0
   const h = height ?? 0
   const total = w * h
-  // Ark 总像素范围 [2560x1440=3686400, 4096x4096=16777216]
+  // Ark total pixel range [2560x1440=3686400, 4096x4096=16777216]
   if (total >= 3686400 && total <= 16777216) return `${w}x${h}`
   return '2K'
 }
@@ -76,13 +76,13 @@ export class VolcEngineProvider extends BaseProvider {
     })
   }
 
-  /** 方舟 Ark 用 Bearer API Key 鉴权 */
+  /** Ark authenticates with a Bearer API key */
   protected getAuthHeaders(): Record<string, string> {
     return { Authorization: `Bearer ${this.config.apiKey}` }
   }
 
   /**
-   * 生成图片（Seedream，同步返回，无需轮询）
+   * Generate an image (Seedream — synchronous, no polling needed)
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
     const body: Record<string, unknown> = {
@@ -91,7 +91,7 @@ export class VolcEngineProvider extends BaseProvider {
       size: toImageSize(options.width, options.height),
       response_format: 'url',
       watermark: false,
-      // 图生图/编辑：传 image（URL 或 base64）
+      // image-to-image / edit: pass image (URL or base64)
       ...(options.referenceImageUrl && { image: options.referenceImageUrl }),
       ...options.extra,
     }
@@ -109,7 +109,7 @@ export class VolcEngineProvider extends BaseProvider {
       )
     }
 
-    // 优先 data[].url，兼容 images[] 字符串数组
+    // Prefer data[].url; fall back to images[] string array for compatibility
     const urls = (resp.data?.map((d) => d.url).filter(Boolean) as string[]) ?? []
     if (urls.length === 0 && Array.isArray(resp.images)) {
       urls.push(...resp.images)
@@ -126,7 +126,7 @@ export class VolcEngineProvider extends BaseProvider {
   }
 
   /**
-   * 生成视频（Seedance，异步任务 + 轮询）
+   * Generate a video (Seedance — async task + polling)
    */
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
     let text = options.prompt
@@ -134,7 +134,7 @@ export class VolcEngineProvider extends BaseProvider {
       text = `${options.prompt}。旁白：「${options.voiceover}」`
     }
 
-    // content：文本 + 可选首帧图（image_url）
+    // content: text + optional first-frame image (image_url)
     const content: Array<Record<string, unknown>> = [{ type: 'text', text }]
     if (options.firstFrameUrl) {
       content.push({ type: 'image_url', image_url: { url: options.firstFrameUrl } })
@@ -173,7 +173,7 @@ export class VolcEngineProvider extends BaseProvider {
   }
 
   /**
-   * 查询任务状态（仅视频异步任务）
+   * Query task status (video async tasks only)
    */
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
     const data = await this.request<ArkTaskQueryResponse>(
@@ -198,7 +198,7 @@ export class VolcEngineProvider extends BaseProvider {
     return taskStatus
   }
 
-  /** Ark 任务状态 → 统一状态 */
+  /** Map Ark task status to unified status */
   private mapStatus(s: ArkTaskQueryResponse['status']): TaskStatusEnum {
     switch (s) {
       case 'queued':
@@ -217,13 +217,13 @@ export class VolcEngineProvider extends BaseProvider {
   }
 
   /**
-   * 获取可用模型列表
-   * 火山方舟模型用 doubao- 前缀；也可在控制台创建推理接入点用 endpoint ID 调用。
-   * 来源：https://www.volcengine.com/docs/82379
+   * Fetch available model list.
+   * VolcEngine Ark models use the doubao- prefix; you can also create inference endpoints in the console and call them by endpoint ID.
+   * Source: https://www.volcengine.com/docs/82379
    */
   async listModels(mediaType?: MediaType): Promise<Model[]> {
     const models: Model[] = [
-      // ==================== 视频生成（Seedance） ====================
+      // ==================== Video generation (Seedance) ====================
       {
         id: 'doubao-seedance-2-0-260128',
         name: 'Seedance 2.0',
@@ -241,7 +241,7 @@ export class VolcEngineProvider extends BaseProvider {
         mediaType: 'video',
         provider: this.name,
       },
-      // ==================== 图片生成（Seedream） ====================
+      // ==================== Image generation (Seedream) ====================
       {
         id: 'doubao-seedream-5-0-260128',
         name: 'Seedream 5.0',

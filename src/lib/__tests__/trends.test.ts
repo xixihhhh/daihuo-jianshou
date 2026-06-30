@@ -17,7 +17,7 @@ const SAMPLE = `<?xml version="1.0"?><rss><channel>
 describe("parseTrendsRss", () => {
   it("只取 <item>，跳过 channel 头部标题；含热度 + 新闻背景 + 实体/CDATA 解码", () => {
     const topics = parseTrendsRss(SAMPLE);
-    expect(topics.length).toBe(2); // 不含 channel 的 "Daily Search Trends"
+    expect(topics.length).toBe(2); // excludes the channel-level "Daily Search Trends" title
     expect(topics[0]).toEqual({ title: "mstr", traffic: "2000+", context: "Strategy Announces & Reserves Plan" });
     expect(topics[1]).toEqual({ title: "world cup results", traffic: "5000+", context: undefined });
   });

@@ -2,23 +2,23 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Shot, CharacterVoiceProfile } from "@/lib/db/schema";
 
-// ==================== 人物/角色 ====================
+// ==================== Character ====================
 
 export interface Character {
   id: string;
   name: string;
   description?: string;
-  /** 外貌特征描述（英文，用于注入 AI prompt） */
+  /** Appearance description (English, injected into AI prompts) */
   appearance?: string;
-  /** 参考图 URL 列表 */
+  /** List of reference image URLs */
   referenceImages: string[];
-  /** 声音偏好 */
+  /** Voice preference */
   voiceProfile?: CharacterVoiceProfile;
-  /** 是否为默认出镜人物 */
+  /** Whether this is the default on-screen character */
   isDefault?: boolean;
 }
 
-// ==================== 项目 ====================
+// ==================== Project ====================
 
 export type Step = "upload" | "script" | "assets" | "video" | "export";
 
@@ -31,7 +31,7 @@ export interface Project {
   productDescription?: string;
   productImages: string[];
   productAnalysis?: string;
-  /** 项目绑定的出镜人物 */
+  /** On-screen character bound to this project */
   characterId?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -54,7 +54,7 @@ interface ProjectState {
   currentProject: Project | null;
   projects: Project[];
   currentStep: Step;
-  /** 当前项目使用的人物 */
+  /** Character currently used by the project */
   currentCharacter: Character | null;
 
   setCurrentProject: (project: Project | null) => void;
@@ -78,7 +78,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       currentProject: state.currentProject
         ? { ...state.currentProject, ...updates }
         : null,
-      // 同步更新 projects 数组中对应的项目
+      // keep the corresponding entry in the projects array in sync
       projects: state.currentProject
         ? state.projects.map((p) =>
             p.id === state.currentProject!.id
@@ -90,7 +90,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setCurrentCharacter: (character) => set({ currentCharacter: character }),
 }));
 
-// ==================== 人物库 Store（持久化） ====================
+// ==================== Character Library Store (persisted) ====================
 
 interface CharacterState {
   characters: Character[];
@@ -98,7 +98,7 @@ interface CharacterState {
   updateCharacter: (id: string, updates: Partial<Character>) => void;
   removeCharacter: (id: string) => void;
   getDefault: () => Character | undefined;
-  /** 将指定人物设为默认，同时取消其他人物的默认状态 */
+  /** Set the specified character as default and clear the default flag on all others */
   setDefault: (id: string) => void;
 }
 

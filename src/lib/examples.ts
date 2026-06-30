@@ -1,18 +1,18 @@
-// 新手示例包：示例商品（一键填充/导入商品库）、参考脚本结构、首页示例作品展示。
-// 说明：这些是「官方示例」，与用户真实创建的数据完全分离、明确标注，不会混入「我的项目」。
-// 中英双语：按界面语言取对应文案（getExampleProducts/Templates/Showcase(locale)）。
+// Onboarding example pack: sample products (one-click fill / import to product library), reference script structures, and homepage showcase.
+// Note: these are "official examples", fully separated from user-created data and clearly labelled — they will never appear under "My Projects".
+// Bilingual: copy is fetched by UI locale (getExampleProducts/Templates/Showcase(locale)).
 import type { Shot } from "@/lib/db/schema";
 import type { Locale } from "@/lib/i18n/config";
 
-// 示例商品品类（对齐商品库 ProductItem.category）
+// Example product categories (aligned with ProductItem.category in the product library)
 export interface ExampleProduct {
   id: string;
   name: string;
   category: "beauty" | "food" | "home" | "fashion" | "tech" | "other";
-  /** 卖点描述（同时用于商品库 description / 新建表单 sellingPoints） */
+  /** Selling-point description (also used as product library description / new-project form sellingPoints) */
   sellingPoints: string;
   price: string;
-  /** 打包在 public/examples 下的真实商品图 */
+  /** Real product image bundled under public/examples */
   image: string;
 }
 
@@ -71,7 +71,7 @@ const exampleProductsByLocale: Record<Locale, ExampleProduct[]> = {
   ],
 };
 
-// 参考脚本结构（高转化带货分镜模板，供「示例作品」展示与新手参考）
+// Reference script structures (high-conversion commerce shot templates, used for the "showcase" display and new-user reference)
 export interface ExampleTemplate {
   id: string;
   name: string;
@@ -179,7 +179,7 @@ const exampleTemplatesByLocale: Record<Locale, ExampleTemplate[]> = {
   ],
 };
 
-// 首页「示例作品」：一个完整可看的样例（脚本结构 + 已合成样片）
+// Homepage "Example Showcase": a complete viewable sample (script structure + pre-composed demo clip)
 export interface ExampleShowcase {
   id: string;
   title: string;
@@ -189,8 +189,8 @@ export interface ExampleShowcase {
   totalDuration: number;
   resolution: string;
   aspectRatio: string;
-  cover: string; // 封面图
-  videoUrl: string; // 打包样片
+  cover: string; // Cover image
+  videoUrl: string; // Bundled demo clip
   shots: Shot[];
 }
 
@@ -233,7 +233,7 @@ const exampleShowcaseByLocale: Record<Locale, ExampleShowcase> = {
   },
 };
 
-// ===== 取数（按界面语言；缺省回退中文）=====
+// ===== Accessors (by UI locale; falls back to Chinese if locale is missing) =====
 export function getExampleProducts(locale: Locale): ExampleProduct[] {
   return exampleProductsByLocale[locale] ?? exampleProductsByLocale.zh;
 }
@@ -244,7 +244,7 @@ export function getExampleShowcase(locale: Locale): ExampleShowcase {
   return exampleShowcaseByLocale[locale] ?? exampleShowcaseByLocale.zh;
 }
 
-// 向后兼容：默认中文（未按语言取数的旧用法仍可用）
+// Backward compatibility: default to Chinese (legacy callers that don't pass a locale still work)
 export const exampleProducts = exampleProductsByLocale.zh;
 export const exampleTemplates = exampleTemplatesByLocale.zh;
 export const exampleShowcase = exampleShowcaseByLocale.zh;

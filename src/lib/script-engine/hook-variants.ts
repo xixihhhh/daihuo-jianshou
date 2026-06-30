@@ -1,10 +1,13 @@
 /**
- * 钩子变体 A/B：固定脚本的后续分镜，只把第 1 镜（钩子）按不同机制重写，
- * 得到 N 条「只有开场不同」的可比变体；每条打 hookId 标签，投放后按 hookId 回流选赢家。
+ * Hook A/B variants: keep all subsequent shots of a base script fixed, rewrite only
+ * shot 1 (the hook) using different patterns to produce N "same-body, different-opening"
+ * comparable variants; each is tagged with hookId for post-campaign winner selection.
  *
- * 纯函数、零 LLM / 零 Key——直接用钩子模式库生成，贴合免 Key 兜底哲学。
- * 注意：变体的开场口播取自模式库示例，是「机制级 A/B 草稿」（用于测哪种钩子机制更能卖），
- * 不是逐字打磨的成稿——测出赢家机制后再精修最划算。
+ * Pure functions, zero LLM / zero API key — generated directly from the hook pattern library,
+ * consistent with the key-free fallback philosophy.
+ * Note: the opening voiceover in each variant comes from the pattern library examples;
+ * these are "mechanism-level A/B drafts" (for testing which hook type converts better),
+ * not word-polished final copy — refine after identifying the winning mechanism.
  */
 import type { Shot } from "../db/schema";
 import type { ProductCategory } from "./templates";
@@ -18,13 +21,13 @@ export interface ScriptLike {
 }
 
 export interface HookVariant {
-  /** 所用钩子机制 id（= HookPattern.id）；效果回流按它聚合 */
+  /** id of the hook pattern used (= HookPattern.id); performance data is aggregated by this key */
   hookId: string;
   hookName: string;
   script: ScriptLike;
 }
 
-/** 用某机制重写第 1 镜：口播换成该机制的钩子，画面描述补上该机制的「截停」做法（保留原画面意图） */
+/** Rewrites shot 1 using the given pattern: replaces voiceover with the pattern's hook example, prepends the pattern's "stop" method to the description (original visual intent preserved) */
 function rewriteHookShot(shot: Shot, p: HookPattern): Shot {
   return {
     ...shot,
@@ -35,8 +38,8 @@ function rewriteHookShot(shot: Shot, p: HookPattern): Shot {
 }
 
 /**
- * 由一条基准脚本生成 N 条钩子变体（只改第 1 镜，shot 2..N 原样保留）。
- * patterns 省略则按品类优选；传入则用指定机制集合。
+ * Generates N hook variants from a base script (only shot 1 is changed; shots 2..N are kept as-is).
+ * If patterns is omitted, category-preferred patterns are used; otherwise the provided set is used.
  */
 export function buildHookVariants(
   base: ScriptLike,

@@ -1,6 +1,6 @@
 /**
- * 数码3C品类脚本模板
- * 包含经典爆款脚本结构，适用于手机配件、智能设备、电脑外设、家电等
+ * Consumer electronics (3C) category script templates
+ * Classic viral script structures for phone accessories, smart devices, PC peripherals, home appliances, etc.
  */
 
 import type { Shot } from "@/lib/db/schema";
@@ -102,7 +102,7 @@ export const techTemplates: ScriptTemplate[] = [
   },
 ];
 
-/** 数码3C品类特有的 prompt 指令 */
+/** Prompt directive specific to the consumer electronics (3C) category */
 export const techPromptDirective = `
 你正在为【数码3C】品类创作短视频带货脚本。请注意以下要点：
 1. 参数不要堆砌，要翻译成用户能感知的体验："67W快充"→"30分钟充满"

@@ -7,8 +7,8 @@ import { shotsToSrt, shotsToVtt } from "@/lib/subtitle-export";
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
 
 /**
- * GET /api/project/[id]/subtitle?format=srt|vtt —— 导出最新脚本的字幕（SRT / WebVTT，浏览器直接下载）。
- * 时间轴按脚本规划时长累加，供创作者二次剪辑 / 平台原生字幕 / 无障碍 / 再校对使用（成片仍内烧字幕）。
+ * GET /api/project/[id]/subtitle?format=srt|vtt —— export the latest script's subtitles (SRT / WebVTT, direct browser download).
+ * Timestamps are accumulated from the planned shot durations in the script, for use in re-editing, platform-native captions, accessibility, or proofreading (the final video still has burnt-in subtitles).
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

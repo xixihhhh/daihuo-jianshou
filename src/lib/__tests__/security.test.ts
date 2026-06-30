@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { resolveUploadFilePath } from "@/lib/remote-image";
 import { escapeSsml } from "@/lib/edge-tts";
 
-// ==================== 路径穿越防护（/api/ai/image|video 的 toRemoteUsableImage）====================
+// ==================== path traversal protection (toRemoteUsableImage in /api/ai/image|video) ====================
 
 describe("resolveUploadFilePath 路径穿越防护", () => {
   it("正常 /api/files 路径解析到 uploads 目录内", () => {
@@ -24,12 +24,12 @@ describe("resolveUploadFilePath 路径穿越防护", () => {
   });
 });
 
-// ==================== SSML 属性注入防护（edge-tts voice/pitch/rate 兜底转义）====================
+// ==================== SSML attribute injection protection (fallback escaping for edge-tts voice/pitch/rate) ====================
 
 describe("escapeSsml 防 SSML 属性注入", () => {
   it("转义单引号/尖括号——voice/rate 落在单引号属性里靠它兜底，未转义的 ' 可越界注入", () => {
     const out = escapeSsml("x' /><voice name='evil");
-    expect(out).not.toContain("'"); // 单引号必须被转义，否则可终止属性、注入新元素
+    expect(out).not.toContain("'"); // single quotes must be escaped; unescaped ones can break out of the attribute and inject new elements
     expect(out).not.toContain("<");
     expect(out).not.toContain(">");
     expect(out).toContain("&apos;");

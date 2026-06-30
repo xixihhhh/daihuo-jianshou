@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSpeechFree, FREE_TTS_VOICES, DEFAULT_FREE_VOICE } from "@/lib/edge-tts";
 
-// GET /api/tts/free —— 列出可用的免费音色（无需任何 Key）
+// GET /api/tts/free —— list available free voices (no API key required)
 export async function GET() {
   return NextResponse.json({ voices: FREE_TTS_VOICES, default: DEFAULT_FREE_VOICE });
 }
 
-// POST /api/tts/free —— 试听：用微软 Edge keyless TTS 合成一小段语音，直接返回 mp3
+// POST /api/tts/free —— preview: synthesize a short audio clip using Microsoft Edge keyless TTS and return it as mp3
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown> = {};
   try {
     body = await req.json();
   } catch {
-    /* 允许空 body，用默认试听词 */
+    /* allow empty body; use default preview text */
   }
   const text = (typeof body.text === "string" && body.text.trim()) || "你好，这是免费配音的试听效果。";
-  // 校验音色名只含安全字符（Edge 音色形如 en-US-AriaNeural；保留连字符，兼容任意合法 Edge 音色而非仅白名单）——非法落默认，防 SSML 注入
+  // validate that the voice name contains only safe characters (Edge voices look like en-US-AriaNeural; hyphens allowed, compatible with any valid Edge voice rather than a fixed allowlist) — fall back to default on invalid input to prevent SSML injection
   const voice = typeof body.voice === "string" && /^[A-Za-z0-9-]{1,40}$/.test(body.voice) ? body.voice : DEFAULT_FREE_VOICE;
-  // 语速须是 SSML prosody rate 格式（如 +10% / -5%）——非法则不传，防 SSML 注入
+  // rate must be in SSML prosody rate format (e.g. +10% / -5%) — omit on invalid input to prevent SSML injection
   const rate = typeof body.rate === "string" && /^[+-]?\d{1,3}%$/.test(body.rate) ? body.rate : undefined;
 
   try {

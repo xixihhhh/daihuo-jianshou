@@ -4,8 +4,8 @@ import { publishMetrics } from "@/lib/db/schema";
 import { aggregateByStyle, aggregateByHook } from "@/lib/performance-insights";
 
 /**
- * GET /api/insights/styles —— 跨所有项目聚合投放数据，得出「哪种风格更能卖」+「哪个钩子机制更能卖」。
- * 转化率(成交/播放)降序，供导出页/仪表盘展示并反哺脚本/钩子生成。
+ * GET /api/insights/styles — aggregate publish metrics across all projects to determine which style sells best and which hook mechanism converts best.
+ * Results are sorted by conversion rate (orders/views) descending, for use in the export page/dashboard and to feed back into script/hook generation.
  */
 export async function GET() {
   const db = getDb();

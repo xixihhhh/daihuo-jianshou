@@ -8,15 +8,15 @@ import type { ScriptTemplate } from "../template-store";
 import type { Character } from "../project-store";
 import type { Shot } from "@/lib/db/schema";
 
-// ==================== 商品库 Store 测试 ====================
+// ==================== ProductLibrary Store Tests ====================
 
 describe("ProductLibraryStore", () => {
   beforeEach(() => {
-    // 每个测试前重置 store 状态
+    // reset store state before each test
     useProductLibraryStore.setState({ products: [] });
   });
 
-  /** 创建测试用商品数据 */
+  /** Create product test data */
   function createProduct(overrides?: Partial<ProductItem>): ProductItem {
     return {
       id: "product-1",
@@ -64,7 +64,7 @@ describe("ProductLibraryStore", () => {
     const { products } = useProductLibraryStore.getState();
     expect(products[0].name).toBe("更新后的商品");
     expect(products[0].price).toBe("199元");
-    // 其他字段保持不变
+    // other fields remain unchanged
     expect(products[0].category).toBe("beauty");
   });
 
@@ -92,7 +92,7 @@ describe("ProductLibraryStore", () => {
 
   it("删除不存在的商品不应报错", () => {
     useProductLibraryStore.getState().addProduct(createProduct());
-    // 删除不存在的 id，不应抛出异常
+    // deleting a non-existent id should not throw
     expect(() => {
       useProductLibraryStore.getState().removeProduct("non-existent-id");
     }).not.toThrow();
@@ -116,7 +116,7 @@ describe("ProductLibraryStore", () => {
       useProductLibraryStore.getState().incrementVideoCount("non-existent-id");
     }).not.toThrow();
 
-    // 原有数据不受影响
+    // existing data must not be affected
     const { products } = useProductLibraryStore.getState();
     expect(products[0].videoCount).toBe(0);
   });
@@ -131,14 +131,14 @@ describe("ProductLibraryStore", () => {
   });
 });
 
-// ==================== 模板 Store 测试 ====================
+// ==================== Template Store Tests ====================
 
 describe("TemplateStore", () => {
   beforeEach(() => {
     useTemplateStore.setState({ templates: [] });
   });
 
-  /** 创建测试用模板数据 */
+  /** Create template test data */
   function createTemplate(overrides?: Partial<ScriptTemplate>): ScriptTemplate {
     const defaultShot: Shot = {
       shotId: 1,
@@ -226,11 +226,11 @@ describe("TemplateStore", () => {
   });
 });
 
-// ==================== 品牌 Store 测试 ====================
+// ==================== Brand Store Tests ====================
 
 describe("BrandStore", () => {
   beforeEach(() => {
-    // 重置为默认值
+    // reset to default values
     useBrandStore.setState({
       brand: {
         id: "test-brand-id",
@@ -281,7 +281,7 @@ describe("BrandStore", () => {
     expect(brand.primaryColor).toBe("#ff0000");
     expect(brand.outroEnabled).toBe(true);
     expect(brand.outroText).toBe("感谢观看");
-    // 未更新的字段保持不变
+    // fields not updated must remain unchanged
     expect(brand.secondaryColor).toBe("#8b5cf6");
     expect(brand.fontFamily).toBe("默认字体");
   });
@@ -290,7 +290,7 @@ describe("BrandStore", () => {
     useBrandStore.getState().updateBrand({ name: "新名称" });
 
     const { brand } = useBrandStore.getState();
-    // 水印配置应该保持完整
+    // watermark config should remain intact
     expect(brand.watermark.enabled).toBe(false);
     expect(brand.watermark.position).toBe("bottom-right");
   });
@@ -304,7 +304,7 @@ describe("BrandStore", () => {
     const { brand } = useBrandStore.getState();
     expect(brand.watermark.enabled).toBe(true);
     expect(brand.watermark.opacity).toBe(0.8);
-    // 未更新的水印字段保持不变
+    // watermark fields not updated must remain unchanged
     expect(brand.watermark.position).toBe("bottom-right");
     expect(brand.watermark.scale).toBe(0.15);
   });
@@ -326,14 +326,14 @@ describe("BrandStore", () => {
   });
 });
 
-// ==================== 人物/角色 Store 测试 ====================
+// ==================== Character Store Tests ====================
 
 describe("CharacterStore", () => {
   beforeEach(() => {
     useCharacterStore.setState({ characters: [] });
   });
 
-  /** 创建测试用人物数据 */
+  /** Create character test data */
   function createCharacter(overrides?: Partial<Character>): Character {
     return {
       id: "char-1",
@@ -375,7 +375,7 @@ describe("CharacterStore", () => {
     const { characters } = useCharacterStore.getState();
     expect(characters[0].name).toBe("小美（更新）");
     expect(characters[0].appearance).toBe("young woman with short hair");
-    // 未更新的字段保持不变
+    // fields not updated must remain unchanged
     expect(characters[0].description).toBe("25岁女生，活泼开朗");
   });
 
@@ -430,7 +430,7 @@ describe("CharacterStore", () => {
     useCharacterStore.getState().addCharacter(createCharacter({ id: "c2", isDefault: false }));
     useCharacterStore.getState().addCharacter(createCharacter({ id: "c3", isDefault: false }));
 
-    // 将 c2 设为默认
+    // set c2 as the default
     useCharacterStore.getState().setDefault("c2");
 
     const { characters } = useCharacterStore.getState();
@@ -438,7 +438,7 @@ describe("CharacterStore", () => {
     expect(characters.find((c) => c.id === "c2")!.isDefault).toBe(true);
     expect(characters.find((c) => c.id === "c3")!.isDefault).toBe(false);
 
-    // getDefault 也应返回 c2
+    // getDefault should also return c2
     const defaultChar = useCharacterStore.getState().getDefault();
     expect(defaultChar!.id).toBe("c2");
   });
@@ -450,13 +450,13 @@ describe("CharacterStore", () => {
       useCharacterStore.getState().setDefault("non-existent-id");
     }).not.toThrow();
 
-    // 所有人物的 isDefault 都会被设为 false（因为没有匹配的 id）
+    // all characters will have isDefault set to false (since no id matches)
     const { characters } = useCharacterStore.getState();
     expect(characters[0].isDefault).toBe(false);
   });
 });
 
-// ==================== 项目 Store 测试 ====================
+// ==================== Project Store Tests ====================
 
 describe("ProjectStore", () => {
   beforeEach(() => {
@@ -502,7 +502,7 @@ describe("ProjectStore", () => {
       updatedAt: new Date(),
     };
 
-    // 同时设置 currentProject 和 projects
+    // set both currentProject and projects at once
     useProjectStore.setState({
       currentProject: project,
       projects: [project],
@@ -511,9 +511,9 @@ describe("ProjectStore", () => {
     useProjectStore.getState().updateProject({ name: "更新后名称" });
 
     const { currentProject, projects } = useProjectStore.getState();
-    // currentProject 应该被更新
+    // currentProject should be updated
     expect(currentProject!.name).toBe("更新后名称");
-    // projects 数组中对应的项目也应该被更新
+    // the corresponding entry in the projects array should also be updated
     expect(projects[0].name).toBe("更新后名称");
   });
 
@@ -557,7 +557,7 @@ describe("ProjectStore", () => {
 
     expect(useProjectStore.getState().projects).toHaveLength(2);
 
-    // 替换为空列表
+    // replace with an empty list
     useProjectStore.getState().setProjects([]);
     expect(useProjectStore.getState().projects).toHaveLength(0);
   });

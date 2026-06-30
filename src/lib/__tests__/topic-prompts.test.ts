@@ -26,7 +26,7 @@ describe("buildTopicPrompt（一句话主题成片，去商品化）", () => {
 
   it("以主题立框而非商品（不含带货输入字段）", () => {
     const p = buildTopicPrompt({ topic: "雨天适合做的小事" });
-    // 围绕「主题」组织，而非带货的「商品信息」输入块
+    // structured around "topic", not the "product info" input block used for commerce
     expect(p).toContain("【主题】");
     expect(p).not.toContain("【商品信息】");
     expect(p).not.toContain("商品名称");

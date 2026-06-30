@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createProvider } from "@/lib/providers";
 import { toRemoteUsableImage } from "@/lib/remote-image";
 
-// AI 生图
+// AI image generation
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { provider: providerName, model, prompt, imageUrl, mode, apiKey, baseUrl, options } = body;
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   try {
     const provider = createProvider({ name: providerName, apiKey, baseUrl });
 
-    // image-to-image 时把本地参考图转为 data URI
+    // For image-to-image mode, convert the local reference image to a data URI
     const referenceImageUrl = await toRemoteUsableImage(imageUrl);
 
     const result = await provider.generateImage({

@@ -10,13 +10,13 @@ const recs: MetricInput[] = [
 describe("aggregateByStyle", () => {
   it("按风格分组、算 avg/rates，按转化率降序", () => {
     const agg = aggregateByStyle(recs);
-    expect(agg.map((i) => i.style)).toEqual(["pain_point", "comparison"]); // 痛点转化更高排前
+    expect(agg.map((i) => i.style)).toEqual(["pain_point", "comparison"]); // pain_point has higher conversion rate, ranked first
     const pp = agg[0];
     expect(pp.samples).toBe(2);
     expect(pp.avgViews).toBe(15000); // (10000+20000)/2
     expect(pp.totalOrders).toBe(280);
-    expect(pp.conversionRate).toBeCloseTo(280 / 30000, 6); // 成交/播放
-    expect(pp.engagementRate).toBeCloseTo(1950 / 30000, 6); // (赞+评+转)/播放
+    expect(pp.conversionRate).toBeCloseTo(280 / 30000, 6); // orders / views
+    expect(pp.engagementRate).toBeCloseTo(1950 / 30000, 6); // (likes + comments + shares) / views
   });
 
   it("0 播放不除零（rate=0）", () => {
@@ -39,13 +39,13 @@ describe("aggregateByStyle", () => {
 
 describe("topConvertingStyle", () => {
   it("达最小样本数才推荐（默认 2）", () => {
-    const top = topConvertingStyle(recs); // pain_point 有 2 条
+    const top = topConvertingStyle(recs); // pain_point has 2 samples
     expect(top?.style).toBe("pain_point");
   });
 
   it("样本不足 → null（不给误导建议）", () => {
-    expect(topConvertingStyle(recs, 3)).toBeNull(); // 没有风格满 3 条
-    expect(topConvertingStyle([{ style: "comparison", views: 10000, orders: 30 }], 2)).toBeNull(); // 只 1 条
+    expect(topConvertingStyle(recs, 3)).toBeNull(); // no style reaches 3 samples
+    expect(topConvertingStyle([{ style: "comparison", views: 10000, orders: 30 }], 2)).toBeNull(); // only 1 sample
   });
 
   it("全 0 转化 → null", () => {
@@ -61,7 +61,7 @@ describe("aggregateByHook / topConvertingHook（钩子 A/B 回流）", () => {
     { style: "x", hookId: "visual_shock", views: 10000, orders: 100 },
     { style: "x", hookId: "visual_shock", views: 10000, orders: 120 },
     { style: "x", hookId: "suspense", views: 10000, orders: 30 },
-    { style: "x", views: 10000, orders: 50 }, // 无 hookId，跳过
+    { style: "x", views: 10000, orders: 50 }, // no hookId, skipped
   ];
 
   it("按 hookId 聚合、无 hookId 跳过、转化率降序", () => {

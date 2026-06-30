@@ -1,8 +1,8 @@
-// Electron 主进程：把 Next standalone 当本地 HTTP 服务拉起，再用窗口加载它
-// 关键点（均来自打包研究的实测结论）：
-//  - 数据写到 app.getPath('userData')/data（可写），通过 APP_DATA_DIR 注入给 server（standalone 的 cwd 只读）
-//  - ffmpeg/ffprobe 用随包二进制，注入 FFMPEG_PATH/FFPROBE_PATH（用户机无需装 ffmpeg）
-//  - 取空闲端口（不写死 3000）、HTTP 轮询 ready 再 loadURL、退出时 kill 子进程
+// Electron main process: start Next standalone as a local HTTP server, then load it in a window.
+// Key points (all validated through real packaging tests):
+//  - Data is written to app.getPath('userData')/data (writable), injected into the server via APP_DATA_DIR (standalone cwd is read-only)
+//  - ffmpeg/ffprobe use bundled binaries, injected via FFMPEG_PATH/FFPROBE_PATH (no ffmpeg install required on the user's machine)
+//  - Acquire a free port (not hardcoded to 3000), poll HTTP until ready before loadURL, kill child process on exit
 const { app, BrowserWindow } = require("electron");
 const { fork } = require("child_process");
 const http = require("http");
@@ -13,7 +13,7 @@ const fs = require("fs");
 let serverChild = null;
 let mainWindow = null;
 
-/** 取一个本地空闲端口 */
+/** Find a free local port */
 function getFreePort() {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
@@ -26,7 +26,7 @@ function getFreePort() {
   });
 }
 
-/** 解析随包二进制绝对路径，修正 asar → asar.unpacked */
+/** Resolve the absolute path of a bundled binary, correcting asar → asar.unpacked */
 function resolveBinary(getter) {
   try {
     let p = getter();
@@ -39,19 +39,19 @@ function resolveBinary(getter) {
   }
 }
 
-/** standalone server.js 入口：打包后在 resources/standalone，开发态在 .next/standalone */
+/** Path to standalone server.js entry: resources/standalone when packaged, .next/standalone in dev */
 function serverEntry() {
   return app.isPackaged
     ? path.join(process.resourcesPath, "standalone", "server.js")
     : path.join(__dirname, "..", ".next", "standalone", "server.js");
 }
 
-/** 迁移 SQL 目录（只读资源）：打包后随 standalone，开发态用项目根 drizzle */
+/** SQL migrations directory (read-only resource): bundled alongside standalone when packaged, or project root drizzle in dev */
 function migrationsDir(serverDir) {
   return app.isPackaged ? path.join(serverDir, "drizzle") : path.join(__dirname, "..", "drizzle");
 }
 
-/** HTTP 轮询直到服务可用（实测 ~0.5s ready，最多约 15s 兜底） */
+/** Poll via HTTP until the server is available (typically ready in ~0.5s, up to ~15s timeout) */
 function waitReady(port, tries = 60) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
@@ -67,7 +67,7 @@ function waitReady(port, tries = 60) {
   });
 }
 
-/** 启动 standalone server 子进程并等待就绪，返回访问 URL */
+/** Start the standalone server child process, wait until ready, and return the access URL */
 async function startServer() {
   const entry = serverEntry();
   const serverDir = path.dirname(entry);
@@ -118,8 +118,8 @@ app.whenReady().then(async () => {
     return;
   }
 
-  // headless 冒烟模式：验证 server 能在 Electron 运行时下起来，并打一个 DB 路由
-  // （触发 better-sqlite3 在 Electron Node ABI 下加载 + migrate），不开窗，立即退出
+  // Headless smoke mode: verify the server can start under the Electron runtime and hit a DB route
+  // (triggers better-sqlite3 load + migrate under the Electron Node ABI); no window is opened, exits immediately
   if (process.env.HEADLESS_SMOKE) {
     const dbProbe = await new Promise((resolve) => {
       const req = http.get(url + "/api/project", (r) => {

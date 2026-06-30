@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * 新版「先做后配」落地页（暗色创作台方向）。
- * 作为新路由 /start 独立存在，不动正在被 i18n 改写的首页；落地即操作：
- * 上传商品图 或 一句话成片 → 直接开跑，要用到 AI 才提示配 Key（推荐 Atlas 一键）。
+ * New "act first, configure later" landing page (dark studio direction).
+ * Lives as an independent route /start, leaving the homepage (currently being rewritten for i18n) untouched.
+ * Users land and act immediately: upload a product image or describe a topic → kick off generation right away;
+ * only prompted to configure a Key when AI is actually needed (Atlas one-click recommended).
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -36,9 +37,9 @@ export default function StartPage() {
   const { llm } = useSettingsStore();
   const applyAtlasOneKey = useSettingsStore((s) => s.applyAtlasOneKey);
   const llmReady = llm.apiKey.trim().length > 0;
-  // 示例商品跟随界面语言
+  // example products follow the UI language
   const examples = getExampleProducts(locale);
-  // 语言切换（中文 ⇄ English）
+  // language toggle (Chinese ⇄ English)
   const toggleLocale = () => setLocale(LOCALES[(LOCALES.indexOf(locale) + 1) % LOCALES.length]);
 
   const [mode, setMode] = useState<Mode>("upload");
@@ -57,7 +58,7 @@ export default function StartPage() {
   const [recent, setRecent] = useState<RecentProject[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // 拉最近项目，给回头客一个「继续」入口（替代旧首页的项目列表，避免被孤立）
+  // fetch recent projects to give returning users a "continue" entry point (replaces the old homepage project list so they are not left stranded)
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -66,13 +67,13 @@ export default function StartPage() {
         const data = res.ok ? await res.json() : [];
         if (!cancelled) setRecent(Array.isArray(data) ? data.slice(0, 4) : []);
       } catch {
-        /* 忽略 */
+        /* ignore */
       }
     })();
     return () => { cancelled = true; };
   }, []);
 
-  // 按项目状态跳到合适的步骤
+  // navigate to the appropriate step based on project status
   const stepFor = (status: string) =>
     status === "done" || status === "composing" || status === "video" ? "video" : status === "assets" ? "assets" : "script";
 
@@ -96,7 +97,7 @@ export default function StartPage() {
       return prev.filter((i) => i.id !== id);
     });
 
-  // 一键填示例：拉示例图为 File 落进上传区 + 填好名称/卖点
+  // one-click fill example: fetch the example image as a File into the upload zone + populate name/selling points
   const fillExample = useCallback(async (ex: ExampleProduct) => {
     setMode("upload");
     setProductName(ex.name);
@@ -110,14 +111,14 @@ export default function StartPage() {
         return [{ id: crypto.randomUUID(), url: URL.createObjectURL(file), file }];
       });
     } catch {
-      /* 取图失败也无妨，文字已填好 */
+      /* image fetch failure is fine; the text fields are already filled */
     }
   }, []);
 
   const canStart =
     mode === "topic" ? topic.trim().length >= 2 : images.length >= 1 && productName.trim().length > 0;
 
-  // 实时从 store 取 LLM 配置：一键接入后同一轮即可读到新写入的 Key，避免闭包拿到旧值
+  // read LLM config live from the store: after one-click setup the newly written Key is immediately available in the same tick, avoiding stale closure values
   const llmConfig = () => {
     const l = useSettingsStore.getState().llm;
     return { baseUrl: l.baseUrl, apiKey: l.apiKey, model: l.model, visionModel: l.visionModel };
@@ -177,7 +178,7 @@ export default function StartPage() {
     router.push(`/project/${project.id}/script`);
   };
 
-  // 真正跑生成（脚本/上传两种模式共用），失败回收 busy/stage
+  // actually run generation (shared by both script and upload modes); restore busy/stage on failure
   const runGeneration = async () => {
     setBusy(true);
     setError(null);
@@ -193,7 +194,7 @@ export default function StartPage() {
 
   const onStart = () => {
     if (!canStart || busy) return;
-    // 没配 LLM：就地展开 Atlas 一键接入面板（不跳走、不丢已填内容）
+    // no LLM configured: expand the Atlas one-click setup panel inline (no navigation, no loss of filled content)
     if (!llmReady) {
       setNeedKey(true);
       return;
@@ -201,7 +202,7 @@ export default function StartPage() {
     runGeneration();
   };
 
-  // 粘贴一个 Atlas Key → 校验 → 写好全套配置 → 立刻接着生成
+  // paste an Atlas Key → validate → write full config → immediately continue with generation
   const connectAtlasAndStart = async () => {
     const key = atlasKey.trim();
     if (!key || connecting || busy) return;
@@ -214,7 +215,7 @@ export default function StartPage() {
         body: JSON.stringify({ name: "atlas-cloud", apiKey: key }),
       });
       const data = await res.json().catch(() => ({ status: "unknown" }));
-      // 只在「明确无效」时拦截；unknown（网络/端点不确定）放行，直接试生成
+      // only block on "explicitly invalid"; unknown (network/endpoint uncertainty) passes through and lets generation attempt proceed
       if (data.status === "invalid") {
         setConnectError(t("atlasKeyInvalid"));
         setConnecting(false);

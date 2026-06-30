@@ -1,8 +1,9 @@
 /**
- * Internet Archive 素材源 —— archive.org 公共领域影像（历史影片/纪录/实拍），免 Key。
+ * Internet Archive media source — archive.org public-domain footage (historical films / documentaries / live-action), no API key required.
  *
- * 两步取材：advancedsearch 检索（强制 licenseurl 含 publicdomain，确保可商用）+ 取 identifier；
- * 每条 /metadata/{id} 列出文件 → 挑 mp4/图片，下载走 archive.org/download/{id}/{file}。
+ * Two-step retrieval: advancedsearch query (forces licenseurl to contain "publicdomain" for commercial use)
+ * to get identifiers; then /metadata/{id} to list files → pick mp4/image,
+ * with downloads served via archive.org/download/{id}/{file}.
  */
 
 import { fetchWithTimeout, type StockCandidate, type StockMediaType } from "./stock-types";
@@ -16,7 +17,7 @@ interface ArchiveFile {
   height?: string | number;
 }
 
-/** 从 metadata.files 里挑一个可用文件（视频优先带宽高的 mp4 派生，图片优先非缩略 jpg/png）。纯函数。 */
+/** Pick a usable file from metadata.files (for video: prefer an mp4 derivative with width/height; for image: prefer non-thumbnail jpg/png). Pure function. */
 export function pickArchiveFile(files: ArchiveFile[], mediaType: Extract<StockMediaType, "video" | "image">): ArchiveFile | null {
   const named = files.filter((f) => typeof f.name === "string" && f.name);
   if (mediaType === "video") {
@@ -27,7 +28,7 @@ export function pickArchiveFile(files: ArchiveFile[], mediaType: Extract<StockMe
   return imgs.find((f) => f.width && f.height) || imgs[0] || null;
 }
 
-/** 构造 archive 下载直链（文件名按段编码，保留路径分隔）。纯函数。 */
+/** Build a direct archive download URL (filename encoded per segment, path separators preserved). Pure function. */
 export function archiveDownloadUrl(identifier: string, name: string): string {
   const file = name
     .split("/")
@@ -43,7 +44,7 @@ interface ArchiveSearchOptions {
 async function searchArchive(query: string, mediaType: Extract<StockMediaType, "video" | "image">, opts: ArchiveSearchOptions = {}): Promise<StockCandidate[]> {
   const perPage = Math.max(1, Math.min(12, opts.perPage ?? 6));
   const mt = mediaType === "video" ? "movies" : "image";
-  // 强制 publicdomain 授权，避免拉到授权不明/NC 的上传
+  // enforce publicdomain license to avoid pulling uploads with unclear or NC licensing
   const q = `(${query}) AND mediatype:${mt} AND licenseurl:*publicdomain*`;
   const url = `${ARCHIVE_SEARCH}?q=${encodeURIComponent(q)}&fl[]=identifier&fl[]=title&fl[]=creator&rows=${perPage}&output=json`;
 

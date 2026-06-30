@@ -17,9 +17,9 @@ describe("splitNarration", () => {
 
 describe("estimateDurationSec", () => {
   it("中文约 5 字/秒、英文约 14 字/秒，夹在 2–15s", () => {
-    expect(estimateDurationSec("短")).toBe(2); // 下限
+    expect(estimateDurationSec("短")).toBe(2); // lower bound
     expect(estimateDurationSec("a".repeat(140))).toBe(10); // 140/14
-    expect(estimateDurationSec("中".repeat(100))).toBe(15); // 100/5=20 → 上限 15
+    expect(estimateDurationSec("中".repeat(100))).toBe(15); // 100/5=20 → upper bound 15
   });
 });
 

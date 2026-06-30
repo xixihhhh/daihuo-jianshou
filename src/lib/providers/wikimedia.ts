@@ -1,13 +1,13 @@
 /**
- * Wikimedia Commons 素材源（commons.wikimedia.org/w/api.php）—— 多源素材引擎的「免 Key」源
+ * Wikimedia Commons media source (commons.wikimedia.org/w/api.php) — the key-free source for the multi-provider media engine.
  *
- * 最大价值：检索完全免 Key，覆盖 CC/公共领域的「图片 + 视频」，是目前**唯一免 Key 的视频源**——
- *           没有 Pexels/Pixabay Key 也能给分镜配实拍 B-roll。
- * 视频取转码版：Commons 原始视频多为大体积 .ogv(theora)，优先取 ≤720p 的 .webm(vp9) 转码——
- *           更小（稳过 80MB 下载上限）、更标准（FFmpeg/合成更友好）。
- * 合规：Commons 全为自由许可，但具体授权不一（PD / CC0 / CC-BY / CC-BY-SA…）；
- *           归一化保留 license/licenseUrl，BY 系标记 requiresAttribution，导出生成 credits。
- * 注意：Wikimedia API 要求带描述性 User-Agent，否则可能被拒。
+ * Main value: fully key-free search covering CC/public-domain images and videos; currently the **only key-free video source** —
+ *             enables B-roll footage for shots even without a Pexels/Pixabay key.
+ * Video transcodes: Commons originals are often large .ogv (Theora) files; we prefer ≤720p .webm (VP9) transcodes —
+ *             smaller (reliably under the 80 MB download limit) and more standard (FFmpeg/composer-friendly).
+ * Compliance: all Commons content is freely licensed, but specific licenses vary (PD / CC0 / CC-BY / CC-BY-SA…);
+ *             normalized to retain license/licenseUrl; BY-family licenses set requiresAttribution so credits are generated on export.
+ * Note: the Wikimedia API requires a descriptive User-Agent header; requests without one may be rejected.
  */
 
 import { type StockCandidate, type StockMediaType, fetchWithTimeout } from "./stock-types";
@@ -15,60 +15,60 @@ import { type StockCandidate, type StockMediaType, fetchWithTimeout } from "./st
 const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
 const USER_AGENT = "clipforge/1.0 (https://github.com/xixihhhh/clipforge; stock media search)";
 
-// ==================== 原始响应类型 ====================
+// ==================== Raw response types ====================
 
 interface CommonsExtMeta {
   LicenseShortName?: { value?: string };
   LicenseUrl?: { value?: string };
   Artist?: { value?: string };
 }
-/** 视频转码版（TimedMediaHandler derivatives） */
+/** Video transcode variant (TimedMediaHandler derivatives) */
 export interface CommonsDerivative {
   src?: string;
   type?: string;
-  transcodekey?: string; // 如 "480p.vp9.webm"
+  transcodekey?: string; // e.g. "480p.vp9.webm"
   width?: number;
   height?: number;
 }
 export interface CommonsMediaInfo {
-  url?: string; // 原始文件直链
-  thumburl?: string; // 缩略图/海报（设了 *urlwidth 才有）
+  url?: string; // direct link to the original file
+  thumburl?: string; // thumbnail / poster (only present when *urlwidth is set)
   width?: number;
   height?: number;
   mime?: string;
-  duration?: number; // 视频/音频时长（秒）
-  user?: string; // 上传者
+  duration?: number; // video/audio duration in seconds
+  user?: string; // uploader
   extmetadata?: CommonsExtMeta;
-  derivatives?: CommonsDerivative[]; // 视频转码版（videoinfo 才有）
+  derivatives?: CommonsDerivative[]; // video transcode variants (videoinfo only)
 }
 export interface CommonsPage {
   pageid: number;
-  title: string; // 形如 "File:Foo.ogv"
+  title: string; // e.g. "File:Foo.ogv"
   imageinfo?: CommonsMediaInfo[];
   videoinfo?: CommonsMediaInfo[];
 }
 
-// ==================== 纯函数（可单测） ====================
+// ==================== Pure functions (unit-testable) ====================
 
-/** 去掉 Wikimedia 字段里常见的 HTML 标签（Artist/License 常带 <a>） */
+/** Strip HTML tags commonly present in Wikimedia fields (Artist/License often contain <a> elements) */
 export function stripHtml(s?: string): string {
   return (s ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }
 
-/** 公共领域 / CC0 无需署名；其余（BY/BY-SA 等）需署名 */
+/** Public domain / CC0 requires no attribution; all other licenses (BY/BY-SA etc.) do */
 export function wikimediaRequiresAttribution(licenseShort?: string): boolean {
   const l = (licenseShort ?? "").toLowerCase();
   return !(l.includes("public domain") || l.includes("pd-") || l === "cc0" || l.includes("cc0"));
 }
 
-/** 取 derivative 高度：优先 height 字段，否则从 transcodekey 的「480p」解析 */
+/** Get derivative height: prefer the height field, otherwise parse it from the transcodekey (e.g. "480p") */
 export function derivativeHeight(d: CommonsDerivative): number {
   if (typeof d.height === "number") return d.height;
   const m = /(\d+)p/.exec(d.transcodekey ?? "");
   return m ? parseInt(m[1], 10) : 0;
 }
 
-/** 视频优先选 ≤720p 的最高 webm(vp9) 转码；无 webm 转码则回退原始直链 */
+/** For video, pick the highest ≤720p webm (VP9) transcode; fall back to the original direct URL if no webm transcode exists */
 export function pickWikimediaVideoSrc(derivatives: CommonsDerivative[] | undefined, fallbackUrl: string): string {
   const webm = (derivatives ?? []).filter((d) => d.src && /webm/i.test(`${d.transcodekey ?? ""} ${d.type ?? ""}`));
   if (!webm.length) return fallbackUrl;
@@ -77,7 +77,7 @@ export function pickWikimediaVideoSrc(derivatives: CommonsDerivative[] | undefin
   return best.src ?? fallbackUrl;
 }
 
-/** 把 Commons 文件页归一化为候选；无直链则返回 null。视频取 ≤720p webm 转码做下载源 */
+/** Normalize a Commons file page into a candidate; returns null if there is no direct URL. Videos use the ≤720p webm transcode as the download source */
 export function toWikimediaCandidate(page: CommonsPage, requested: StockMediaType): StockCandidate | null {
   const ii = page.imageinfo?.[0] ?? page.videoinfo?.[0];
   if (!ii?.url) return null;
@@ -87,8 +87,8 @@ export function toWikimediaCandidate(page: CommonsPage, requested: StockMediaTyp
   const isAudio = requested === "audio" || /^audio\//.test(mime);
   const isVideo = !isAudio && (requested === "video" || /^video\//.test(mime));
   const downloadUrl = isVideo ? pickWikimediaVideoSrc(ii.derivatives, ii.url) : ii.url;
-  // 视频但没有 ≤720p webm 转码（回退到原始 .ogv 等）→ 跳过：体积大、FFmpeg/浏览器播放不友好，
-  // 且静态文件路由不识别其 MIME（octet-stream 不可播）。让该分镜改由其它源/图片兜底。
+  // Video with no ≤720p webm transcode (falls back to original .ogv etc.) → skip: large file size, poor FFmpeg/browser compatibility,
+  // and the static file route doesn't recognise its MIME type (octet-stream is unplayable). Let the shot fall back to another source or an image.
   if (isVideo && !/\.webm(\?|$)/i.test(downloadUrl)) return null;
   const commonsPageUrl = `https://commons.wikimedia.org/wiki/${encodeURIComponent(page.title)}`;
   return {
@@ -109,9 +109,9 @@ export function toWikimediaCandidate(page: CommonsPage, requested: StockMediaTyp
   };
 }
 
-// ==================== 网络函数 ====================
+// ==================== Network functions ====================
 
-/** 检索 Commons 媒体：generator=search + namespace=6(File)；视频用 videoinfo 取转码版 */
+/** Search Commons media: generator=search + namespace=6(File); video requests use videoinfo to fetch transcode variants */
 async function searchWikimedia(
   query: string,
   mediaType: StockMediaType,
@@ -131,7 +131,7 @@ async function searchWikimedia(
     gsrlimit: String(perPage),
   });
   if (isVideo) {
-    // videoinfo 比 imageinfo 多 derivatives（转码版）
+    // videoinfo includes derivatives (transcode variants) that imageinfo does not
     params.set("prop", "videoinfo");
     params.set("viprop", "url|size|mime|extmetadata|user|derivatives");
     params.set("viurlwidth", "640");
@@ -155,17 +155,17 @@ async function searchWikimedia(
     .filter((c): c is StockCandidate => c !== null);
 }
 
-/** 检索 Commons 图片（CC/PD） */
+/** Search Commons images (CC/PD) */
 export function searchWikimediaImages(query: string, opts: { perPage?: number } = {}): Promise<StockCandidate[]> {
   return searchWikimedia(query, "image", opts);
 }
 
-/** 检索 Commons 视频（取 ≤720p webm 转码，免 Key 的实拍 B-roll） */
+/** Search Commons videos (uses ≤720p webm transcodes; key-free live-action B-roll) */
 export function searchWikimediaVideos(query: string, opts: { perPage?: number } = {}): Promise<StockCandidate[]> {
   return searchWikimedia(query, "video", opts);
 }
 
-/** 检索 Commons 音频（CC/PD，直链可下，免 Key 背景音乐来源） */
+/** Search Commons audio (CC/PD, direct download link, key-free background music source) */
 export function searchWikimediaAudio(query: string, opts: { perPage?: number } = {}): Promise<StockCandidate[]> {
   return searchWikimedia(query, "audio", opts);
 }

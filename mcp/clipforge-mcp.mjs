@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * ClipForge MCP Server —— 把 ClipForge 的「一句话成片」流水线暴露为 MCP 工具，
- * 让 Claude Desktop / Claude Code / Cursor 等任意 MCP 客户端都能直接驱动出片。
+ * ClipForge MCP Server — exposes ClipForge's "one-sentence-to-video" pipeline as MCP tools,
+ * allowing any MCP client (Claude Desktop / Claude Code / Cursor, etc.) to drive video generation directly.
  *
- * 设计：本服务是 ClipForge HTTP API 的薄封装（复用其全部编排：DB / FFmpeg / 免费 TTS / 免费素材），
- * 通过 stdio 与客户端通信。只有「生成脚本」需要一个 LLM Key（其余 Openverse 素材 + Edge TTS 全程免 Key）。
+ * Design: this service is a thin wrapper around the ClipForge HTTP API (reusing all its orchestration:
+ * DB / FFmpeg / free TTS / free stock), communicating with the client via stdio.
+ * Only "generate script" requires an LLM Key; Openverse stock + Edge TTS are fully key-free.
  *
- * 环境变量：
- *   CLIPFORGE_BASE_URL     ClipForge 实例地址（默认 http://localhost:3000，需先 `pnpm dev` / `pnpm start`）
- *   CLIPFORGE_LLM_BASE_URL LLM 接口（OpenAI 兼容，如 https://api.atlascloud.ai/v1）
- *   CLIPFORGE_LLM_API_KEY  LLM Key（生成脚本必需；不配则 create_video / generate_script 会给出明确提示）
- *   CLIPFORGE_LLM_MODEL    LLM 模型名（如 deepseek-ai/deepseek-v3.2）
+ * Environment variables:
+ *   CLIPFORGE_BASE_URL     ClipForge instance URL (default http://localhost:3000; run `pnpm dev` / `pnpm start` first)
+ *   CLIPFORGE_LLM_BASE_URL LLM endpoint (OpenAI-compatible, e.g. https://api.atlascloud.ai/v1)
+ *   CLIPFORGE_LLM_API_KEY  LLM key (required for script generation; omitting it gives a clear prompt in create_video / generate_script)
+ *   CLIPFORGE_LLM_MODEL    LLM model name (e.g. deepseek-ai/deepseek-v3.2)
  */
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -26,51 +27,53 @@ const LLM = {
   model: process.env.CLIPFORGE_LLM_MODEL || "",
 };
 
-// 免费素材源 Key（可选）：配了就再补充 Pexels/Pixabay 高质量视频；不配也有 keyless Wikimedia 视频 + Openverse 图片
+// Free stock source keys (optional): when provided, adds high-quality Pexels/Pixabay video; without them, keyless Wikimedia video + Openverse images are still available
 const STOCK_KEYS = {};
 if (process.env.CLIPFORGE_PIXABAY_KEY) STOCK_KEYS.pixabay = process.env.CLIPFORGE_PIXABAY_KEY;
 if (process.env.CLIPFORGE_PEXELS_KEY) STOCK_KEYS.pexels = process.env.CLIPFORGE_PEXELS_KEY;
 
 const NARRATION_STYLES = ["knowledge", "story", "lifestyle", "inspiration", "travel"];
 const FOOTAGE_KINDS = ["auto", "image", "video"];
-const ASPECT_RATIOS = ["9:16", "16:9", "1:1"]; // 9:16 竖屏(抖音/快手/Reels/Shorts) · 16:9 横屏 · 1:1 方形
-const QUALITY_PRESETS = ["fast", "standard", "hd"]; // 映射真实 FFmpeg 编码：分辨率 + x264 preset + crf
+const ASPECT_RATIOS = ["9:16", "16:9", "1:1"]; // 9:16 portrait (Douyin/Kuaishou/Reels/Shorts) · 16:9 landscape · 1:1 square
+const QUALITY_PRESETS = ["fast", "standard", "hd"]; // maps to real FFmpeg encoding: resolution + x264 preset + crf
 
-/** footage 解析：默认 "auto"——交给 stock-fill 逐镜「视频优先、缺则图片」（全程免 Key）；image/video 为显式指定 */
+/** footage resolution: default "auto" — delegates to stock-fill per shot ("video first, fall back to image" — fully key-free); image/video are explicit overrides */
 function resolveMediaType(footage) {
   return FOOTAGE_KINDS.includes(footage) ? footage : "auto";
 }
 
-/** 由工具入参拼出 compose 请求体：免费 TTS（可选音色）+ 画幅 + 画质预设 */
+/** Build the compose request body from tool args: free TTS (optional voice) + aspect ratio + quality preset */
 function composeBody(args) {
   const body = { freeTts: { enabled: true } };
   if (typeof args.voice === "string" && args.voice) body.freeTts.voice = args.voice;
   if (ASPECT_RATIOS.includes(args.aspectRatio)) body.aspectRatio = args.aspectRatio;
   if (QUALITY_PRESETS.includes(args.quality)) body.renderPreset = args.quality;
-  if (args.bgm === true) body.freeBgm = true; // 自动加一段免费 CC 背景音乐
-  if (["upbeat", "chill", "energetic", "emotional"].includes(args.bgmMood)) body.bgmMood = args.bgmMood; // BGM 情绪
-  if (args.bgmDuck === true) body.bgmDuck = true; // 旁白闪避（旁白更清晰）
-  if (args.karaoke === true) body.karaoke = true; // 卡拉OK逐字字幕
-  if (args.productCard === true) body.productCard = true; // 商品卡贴片（有商品图才生效）
-  if (args.aiDisclosure === true) body.aiDisclosure = true; // AI 合规标识
-  if (typeof args.ctaText === "string" && args.ctaText.trim()) body.ctaText = args.ctaText.trim(); // 片尾购买 CTA
+  if (args.bgm === true) body.freeBgm = true; // automatically add a free CC background music track
+  if (["upbeat", "chill", "energetic", "emotional"].includes(args.bgmMood)) body.bgmMood = args.bgmMood; // BGM mood
+  if (args.bgmDuck === true) body.bgmDuck = true; // voiceover ducking (makes narration clearer)
+  if (args.karaoke === true) body.karaoke = true; // karaoke word-by-word captions
+  if (args.productCard === true) body.productCard = true; // product card overlay (only applies when product image exists)
+  if (args.aiDisclosure === true) body.aiDisclosure = true; // AI compliance disclosure label
+  if (typeof args.ctaText === "string" && args.ctaText.trim()) body.ctaText = args.ctaText.trim(); // end-card purchase CTA
   return body;
 }
 
 /**
- * 按主题文字的书写系统挑默认免费音色（未显式指定 voice 时用）。
- * 否则英文/日文/韩文主题会被中文默认音色读得发音错乱。返回 null = 用服务端中文默认。
- * 假名→日，谚文→韩，汉字→中(null)，其余(拉丁等)→英。西语等拉丁语种无法靠脚本区分，需显式指定。
+ * Pick the default free voice based on the writing system of the topic text (used when no voice is explicitly specified).
+ * Without this, English/Japanese/Korean topics would be read with the Chinese default voice, producing garbled pronunciation.
+ * Returns null = use the server-side Chinese default.
+ * Hiragana/Katakana → Japanese, Hangul → Korean, CJK → Chinese (null), everything else (Latin, etc.) → English.
+ * Latin-script languages like Spanish cannot be distinguished by script alone — must be specified explicitly.
  */
 export function defaultVoiceForTopic(topic) {
   const t = String(topic || "");
-  if (/[぀-ヿ]/.test(t)) return "ja-JP-NanamiNeural"; // 平/片假名 → 日
-  if (/[가-힯]/.test(t)) return "ko-KR-SunHiNeural"; // 谚文 → 韩（内置 Noto CJK 字幕字体覆盖谚文）
-  if (/[一-鿿]/.test(t)) return null; // 汉字 → 中文默认
-  return "en-US-AriaNeural"; // 拉丁等 → 英文
+  if (/[぀-ヿ]/.test(t)) return "ja-JP-NanamiNeural"; // hiragana/katakana → Japanese
+  if (/[가-힯]/.test(t)) return "ko-KR-SunHiNeural"; // hangul → Korean (bundled Noto CJK subtitle font covers hangul)
+  if (/[一-鿿]/.test(t)) return null; // CJK → Chinese default
+  return "en-US-AriaNeural"; // Latin etc. → English
 }
 
-/** create_video / compose 共用的「成片选项」JSON-Schema 属性 */
+/** Shared "output options" JSON-Schema properties for create_video / compose */
 const OUTPUT_OPTION_PROPS = {
   voice: { type: "string", description: "Edge TTS 音色 value（见 clipforge_list_voices）。create_video 不指定则按主题语言自动挑（英文主题→英文音色，日/韩同理；中文→晓晓）" },
   aspectRatio: { type: "string", enum: ASPECT_RATIOS, description: "画幅，默认 9:16 竖屏" },
@@ -106,7 +109,7 @@ const OUTPUT_OPTION_PROPS = {
   },
 };
 
-/** 调用 ClipForge HTTP API；非 2xx 抛出携带后端 error 文案的异常 */
+/** Call the ClipForge HTTP API; throws an error with the backend error message on non-2xx responses */
 async function api(path, { method = "GET", body, timeoutMs = 600000 } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -119,7 +122,7 @@ async function api(path, { method = "GET", body, timeoutMs = 600000 } = {}) {
       body: body ? JSON.stringify(body) : undefined,
       signal: ctrl.signal,
     });
-    // 读 body 也要在超时保护内：fetch 只在收到响应头时 resolve，body 卡住时不清掉 timer 才能中止
+    // Reading the body must also be within the timeout guard: fetch only resolves when response headers arrive; the timer must stay active to abort a stalled body read
     text = await res.text();
   } catch (e) {
     if (e?.name === "AbortError") throw new Error(`请求超时：${path}`);
@@ -142,7 +145,7 @@ async function api(path, { method = "GET", body, timeoutMs = 600000 } = {}) {
   return data;
 }
 
-/** 生成脚本前确保 LLM 配置就绪，否则给出可操作的提示 */
+/** Ensure LLM config is ready before generating a script; otherwise throw an actionable error */
 function requireLlm() {
   if (!LLM.baseUrl || !LLM.apiKey || !LLM.model) {
     throw new Error(
@@ -151,10 +154,10 @@ function requireLlm() {
   }
 }
 
-/** 轮询合成结果直到 done/failed（compose 是异步的，立即返回 compositionId 后台跑） */
+/** Poll for compose result until done/failed (compose is async: it returns compositionId immediately and runs in the background) */
 async function pollCompose(projectId, { timeoutMs = 300000, intervalMs = 2500 } = {}) {
   const deadline = Date.now() + timeoutMs;
-  // 注意：用传入的时间预算循环；这里不依赖 Date.now 的随机性，仅作超时控制
+  // Note: loops within the given time budget; Date.now() is used only for timeout control, not randomness
   for (;;) {
     const { composition } = await api(`/api/project/${projectId}/compose`);
     const status = composition?.status;
@@ -174,7 +177,7 @@ function ok(textObj) {
   return { content: [{ type: "text", text }] };
 }
 
-// ---- 工具定义（JSON Schema，无需 zod）----
+// ---- Tool definitions (JSON Schema, no zod required) ----
 const TOOLS = [
   {
     name: "clipforge_create_video",
@@ -277,7 +280,7 @@ const TOOLS = [
   },
 ];
 
-// ---- 工具处理 ----
+// ---- Tool handlers ----
 async function handleCreateVideo(args) {
   requireLlm();
   const topic = String(args.topic || "").trim();
@@ -285,7 +288,7 @@ async function handleCreateVideo(args) {
   const narrationStyle = NARRATION_STYLES.includes(args.narrationStyle) ? args.narrationStyle : "knowledge";
   const targetDuration = Number.isFinite(args.durationSec) ? Number(args.durationSec) : 25;
 
-  // 1) 写脚本
+  // 1) generate script
   const scriptRes = await api("/api/topic/script", {
     method: "POST",
     body: { topic, narrationStyle, targetDuration, llmConfig: LLM },
@@ -293,13 +296,13 @@ async function handleCreateVideo(args) {
   const projectId = scriptRes.projectId;
   const shots = scriptRes?.scripts?.[0]?.shots ?? [];
 
-  // 2) 配画面：默认免费 Openverse 图片；配了 Pexels/Pixabay Key 则按 footage 取视频 B-roll
+  // 2) match visuals: free Openverse images by default; with Pexels/Pixabay keys, fetches video B-roll per footage setting
   const mediaType = resolveMediaType(args.footage);
   const fill = await api(`/api/project/${projectId}/stock-fill`, {
     method: "POST",
     body: { source: "all", mediaType, apiKeys: STOCK_KEYS },
   });
-  // 一个画面都没配到就别硬合成（会产出空白/失败片）——给可操作的提示
+  // if no visuals were matched at all, don't force a compose (it would produce a blank/failed video) — return an actionable hint instead
   if (!fill.filled) {
     return ok({
       ok: false,
@@ -311,14 +314,14 @@ async function handleCreateVideo(args) {
     });
   }
 
-  // 3) 合成（免费 Edge TTS 配音 + 字幕；可选音色/画幅/画质）
+  // 3) compose (free Edge TTS voiceover + captions; optional voice/aspect ratio/quality)
   const body = composeBody(args);
-  // 未显式指定音色时，按主题语言挑默认音色（英文主题→英文音色，避免中文音色读英文）
+  // if no voice is explicitly specified, pick a default based on the topic language (English topic → English voice, to avoid Chinese voice reading English)
   if (!body.freeTts.voice) {
     const v = defaultVoiceForTopic(topic);
     if (v) body.freeTts.voice = v;
   }
-  // 实际发给后端的音色（含上面的自动探测）；勿再调 composeBody(args)——那会得到没探测过的新 body、回报错音色
+  // actual voice sent to the backend (including auto-detection above); do NOT call composeBody(args) again — that would produce a fresh body without detection, reporting the wrong voice
   const usedVoice = body.freeTts.voice || "zh-CN-XiaoxiaoNeural";
   await api(`/api/project/${projectId}/compose`, { method: "POST", body });
   const composition = await pollCompose(projectId);
@@ -405,10 +408,10 @@ async function handleCompose(args) {
     await api(`/api/project/${projectId}/stock-fill`, {
       method: "POST",
       body: { source: "all", mediaType: resolveMediaType(args.footage), apiKeys: STOCK_KEYS },
-    }).catch(() => {}); // 配画面失败不阻断合成（可能已有素材）
+    }).catch(() => {}); // stock-fill failure does not block compose (project may already have assets)
   }
   const body = composeBody(args);
-  // 未显式指定音色时，按项目主题语言挑默认音色（与 create_video 一致）——否则日/韩主题走 compose 会落中文默认音色读错音
+  // if no voice is explicitly specified, pick a default based on the project topic language (same logic as create_video) — otherwise Japanese/Korean topics via compose would fall back to the Chinese default voice and mispronounce
   if (!body.freeTts.voice) {
     const proj = await api(`/api/project/${projectId}`).catch(() => null);
     const v = proj && proj.topic ? defaultVoiceForTopic(String(proj.topic)) : null;
@@ -461,7 +464,7 @@ const HANDLERS = {
   clipforge_get_video: handleGetVideo,
 };
 
-// ---- 启动 MCP server ----
+// ---- Start MCP server ----
 const server = new Server(
   { name: "clipforge", version: "0.1.0" },
   { capabilities: { tools: {} } },
@@ -483,5 +486,5 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
-// 启动日志走 stderr（stdout 被 MCP 协议占用）
+// startup log goes to stderr (stdout is reserved for the MCP protocol)
 console.error(`ClipForge MCP server 已启动 · 目标实例 ${BASE_URL}`);

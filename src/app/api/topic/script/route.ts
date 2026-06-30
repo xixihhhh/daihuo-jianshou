@@ -13,16 +13,16 @@ const VALID_NARRATION = new Set<TopicNarrationStyle>([
   "travel",
 ]);
 
-/** 主题截断成项目名（保留前 20 字） */
+/** truncate topic to a project name (keep first 20 characters) */
 function topicToName(topic: string): string {
   const t = topic.trim().replace(/\s+/g, " ");
   return t.length > 20 ? `${t.slice(0, 20)}…` : t;
 }
 
 /**
- * POST /api/topic/script —— 一句话主题成片入口（去商品化）。
- * 一次完成：建项目（contentType=topic）+ 生成多套带英文检索词的旁白脚本并落库。
- * 随后前端可直接走 /api/project/[id]/stock-fill 自动配画面 → /api/project/[id]/compose 合成。
+ * POST /api/topic/script —— one-sentence topic-to-video entry point (non-product / topic mode).
+ * Completes in a single request: create project (contentType=topic) + generate multiple narration scripts with English search keywords and persist them.
+ * The frontend can then call /api/project/[id]/stock-fill to auto-fill footage → /api/project/[id]/compose to render.
  *
  * body: { topic, narrationStyle?, targetDuration?, count?, platforms?, projectId?, llmConfig }
  */
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   const db = getDb();
 
-  // 取已有项目或新建一个 topic 项目（建项目放在生成前，生成失败也能落到草稿项目供重试）
+  // use an existing project or create a new topic project (create before generation so a draft project exists for retry even if generation fails)
   let projectId = typeof body.projectId === "string" && body.projectId ? body.projectId : "";
   if (projectId) {
     const exists = await db
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     if (exists.length === 0) {
       return NextResponse.json({ error: "项目不存在" }, { status: 404 });
     }
-    // 不能用一句话主题脚本覆盖带货项目——否则会把它静默改成 topic 并删掉其已有脚本
+    // refuse to overwrite a product project with a topic script — it would silently convert it to topic type and delete its existing scripts
     if (exists[0].contentType === "product") {
       return NextResponse.json(
         { error: "该项目是带货项目，请新建主题项目而不是覆盖它", projectId },
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     projectId = created.id;
   }
 
-  // 生成脚本
+  // generate scripts
   let generated;
   try {
     generated = await generateTopicScript({
@@ -92,11 +92,11 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    // 项目已建好，返回 projectId 便于前端跳转后重试
+    // project already created; return projectId so the frontend can navigate and retry
     return NextResponse.json({ error: `脚本生成失败: ${msg}`, projectId }, { status: 500 });
   }
 
-  // 落库：清旧脚本 → 写入 → 默认选中第一套 → 项目转 scripting
+  // persist to DB: delete old scripts → insert new ones → select first by default → update project status to scripting
   let savedScripts = generated;
   try {
     await db.delete(scriptsTable).where(eq(scriptsTable.projectId, projectId));
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
         generated.map((s, i) => ({
           projectId,
           version: 1,
-          styleType: "custom" as const, // 主题成片统一 custom
+          styleType: "custom" as const, // topic videos always use custom style type
           title: s.title,
           totalDuration: s.totalDuration,
           shots: s.shots,
@@ -127,8 +127,8 @@ export async function POST(req: NextRequest) {
       .set({ status: "scripting", contentType: "topic", topic, updatedAt: new Date() })
       .where(eq(projects.id, projectId));
   } catch (e) {
-    // 落库失败必须报错，不能再回退到 200——否则前端按成功跳转却从 DB 读到空脚本（且可能已删旧脚本=数据丢失）
-    console.error("主题脚本落库失败:", e);
+    // DB persistence failure must return an error, never fall back to 200 — the frontend would navigate as if successful but find empty scripts (old scripts may already be deleted = data loss)
+    console.error("topic script DB persistence failed:", e);
     return NextResponse.json({ error: "脚本落库失败，请重试", projectId }, { status: 500 });
   }
 

@@ -14,7 +14,7 @@ import { buildAssetRows, shouldOfferStockFill, needsImageModelWarning, type Asse
 import { useT } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 
-// 镜头类型标签（label 改为 assets 命名空间的词条 key，按语言取）
+// shot type labels (label changed to i18n key in the assets namespace, resolved per locale)
 const shotTypeLabels: Record<Shot["type"], { key: string; color: string }> = {
   hook: { key: "shotTypeHook", color: "bg-red-500/20 text-red-400" },
   pain_point: { key: "shotTypePainPoint", color: "bg-orange-500/20 text-orange-400" },
@@ -24,7 +24,7 @@ const shotTypeLabels: Record<Shot["type"], { key: string; color: string }> = {
   cta: { key: "shotTypeCta", color: "bg-amber-500/20 text-amber-400" },
 };
 
-// 默认生图模型对应的平台信息（用于发起生成请求）
+// platform info for the default image model (used when initiating generation requests)
 interface ImageModelTarget {
   provider: string;
   model: string;
@@ -32,18 +32,18 @@ interface ImageModelTarget {
   baseUrl?: string;
 }
 
-// 会"展示商品"的分镜类型：开启商品保真时，这些 AI 分镜走 image-to-image（用商品图重绘，锁定主体）
+// shot types that "feature the product": when product fidelity is enabled, these AI shots use image-to-image (redraw with product photo to lock in the subject)
 const PRODUCT_SHOT_TYPES = new Set(["product_reveal", "demo", "cta"]);
 
-// 把文生图模型映射到对应的编辑/图生图变体（商品保真重绘）
+// map a text-to-image model to its corresponding edit / image-to-image variant (product fidelity redraw)
 function toEditVariant(modelId: string): string {
   if (modelId === "openai/gpt-image-2") return "openai/gpt-image-2/image-to-image";
   if (modelId === "fal-ai/gpt-image-1.5") return "fal-ai/gpt-image-1.5/edit";
-  // Replicate FLUX 文生图 → Kontext 编辑模型
+  // Replicate FLUX text-to-image → Kontext edit model
   if (modelId.startsWith("black-forest-labs/flux") && !modelId.includes("kontext")) {
     return "black-forest-labs/flux-kontext-pro";
   }
-  // 其余模型（Seedream/通义万相等）多数原生支持参考图 image-to-image，沿用原模型
+  // other models (Seedream / Tongyi Wanxiang, etc.) mostly support reference-image image-to-image natively, keep the original model
   return modelId;
 }
 
@@ -55,32 +55,32 @@ export default function AssetsPage() {
 
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [productImages, setProductImages] = useState<string[]>([]);
-  // 商品保真：AI 生成展示商品的分镜时，用商品原图作参考重绘，避免 AI 篡改商品（带货命门）
+  // product fidelity: when AI generates shots featuring the product, use the original product photo as a reference for redrawing to prevent AI from altering the product (critical for commerce)
   const [productSafe, setProductSafe] = useState(true);
-  // 出图后自动「图生视频」转成真动态镜头（i2v 质量主路，替掉假 Ken-Burns 运镜）。仅配了视频模型时生效。
+  // after image generation, automatically run image-to-video to produce real motion shots (i2v quality path, replacing fake Ken-Burns camera moves). Only active when a video model is configured.
   const [autoMotion, setAutoMotion] = useState(true);
   const [projectName, setProjectName] = useState("");
-  // 项目类型：topic（无商品一句话成片）走免费素材库自动配画面
+  // project type: topic (one-sentence-to-video without a product) uses the free stock library for automatic visuals
   const [contentType, setContentType] = useState<string>("");
   const [modelTarget, setModelTarget] = useState<ImageModelTarget | null>(null);
   const [videoModelTarget, setVideoModelTarget] = useState<ImageModelTarget | null>(null);
-  // 正在转动态镜头的分镜
+  // shots currently being converted to motion
   const [motionShots, setMotionShots] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
-  // 「自动配画面（免费素材）」状态
+  // state for "auto-fill visuals (free stock)" feature
   const [isFillingStock, setIsFillingStock] = useState(false);
   const [stockMsg, setStockMsg] = useState<string | null>(null);
 
   const doneCount = assets.filter((a) => a.status === "done").length;
   const allDone = assets.length > 0 && doneCount === assets.length;
-  // 未配置生图模型时（modelTarget 为空）给无 Key 用户提供免费素材配画面入口
+  // when no image model is configured (modelTarget is null), offer key-free users a free stock fill entry point
   const offerStockFill = !loading && shouldOfferStockFill(assets, contentType, modelTarget !== null);
-  // 仅当还有 AI 分镜未出图时才提示配模型（已全部就绪则不提示，避免与「已就绪」矛盾）
+  // only show the "configure a model" warning when there are still AI shots that need generating (no warning once everything is ready, to avoid contradicting the "all done" state)
   const showModelWarning = !loading && needsImageModelWarning(assets, modelTarget !== null);
 
-  // 载入真实数据：项目信息 + 已选脚本分镜 + 解析默认生图模型所属平台
+  // load real data: project info + selected script shots + resolve the provider for the default image model
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -105,7 +105,7 @@ export default function AssetsPage() {
           setContentType(typeof project.contentType === "string" ? project.contentType : "");
         }
 
-        // 取已选中的脚本（无 selected 则取第一套）
+        // use the selected script (fall back to the first one if none is marked selected)
         const selected = Array.isArray(scripts)
           ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
           : null;
@@ -116,7 +116,7 @@ export default function AssetsPage() {
           return;
         }
 
-        // 选中脚本分镜 + 已落库素材 → 视图行（与「配画面后刷新」共用同一纯函数）
+        // selected script shots + persisted assets → view rows (shared pure function used by "refresh after filling visuals")
         setAssets(buildAssetRows(selected.shots as Shot[], Array.isArray(savedAssets) ? savedAssets : [], imgs));
       } catch (e) {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : t("errorLoadFailed"));
@@ -129,7 +129,7 @@ export default function AssetsPage() {
     };
   }, [id]);
 
-  // 重新拉取项目/脚本/素材并重建视图行（配画面后刷新缩略图，复用同一纯函数）
+  // re-fetch project / scripts / assets and rebuild view rows (refresh thumbnails after filling visuals, reuses the same pure function)
   const reloadAssets = useCallback(async () => {
     const [projectRes, scriptsRes, assetsRes] = await Promise.all([
       fetch(`/api/project/${id}`),
@@ -148,8 +148,8 @@ export default function AssetsPage() {
     }
   }, [id]);
 
-  // 一键「自动配画面（免费素材）」：从免费素材库（keyless Openverse 图片）按检索词逐镜配画面。
-  // 无需任何生图 Key —— 这是「一句话主题成片」零门槛闭环的关键一步。
+  // one-click "auto-fill visuals (free stock)": pull visuals from the free stock library (keyless Openverse images) shot-by-shot using search terms.
+  // no image generation key required — this is the key step in the zero-barrier "one-sentence topic video" closed loop.
   const fillStock = useCallback(async () => {
     if (isFillingStock) return;
     setIsFillingStock(true);
@@ -158,7 +158,7 @@ export default function AssetsPage() {
       const res = await fetch(`/api/project/${id}/stock-fill`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // 免费源以 Openverse 图片为主（视频源需 Pexels/Pixabay Key，后续在设置接入）
+        // free sources are primarily Openverse images (video sources require a Pexels/Pixabay key, to be integrated in settings later)
         body: JSON.stringify({ source: "all", mediaType: "image" }),
       });
       const data = await res.json().catch(() => ({}));
@@ -172,7 +172,7 @@ export default function AssetsPage() {
     }
   }, [id, isFillingStock, reloadAssets, t]);
 
-  // 解析默认生图模型对应的平台（从 /api/ai/models 聚合结果里按 model 定位 provider）
+  // resolve the provider for the default image model (locate provider by model from /api/ai/models aggregated results)
   useEffect(() => {
     let cancelled = false;
     const enabled = Object.entries(providers)
@@ -191,7 +191,7 @@ export default function AssetsPage() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        // 并入用户自定义模型，使自定义生图模型也能被解析到对应平台
+        // merge user-defined custom models so they can also be resolved to their provider
         const merged = mergeCustomModels(data.models ?? [], customModels, "image", new Set(enabled.map((e) => e.name)));
         const model = merged.find((m) => m.id === defaultImageModel);
         if (cancelled || !model) return;
@@ -200,7 +200,7 @@ export default function AssetsPage() {
           setModelTarget({ provider: prov.name, model: defaultImageModel, apiKey: prov.apiKey, baseUrl: prov.baseUrl });
         }
       } catch {
-        // 忽略，generateOne 时会提示未配置
+        // ignore; generateOne will surface the "not configured" error when called
       }
     })();
     return () => {
@@ -208,7 +208,7 @@ export default function AssetsPage() {
     };
   }, [providers, defaultImageModel, customModels]);
 
-  // 解析默认生视频模型对应的平台（用于「转动态镜头」）
+  // resolve the provider for the default video model (used for "convert to motion shot")
   useEffect(() => {
     let cancelled = false;
     const enabled = Object.entries(providers)
@@ -227,7 +227,7 @@ export default function AssetsPage() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        // 并入用户自定义视频模型
+        // merge user-defined custom video models
         const merged = mergeCustomModels(data.models ?? [], customModels, "video", new Set(enabled.map((e) => e.name)));
         const model = merged.find((m) => m.id === defaultVideoModel);
         if (cancelled || !model) return;
@@ -236,7 +236,7 @@ export default function AssetsPage() {
           setVideoModelTarget({ provider: prov.name, model: defaultVideoModel, apiKey: prov.apiKey, baseUrl: prov.baseUrl });
         }
       } catch {
-        // 忽略
+        // ignore
       }
     })();
     return () => {
@@ -244,11 +244,11 @@ export default function AssetsPage() {
     };
   }, [providers, defaultVideoModel, customModels]);
 
-  // 转动态镜头：用该分镜已生成的图作首帧，调图生视频模型，结果存为该分镜素材（视频）
+  // convert to motion shot: use the already-generated image for this shot as the first frame, call the image-to-video model, and save the result as the shot's asset (video)
   const generateMotion = useCallback(
     async (shotId: number, firstFrameOverride?: string) => {
       const asset = assets.find((a) => a.shotId === shotId);
-      // 首帧优先用传入的新鲜 URL：自动接力时 React state 还没刷新，闭包里的 thumbnailUrl 是旧的
+      // prefer the freshly passed URL for the first frame: during auto-chaining React state hasn't updated yet, so the thumbnailUrl in the closure is stale
       const firstFrame = firstFrameOverride || asset?.thumbnailUrl;
       if (!firstFrame) return;
       if (!videoModelTarget) {
@@ -270,7 +270,7 @@ export default function AssetsPage() {
             mode: "image-to-video",
             prompt: asset?.prompt || asset?.description,
             imageUrl: firstFrame,
-            // 用户自定义视频参数（比例/分辨率/时长/帧率/运动/种子/反向词）
+            // user-defined video parameters (aspect ratio / resolution / duration / frame rate / motion / seed / negative prompt)
             options: buildVideoOptions(videoParams),
           }),
         });
@@ -278,7 +278,7 @@ export default function AssetsPage() {
         if (!res.ok) throw new Error(data.error || t("errorImageToVideoFailed"));
         const url = data.videoUrls?.[0];
         if (!url) throw new Error(t("errorEmptyResult"));
-        // 存为该分镜素材（视频会被下载到本地），compose 会按视频片段处理（含原生音轨检测）
+        // save as this shot's asset (video will be downloaded locally); compose processes it as a video clip (including native audio track detection)
         const saveRes = await fetch(`/api/project/${id}/assets`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -310,13 +310,13 @@ export default function AssetsPage() {
     [assets, videoModelTarget, id, videoParams]
   );
 
-  // 真实生成单个素材
+  // actually generate a single asset
   const generateOne = useCallback(
     async (shotId: number) => {
       const asset = assets.find((a) => a.shotId === shotId);
       if (!asset) return;
 
-      // 商品原图分镜：直接用商品图，无需调用 AI（落库供合成读取）
+      // product image shot: use the product photo directly, no AI call needed (persisted for the composer to read)
       if (asset.visualSource === "product_image") {
         setAssets((prev) =>
           prev.map((a) =>
@@ -329,13 +329,13 @@ export default function AssetsPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ shotId, type: "product_image", sourceUrl: productImages[0] }),
           }).catch(() => {});
-          // 自动转动态：商品原图当首帧跑图生视频（让真货动起来），失败自动回退静图
+          // auto motion: use the product image as the first frame and run image-to-video (bring the real product to life); falls back to a static image on failure
           if (autoMotion && videoModelTarget) await generateMotion(shotId, productImages[0]);
         }
         return;
       }
 
-      // AI 生成分镜：需要已配置默认生图模型
+      // AI-generated shot: requires a default image model to be configured
       if (!modelTarget) {
         setAssets((prev) =>
           prev.map((a) =>
@@ -349,7 +349,7 @@ export default function AssetsPage() {
 
       setAssets((prev) => prev.map((a) => (a.shotId === shotId ? { ...a, status: "generating", error: undefined } : a)));
 
-      // 商品保真：展示商品的 AI 分镜 + 有商品图 + 开关开 → 用商品图重绘（image-to-image，锁定商品主体）
+      // product fidelity: AI shot featuring product + product image available + toggle on → redraw with product image (image-to-image, locks in the product subject)
       const useProductSafe =
         productSafe && !!productImages[0] && PRODUCT_SHOT_TYPES.has(asset.type);
       const genModel = useProductSafe ? toEditVariant(modelTarget.model) : modelTarget.model;
@@ -371,7 +371,7 @@ export default function AssetsPage() {
             mode: genMode,
             prompt: genPrompt,
             ...(useProductSafe && { imageUrl: productImages[0] }),
-            // 用户自定义图片参数（比例→尺寸/数量/步数/引导/种子/反向词）
+            // user-defined image parameters (aspect ratio → dimensions / count / steps / guidance / seed / negative prompt)
             options: buildImageOptions(imageParams),
           }),
         });
@@ -379,7 +379,7 @@ export default function AssetsPage() {
         if (!res.ok) throw new Error(data.error || t("errorGenerateFailed"));
         const url = data.imageUrls?.[0];
         if (!url) throw new Error(t("errorEmptyResult"));
-        // 落库（远程图会被下载到本地），供合成读取真实 AI 素材
+        // persist to database (remote images will be downloaded locally) so the composer can read the real AI asset
         let savedUrl = url;
         try {
           const saveRes = await fetch(`/api/project/${id}/assets`, {
@@ -395,12 +395,12 @@ export default function AssetsPage() {
             if (saved.filePath) savedUrl = saved.filePath;
           }
         } catch {
-          // 落库失败不影响预览（仅合成时会回退商品图兜底）
+          // persist failure doesn't affect the preview (the composer will fall back to the product image as a safety net)
         }
         setAssets((prev) =>
           prev.map((a) => (a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: savedUrl } : a))
         );
-        // 自动转动态：刚生成的图当首帧跑图生视频（真运镜替掉假 Ken-Burns），失败自动回退静图
+        // auto motion: use the freshly generated image as the first frame and run image-to-video (real camera moves replace fake Ken-Burns); falls back to static image on failure
         if (autoMotion && videoModelTarget) await generateMotion(shotId, savedUrl);
       } catch (e) {
         setAssets((prev) =>
@@ -413,7 +413,7 @@ export default function AssetsPage() {
     [assets, modelTarget, productImages, productSafe, imageParams, autoMotion, videoModelTarget, generateMotion]
   );
 
-  // 一键全部生成（串行，避免并发打满平台限流）
+  // generate all in one click (sequential, to avoid hitting platform rate limits with concurrent requests)
   const generateAll = useCallback(async () => {
     const pending = assets.filter((a) => a.status === "pending" || a.status === "failed");
     if (pending.length === 0) return;
@@ -426,7 +426,7 @@ export default function AssetsPage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* 顶部导航 */}
+      {/* top navigation */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-4">
@@ -443,10 +443,10 @@ export default function AssetsPage() {
             <span className="text-sm text-muted-foreground truncate max-w-[40vw] sm:max-w-xs">{projectName || t("untitledProject")}</span>
           </div>
 
-          {/* 步骤进度 */}
+          {/* step progress */}
           <div className="flex items-center gap-1">
             <LanguageToggle className="mr-1" />
-            {/* 步骤胶囊在窄屏放不下，移动端隐藏（仅进度展示、非导航） */}
+            {/* step pills don't fit on narrow screens, hidden on mobile (progress display only, not navigation) */}
             <div className="hidden sm:flex items-center gap-1">
             {[t("stepScript"), t("stepAssets"), t("stepVideo"), t("stepExport")].map((step, i) => (
               <div key={step} className="flex items-center">
@@ -465,7 +465,7 @@ export default function AssetsPage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
-        {/* 操作栏 */}
+        {/* action bar */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-lg font-semibold">{t("title")}</h2>
@@ -554,7 +554,7 @@ export default function AssetsPage() {
           </div>
         </div>
 
-        {/* 自动配画面 提示/结果（免费素材，零 Key，topic 成片首选路径） */}
+        {/* auto-fill visuals hint/result (free stock, no key required, preferred path for topic videos) */}
         {offerStockFill && (
           <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/15 px-3 py-2 text-xs text-muted-foreground">
             <LuImage className="w-3.5 h-3.5 text-primary/70 shrink-0" />
@@ -562,7 +562,7 @@ export default function AssetsPage() {
           </div>
         )}
 
-        {/* 未配置生图模型提示（仅当仍有 AI 分镜待出图） */}
+        {/* no image model configured warning (only shown when there are still AI shots pending generation) */}
         {showModelWarning && (
           <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
             <LuTriangleAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -576,7 +576,7 @@ export default function AssetsPage() {
           </div>
         )}
 
-        {/* 加载态 / 空态 */}
+        {/* loading state / empty state */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <LuLoaderCircle className="w-6 h-6 animate-spin mb-3" />
@@ -592,7 +592,7 @@ export default function AssetsPage() {
           </div>
         ) : (
           <>
-            {/* 进度条 */}
+            {/* progress bar */}
             <div className="mb-6">
               <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
                 <div
@@ -602,7 +602,7 @@ export default function AssetsPage() {
               </div>
             </div>
 
-            {/* 素材列表 */}
+            {/* asset list */}
             <div className="space-y-4">
               {assets.map((asset) => {
                 const typeInfo = shotTypeLabels[asset.type];
@@ -610,7 +610,7 @@ export default function AssetsPage() {
                   <Card key={asset.shotId} className="glass-card overflow-hidden">
                     <CardContent className="p-0">
                       <div className="flex">
-                        {/* 左侧序号 */}
+                        {/* left-side index */}
                         <div className="flex flex-col items-center justify-center w-16 py-4 border-r border-border/50 shrink-0">
                           <span className="text-lg font-bold text-muted-foreground/50">
                             {String(asset.shotId).padStart(2, "0")}
@@ -621,7 +621,7 @@ export default function AssetsPage() {
                           <span className="text-[10px] text-muted-foreground mt-1">{asset.duration}s</span>
                         </div>
 
-                        {/* 中间内容 */}
+                        {/* center content */}
                         <div className="flex-1 p-4">
                           <p className="text-sm leading-relaxed mb-2">{asset.description}</p>
                           {asset.prompt && (
@@ -645,9 +645,9 @@ export default function AssetsPage() {
                           )}
                         </div>
 
-                        {/* 右侧预览+操作 */}
+                        {/* right-side preview + actions */}
                         <div className="flex flex-col items-center justify-center gap-2 p-4 shrink-0">
-                          {/* 缩略图区域 */}
+                          {/* thumbnail area */}
                           <div className="w-24 h-16 bg-muted/30 rounded-md flex items-center justify-center border border-border/30 overflow-hidden">
                             {asset.status === "done" && asset.thumbnailUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -665,7 +665,7 @@ export default function AssetsPage() {
                             )}
                           </div>
 
-                          {/* 操作按钮（AI 生成分镜可手动生成/重试） */}
+                          {/* action buttons (AI-generated shots can be manually generated or retried) */}
                           {asset.visualSource === "ai_generate" && (
                             <Button
                               variant="outline"
@@ -683,7 +683,7 @@ export default function AssetsPage() {
                                 : t("btnGenerate")}
                             </Button>
                           )}
-                          {/* 转动态镜头：已有图素材 → 图生视频（真实运镜）。商品特写镜头建议保持静态避免篡改 */}
+                          {/* convert to motion shot: existing image asset → image-to-video (real camera moves). Product close-up shots are best kept static to avoid distortion */}
                           {asset.status === "done" && asset.thumbnailUrl && !asset.isVideo && (
                             <Button
                               variant="ghost"
@@ -710,7 +710,7 @@ export default function AssetsPage() {
               })}
             </div>
 
-            {/* 底部操作 */}
+            {/* bottom action */}
             <div className="mt-8 flex justify-end">
               <Link href={allDone ? `/project/${id}/video` : "#"}>
                 <Button className="brand-gradient text-white text-sm" disabled={!allDone}>

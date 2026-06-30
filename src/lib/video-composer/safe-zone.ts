@@ -1,35 +1,43 @@
 /**
- * 字幕安全区（2026 竖屏带货标配）
+ * Subtitle safe zone (2026 vertical e-commerce standard)
  *
- * TikTok / 抖音 / Reels / Shorts 等竖屏短视频，画面底部被平台 UI 占据
- * （视频描述、账号名、购物车/小黄车、点赞评论列、进度条）。字幕若落进这一区会被
- * 平台控件物理遮挡——而烧录字幕的全部价值正是服务 ~85%~93% 的静音观看人群，被遮挡等于白做。
+ * In portrait short-video platforms such as TikTok / Douyin / Reels / Shorts, the bottom of the frame
+ * is occupied by platform UI (video description, username, shopping-cart button, like/comment bar, progress bar).
+ * Subtitles that fall into this zone are physically obscured by platform controls — yet the entire value of
+ * burned-in subtitles is to serve the ~85–93% of viewers watching on mute, so an obscured subtitle is wasted work.
  *
- * 本模块把字幕底边抬到 UI 区之上。带货时画面底部是「商品卡在上、字幕在下」的堆叠：
- * 商品卡底距 0.25（composer.ts `cardY = height - thumb - height*0.25`，卡底落在 h*0.75），
- * 字幕底边落在 h*0.83（底距 0.17）、紧贴卡片下方且不重叠——0.17 是字幕在「卡上字下」堆叠里
- * 能取的最大底距（再大两行字幕会顶到商品卡）。
+ * This module raises the subtitle bottom edge above the UI zone.  In e-commerce mode the bottom of the frame uses
+ * a "product card above, subtitle below" stack:
+ * product card bottom clearance 0.25 (composer.ts `cardY = height - thumb - height*0.25`, card bottom at h*0.75),
+ * subtitle bottom edge at h*0.83 (clearance 0.17), immediately below the card with no overlap.
+ * 0.17 is the maximum bottom clearance for the subtitle in this "card above, subtitle below" stack
+ * (any higher and a two-line subtitle would collide with the card).
  *
- * ⚠️ 2026 实测：各家 TikTok 规范把底部 UI 区给到 ~20%~25%（OpusClip 字幕指南建议字幕避开底部 25%），
- * 比这里的 0.17 更高。但带货场景字幕被商品卡「钉」在 0.17——要让字幕真正清出 25% UI 区，需把
- * 「卡上字下」反转为「字上卡下」（字幕拿安全位、商品卡退到下方），属主观排版取舍，留待用户定夺。
- * 无商品卡的纯主题视频不受此约束，字幕底距本可抬到 0.20+（暂未做条件化，统一 0.17）。
+ * ⚠️ 2026 measurements: various TikTok guidelines put the bottom UI zone at ~20–25%
+ * (OpusClip subtitle guide recommends keeping subtitles out of the bottom 25%), which is higher than the 0.17 here.
+ * In e-commerce mode the subtitle is "pinned" to 0.17 by the product card — to truly clear the 25% UI zone
+ * the layout would need to be inverted ("subtitle above, card below"), which is a subjective design trade-off
+ * for the user to decide.  Videos without a product card are not constrained in the same way; their subtitle
+ * clearance could be raised to 0.20+ (not yet conditionalised — uniformly 0.17 for now).
  *
- * 纯函数，便于确定性单测（无需跑 ffmpeg）。
+ * Pure functions for deterministic unit testing (no ffmpeg required).
  */
 
-/** 底部安全留白比例：字幕底边距画面底 ≥ 该比例，避开平台底部 UI 区（带货时被商品卡 0.25 堆叠钉在此上限） */
+/** bottom safe clearance ratio: subtitle bottom edge must be at least this fraction above the frame bottom to clear the platform UI zone (in e-commerce mode, pinned to this upper limit by the product card stack at 0.25) */
 export const CAPTION_SAFE_BOTTOM_RATIO = 0.17;
 
 /**
- * 无商品卡时的字幕底部留白：纯主题视频/无卡带货没有「卡上字下」堆叠约束，
- * 字幕可抬到更清出 2026 平台底部 UI 区(各家规范 ~20%~25%)的位置。
- * 取 0.22：清出 20% 共识 UI 区且留余量、上移幅度温和；更严的字幕专项指南(避开底部 25%)
- * 可到 0.25，这里权衡「清出 UI」与「别太侵入画面」取 0.22。带货有卡场景仍用 0.17（上方约束见该常量注释）。
+ * Subtitle bottom clearance when no product card is present: pure topic videos / cardless e-commerce videos
+ * have no "card above, subtitle below" stacking constraint, so subtitles can be raised to better clear
+ * the 2026 platform bottom UI zone (various guidelines: ~20–25%).
+ * Set to 0.22: clears the broadly agreed 20% UI zone with headroom, without moving too far into the frame;
+ * stricter subtitle-specific guides (avoid the bottom 25%) would suggest 0.25, but 0.22 balances
+ * "clear the UI" against "don't intrude too much into the picture".
+ * E-commerce videos with a product card still use 0.17 (see the constraint described in that constant's comment).
  */
 export const CAPTION_SAFE_BOTTOM_RATIO_NOCARD = 0.22;
 
-/** 卡拉OK ASS 的 MarginV（距底边像素，PlayRes 坐标系）：playResY × 安全比例 */
+/** MarginV for karaoke ASS (pixels from the bottom edge in PlayRes coordinate space): playResY × safe clearance ratio */
 export function karaokeSafeMarginV(playResY: number): number {
   return Math.round(playResY * CAPTION_SAFE_BOTTOM_RATIO);
 }

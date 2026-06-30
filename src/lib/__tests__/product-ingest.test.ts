@@ -81,7 +81,7 @@ describe("parseProductFromHtml", () => {
   });
 });
 
-// 解析 bug 群回归（audit 工作流实测复现）：撇号截断 / 二次解码 / 价格双符号·$0
+// Regression suite for parsing bugs (reproduced from audit workflow): apostrophe truncation / double-decode / duplicate price symbol / $0
 describe("product-ingest 解析健壮性回归", () => {
   it("getMeta：双引号 content 内含单引号不被截断", () => {
     expect(getMeta(`<meta property="og:title" content="Tom's Coffee Mug">`, ["og:title"])).toBe("Tom's Coffee Mug");

@@ -20,17 +20,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// 旁白风格（与后端 TopicNarrationStyle 一一对应）；label/desc 在渲染时按语言取词
+// narration styles (one-to-one correspondence with the backend TopicNarrationStyle); label/desc resolved per locale at render time
 const narrationStyleValues = ["knowledge", "story", "lifestyle", "inspiration", "travel"] as const;
 
-// 时长选项（label 为单位文本，无需翻译）
+// duration options (label is a plain unit string, no translation needed)
 const durationOptions = [
   { value: "15", label: "15s" },
   { value: "25", label: "25s" },
   { value: "40", label: "40s" },
 ];
 
-// 主题灵感示例（新手零门槛试用）；文案按语言取词，key 顺序与下方渲染一致
+// topic inspiration examples (zero-barrier trial for beginners); copy resolved per locale; key order matches the render below
 const exampleTopicKeys = ["exampleTopic1", "exampleTopic2", "exampleTopic3", "exampleTopic4", "exampleTopic5"];
 
 export default function TopicProjectPage() {
@@ -74,14 +74,14 @@ export default function TopicProjectPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // 即便生成失败，后端也可能已建好草稿项目并回传 projectId，便于跳转后重试
+        // even on failure, the backend may have created a draft project and returned a projectId so the user can retry after navigating
         if (data.projectId) {
           router.push(`/project/${data.projectId}/script`);
           return;
         }
         throw new Error(data.error || t("errorGenerateCheckLlm"));
       }
-      // 成功：跳到脚本页查看多套方案，再走素材自动配齐 → 合成
+      // success: navigate to the script page to review multiple options, then proceed through auto-fill assets → compose
       router.push(`/project/${data.projectId}/script`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errorGenerate"));
@@ -91,7 +91,7 @@ export default function TopicProjectPage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* 顶部导航 */}
+      {/* top navigation */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
@@ -119,7 +119,7 @@ export default function TopicProjectPage() {
       </header>
 
       <main className="mx-auto max-w-2xl px-6 py-10">
-        {/* 页面标题 */}
+        {/* page title */}
         <div className="mb-8">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-500">
             <LuSparkles className="w-3.5 h-3.5" />
@@ -131,7 +131,7 @@ export default function TopicProjectPage() {
           </p>
         </div>
 
-        {/* 未配置 LLM 引导 */}
+        {/* LLM not configured guidance */}
         {!isLLMConfigured && (
           <Link href="/settings">
             <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 cursor-pointer hover:bg-amber-100 transition-colors">
@@ -149,7 +149,7 @@ export default function TopicProjectPage() {
 
         <Card className="glass-card">
           <CardContent className="p-6 space-y-6">
-            {/* 主题输入 */}
+            {/* topic input */}
             <div className="space-y-2">
               <Label htmlFor="topic" className="text-sm font-medium">
                 {t("topicLabel")} <span className="text-destructive">*</span>
@@ -162,7 +162,7 @@ export default function TopicProjectPage() {
                 rows={3}
                 className="resize-none"
               />
-              {/* 灵感示例 */}
+              {/* inspiration examples */}
               <div className="flex flex-wrap gap-1.5 pt-1">
                 <span className="text-xs text-muted-foreground self-center">{t("tryLabel")}</span>
                 {exampleTopicKeys.map((key) => {
@@ -181,12 +181,12 @@ export default function TopicProjectPage() {
               </div>
             </div>
 
-            {/* 旁白风格 */}
+            {/* narration style */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">{t("narrationLabel")}</Label>
               <Select value={narrationStyle} onValueChange={(val) => setNarrationStyle(val ?? "knowledge")}>
                 <SelectTrigger>
-                  {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为标签（按语言取词） */}
+                  {/* Base UI's Select.Value shows the raw value by default; use a function child to map it to the translated label */}
                   <SelectValue>
                     {(value: string) => t(`narration_${value}_label`)}
                   </SelectValue>
@@ -199,13 +199,13 @@ export default function TopicProjectPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {/* 选中风格的说明（放在 Select 外，避免触发器显示原始 value） */}
+              {/* description for the selected style (placed outside the Select to avoid the trigger showing the raw value) */}
               <p className="text-xs text-muted-foreground">
                 {t(`narration_${narrationStyle}_desc`)}
               </p>
             </div>
 
-            {/* 时长 */}
+            {/* duration */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">{t("durationLabel")}</Label>
               <div className="flex gap-2">
@@ -226,7 +226,7 @@ export default function TopicProjectPage() {
               </div>
             </div>
 
-            {/* 错误提示 */}
+            {/* error message */}
             {error && (
               <div className="flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 <LuCircleAlert className="w-4 h-4 shrink-0 mt-0.5" />
@@ -234,7 +234,7 @@ export default function TopicProjectPage() {
               </div>
             )}
 
-            {/* 生成按钮 */}
+            {/* generate button */}
             <Button
               onClick={handleGenerate}
               disabled={!isValid || isSubmitting}
@@ -254,7 +254,7 @@ export default function TopicProjectPage() {
               )}
             </Button>
 
-            {/* 流程提示 */}
+            {/* workflow hints */}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-1">
               <Badge variant="secondary" className="text-[10px]">{t("flowStep1")}</Badge>
               <span className="text-border">→</span>

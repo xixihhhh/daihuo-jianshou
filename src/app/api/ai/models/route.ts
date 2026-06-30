@@ -3,13 +3,14 @@ import { createProvider } from "@/lib/providers";
 import type { MediaType, Model } from "@/lib/providers/types";
 
 /**
- * 聚合各启用平台的可用模型列表
- * 供前端（设置页默认模型选择、素材/视频生成入口）拉取并展示可选模型
+ * Aggregates the available model list from all enabled providers.
+ * Used by the frontend (settings page default model selector, asset/video generation entry points)
+ * to fetch and display selectable models.
  *
- * 请求体：
+ * Request body:
  *   { providers: [{ name, apiKey?, baseUrl? }], mediaType?: 'image' | 'video' }
- * 返回：
- *   { models: Model[] }  // 已按 provider 聚合
+ * Response:
+ *   { models: Model[] }  // aggregated by provider
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ models: [] });
   }
 
-  // 并发拉取每个平台的模型列表，单个平台失败不影响其他平台
+  // Fetch each provider's model list concurrently; a failure from one provider does not affect the others
   const results = await Promise.allSettled(
     providers.map(async (p) => {
       const provider = createProvider({

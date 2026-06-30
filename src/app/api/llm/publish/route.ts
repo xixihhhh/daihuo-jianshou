@@ -4,8 +4,8 @@ import { extractJSON } from "@/lib/script-engine/generator";
 import { buildPublishPrompt } from "@/lib/publish-pack";
 
 /**
- * 生成发布文案：标题（3 个）、#话题标签、一句话种草文案。
- * 用于带货视频发布到抖音/快手/小红书时直接复制。
+ * Generate publish copy: 3 titles, #hashtags, and a one-line promotional caption.
+ * Used for copy-pasting when publishing commerce videos to Douyin/Kuaishou/Xiaohongshu.
  */
 export async function POST(req: NextRequest) {
   try {

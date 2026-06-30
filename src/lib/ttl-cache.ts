@@ -1,7 +1,8 @@
 /**
- * 轻量 TTL + LRU 缓存（无依赖、可单测）。
- * 用于聚合素材检索等「短时间内同 key 重复请求」的场景，避免重复打第三方 API / 撞限流。
- * 注入 `now` 便于测 TTL 过期（默认 Date.now）。
+ * Lightweight TTL + LRU cache (no dependencies, unit-testable).
+ * Used for scenarios like aggregated asset retrieval where the same key is requested repeatedly
+ * within a short window, to avoid hammering third-party APIs and hitting rate limits.
+ * The `now` function is injectable to facilitate TTL expiry testing (defaults to Date.now).
  */
 export class TtlCache<V> {
   private m = new Map<string, { at: number; v: V }>();
@@ -19,7 +20,7 @@ export class TtlCache<V> {
       this.m.delete(key);
       return undefined;
     }
-    // LRU：命中移到末尾（Map 保留插入序，删除淘汰最久未用的）
+    // LRU: on hit, move the entry to the end (Map preserves insertion order; delete evicts the least recently used)
     this.m.delete(key);
     this.m.set(key, e);
     return e.v;

@@ -1,23 +1,23 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-// 品牌配置
+// brand configuration
 export interface BrandConfig {
   id: string;
-  name: string; // 品牌/店铺名
-  logoUrl?: string; // logo 图片 URL
-  primaryColor: string; // 主色（hex）
-  secondaryColor: string; // 辅色（hex）
-  fontFamily: string; // 字体
+  name: string; // brand / store name
+  logoUrl?: string; // logo image URL
+  primaryColor: string; // primary color (hex)
+  secondaryColor: string; // secondary color (hex)
+  fontFamily: string; // font family
   watermark: {
     enabled: boolean;
     position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
-    opacity: number; // 0.1-1.0
-    scale: number; // 0.1-0.5
+    opacity: number; // 0.1–1.0
+    scale: number; // 0.1–0.5
   };
-  introEnabled: boolean; // 是否启用片头
-  outroEnabled: boolean; // 是否启用片尾
-  outroText?: string; // 片尾文字（如"关注我们获取更多好物推荐"）
+  introEnabled: boolean; // whether to show an intro card
+  outroEnabled: boolean; // whether to show an outro card
+  outroText?: string; // outro text (e.g. "关注我们获取更多好物推荐")
 }
 
 interface BrandState {
@@ -44,12 +44,12 @@ export const useBrandStore = create<BrandState>()(
         introEnabled: false,
         outroEnabled: false,
       },
-      // 更新品牌配置（浅合并）
+      // update brand config (shallow merge)
       updateBrand: (updates) =>
         set((state) => ({
           brand: { ...state.brand, ...updates },
         })),
-      // 更新水印配置（浅合并）
+      // update watermark config (shallow merge)
       updateWatermark: (updates) =>
         set((state) => ({
           brand: {

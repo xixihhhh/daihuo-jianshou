@@ -5,8 +5,8 @@ import { useLocale, useSetLocale } from "@/lib/i18n";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
 
 /**
- * 语言切换：中文 ⇄ English。点击在两种语言间循环切换，存到 settings store（localStorage 持久化）。
- * 放在各页顶部导航。
+ * Language toggle: Chinese ⇄ English. Clicking cycles between the two languages and persists the choice in the settings store (localStorage).
+ * Placed in the top navigation of each page.
  */
 export function LanguageToggle({ className = "" }: { className?: string }) {
   const locale = useLocale();

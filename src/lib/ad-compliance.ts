@@ -1,7 +1,9 @@
 /**
- * 带货脚本广告法合规检查 —— 对「已生成」的脚本文案做规则扫描，标出可能违反《广告法》的风险词。
- * 脚本引擎的 prompt 只是「叮嘱 LLM 避免」，但 LLM 仍会漏；这里在出片前对实际产物做兜底校验，
- * 命中即给用户警示 + 修改建议（不强制拦截，由用户决定）。纯函数、可单测、零 Key、与合成管线解耦。
+ * Ad-law compliance check for e-commerce scripts — scans already-generated script copy for terms
+ * that may violate China's Advertising Law. The script engine prompt only asks the LLM to avoid
+ * them, but the LLM still misses some; this provides a safety-net check on the actual output
+ * before rendering. Hits surface a warning + revision suggestion (not a hard block — user decides).
+ * Pure function, unit-testable, zero external keys, decoupled from the compose pipeline.
  */
 
 export type AdViolationCategory = "绝对化用语" | "医疗/虚假功效" | "需认证宣称";
@@ -20,10 +22,10 @@ interface Rule {
   suggestion: string;
 }
 
-// 保守取词，尽量只收「在带货语境下几乎必然违规」的词，减少误报（这是警示工具、非硬拦截）。
+// Conservative term selection — only include terms that are almost certainly illegal in an e-commerce context, to minimize false positives (this is a warning tool, not a hard block).
 const RULES: Rule[] = [
   {
-    // 《广告法》第 9 条：禁用国家级、最高级、最佳等绝对化用语
+    // Advertising Law Article 9: prohibits absolute superlatives such as "national level", "highest grade", "best"
     terms: [
       "最佳", "最好", "最优", "最强", "最高级", "国家级", "世界级", "顶级", "顶尖", "极致",
       "100%", "百分百", "绝对", "万能", "史上最", "无敌", "销量第一", "全网第一", "排名第一",
@@ -34,7 +36,7 @@ const RULES: Rule[] = [
     suggestion: "《广告法》第9条禁用绝对化用语，改为「之一 / 较 / 更 / 深受喜爱」等相对表述",
   },
   {
-    // 普通商品不得宣称医疗、治疗、根治等功效
+    // Ordinary goods must not claim medical, therapeutic, or curative effects
     terms: [
       "根治", "包治", "治愈", "药到病除", "立竿见影", "三天见效", "七天见效", "永不复发",
       "彻底根除", "疗效", "抗癌", "消炎", "杀菌", "处方药", "药妆", "医学级", "医疗级", "特效药",
@@ -44,7 +46,7 @@ const RULES: Rule[] = [
     suggestion: "普通商品不得宣称医疗 / 治疗 / 根治等功效，删除或改为真实体验描述",
   },
   {
-    // 无认证不得宣称纯天然 / 有机 / 零添加
+    // "Pure natural / organic / additive-free" claims require authoritative certification
     terms: ["纯天然", "零添加", "无添加", "有机食品", "100%天然"],
     category: "需认证宣称",
     severity: "med",
@@ -52,7 +54,7 @@ const RULES: Rule[] = [
   },
 ];
 
-/** 扫描一段文本，返回命中的广告法风险词（按 term 去重、high 在前）。 */
+/** Scans a text string and returns matched ad-law risk terms (deduplicated by term, high-severity first). */
 export function checkAdCompliance(text: string): AdViolation[] {
   const clean = String(text || "");
   if (!clean) return [];
@@ -66,13 +68,13 @@ export function checkAdCompliance(text: string): AdViolation[] {
       }
     }
   }
-  // 去掉被更长命中词包含的短词（如「100%」被「100%天然」覆盖），避免同一处文字重复且矛盾的提示
+  // Remove shorter terms that are substrings of a longer matched term (e.g. "100%" subsumed by "100%天然") to avoid duplicate or contradictory hints for the same text span
   const terms = out.map((v) => v.term);
   const deduped = out.filter((v) => !terms.some((t) => t !== v.term && t.includes(v.term)));
   return deduped.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "high" ? -1 : 1));
 }
 
-/** 扫描整条脚本的所有分镜（旁白 + 文字贴片），汇总去重后的风险词。 */
+/** Scans all shots in a script (voiceover + text overlays) and returns deduplicated risk terms. */
 export function checkScriptCompliance(shots: Array<{ voiceover?: string; textOverlay?: { text?: string } | null }>): AdViolation[] {
   const text = (shots || [])
     .flatMap((s) => [s.voiceover || "", s.textOverlay?.text || ""])

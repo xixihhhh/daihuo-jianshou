@@ -15,17 +15,17 @@ describe("TtlCache", () => {
     const c = new TtlCache<number>(1000, 8, () => t);
     c.set("a", 1);
     t = 999;
-    expect(c.get("a")).toBe(1); // 未过期
+    expect(c.get("a")).toBe(1); // not yet expired
     t = 1001;
-    expect(c.get("a")).toBeUndefined(); // 过期
+    expect(c.get("a")).toBeUndefined(); // expired
   });
 
   it("超过容量淘汰最久未用（LRU：get 会刷新）", () => {
     const c = new TtlCache<number>(10000, 2);
     c.set("a", 1);
     c.set("b", 2);
-    c.get("a"); // a 刷新到末尾，b 变最久未用
-    c.set("c", 3); // 超容量 2 → 淘汰 b
+    c.get("a"); // refresh a to the tail; b becomes the least recently used
+    c.set("c", 3); // exceeds capacity 2 → evict b
     expect(c.get("a")).toBe(1);
     expect(c.get("b")).toBeUndefined();
     expect(c.get("c")).toBe(3);
@@ -36,10 +36,10 @@ describe("TtlCache", () => {
 describe("stockCacheKey", () => {
   it("同参数同源 → 同键；不同 query/mediaType/源 → 不同键", () => {
     const k1 = stockCacheKey("beauty serum", { mediaType: "video" }, ["openverse", "wikimedia"]);
-    const k2 = stockCacheKey("BEAUTY SERUM ", { mediaType: "video" }, ["wikimedia", "openverse"]); // 大小写/空格/源序无关
+    const k2 = stockCacheKey("BEAUTY SERUM ", { mediaType: "video" }, ["wikimedia", "openverse"]); // case/whitespace/source order are irrelevant
     expect(k1).toBe(k2);
     expect(k1).not.toBe(stockCacheKey("beauty serum", { mediaType: "image" }, ["openverse", "wikimedia"]));
     expect(k1).not.toBe(stockCacheKey("other", { mediaType: "video" }, ["openverse", "wikimedia"]));
-    expect(k1).not.toBe(stockCacheKey("beauty serum", { mediaType: "video" }, ["openverse"])); // 有 Key 多一个源 → 不同键
+    expect(k1).not.toBe(stockCacheKey("beauty serum", { mediaType: "video" }, ["openverse"])); // one extra source with a key → different cache key
   });
 });

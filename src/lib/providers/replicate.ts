@@ -1,11 +1,11 @@
 /**
  * Replicate Provider
- * 基于 Replicate 官方 HTTP API（https://replicate.com/docs/reference/http）
- * - 创建预测：POST /v1/models/{owner}/{name}/predictions  body: { input }
- * - 轮询：    GET  /v1/predictions/{id}
- * - 鉴权：    Authorization: Bearer <token>
+ * Based on the official Replicate HTTP API (https://replicate.com/docs/reference/http)
+ * - Create prediction: POST /v1/models/{owner}/{name}/predictions  body: { input }
+ * - Poll:              GET  /v1/predictions/{id}
+ * - Auth:              Authorization: Bearer <token>
  * status: starting | processing | succeeded | failed | canceled
- * output: 图片为 url 数组；视频通常为单个 url 字符串
+ * output: images are a url array; videos are typically a single url string
  */
 import { BaseProvider } from './base'
 import type {
@@ -20,7 +20,7 @@ import type {
   MediaType,
 } from './types'
 
-/** Replicate 预测响应 */
+/** Replicate prediction response */
 interface ReplicatePrediction {
   id: string
   status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled'
@@ -29,7 +29,7 @@ interface ReplicatePrediction {
   metrics?: { predict_time?: number }
 }
 
-/** 把宽高映射为 Replicate 常用的 aspect_ratio */
+/** Map width/height to an aspect_ratio string used by Replicate */
 function toAspectRatio(width?: number, height?: number): string {
   const w = width ?? 0
   const h = height ?? 0
@@ -49,7 +49,7 @@ export class ReplicateProvider extends BaseProvider {
     })
   }
 
-  /** Replicate 用 Bearer token 鉴权（基类默认即是，显式声明以防覆盖） */
+  /** Replicate uses Bearer token auth (base class default, declared explicitly to prevent accidental override) */
   protected getAuthHeaders(): Record<string, string> {
     return { Authorization: `Bearer ${this.config.apiKey}` }
   }
@@ -61,7 +61,7 @@ export class ReplicateProvider extends BaseProvider {
       num_outputs: options.count ?? 1,
       output_format: 'png',
       ...(options.seed != null && { seed: options.seed }),
-      // 图生图：多数模型用 image 字段
+      // image-to-image: most models use the image field
       ...(options.referenceImageUrl && { image: options.referenceImageUrl }),
       ...options.extra,
     }
@@ -69,7 +69,7 @@ export class ReplicateProvider extends BaseProvider {
     const prediction = await this.createPrediction(options.modelId, input)
     const finalStatus = await this.pollTaskStatus(prediction.id, { interval: 2500 })
     const result = this.requireResult(finalStatus.result)
-    // getTaskStatus 只有 taskId、无从得知模型，置了空 modelId；这里回填实际模型（与 alibaba/volcengine/siliconflow 一致，否则返给前端的 modelId 为空串）
+    // getTaskStatus only has taskId with no way to know the model, so modelId is set to empty string there; backfill the actual model here (consistent with alibaba/volcengine/siliconflow, otherwise the modelId returned to the frontend would be an empty string)
     result.modelId = options.modelId
     return result as ImageResult
   }
@@ -79,7 +79,7 @@ export class ReplicateProvider extends BaseProvider {
       prompt: options.prompt,
       ...(options.duration != null && { duration: options.duration }),
       ...(options.seed != null && { seed: options.seed }),
-      // 图生视频：不同模型字段名不一，常见 start_image / image / first_frame_image
+      // image-to-video: field names vary by model; common ones are start_image / image / first_frame_image
       ...(options.firstFrameUrl && {
         start_image: options.firstFrameUrl,
         image: options.firstFrameUrl,
@@ -90,12 +90,12 @@ export class ReplicateProvider extends BaseProvider {
     const prediction = await this.createPrediction(options.modelId, input)
     const finalStatus = await this.pollTaskStatus(prediction.id, { interval: 5000 })
     const result = this.requireResult(finalStatus.result)
-    // 同 generateImage：getTaskStatus 置了空 modelId，这里回填实际模型，避免返给前端的 modelId 为空串
+    // same as generateImage: getTaskStatus sets modelId to empty string, backfill the actual model here to avoid returning an empty modelId to the frontend
     result.modelId = options.modelId
     return result as VideoResult
   }
 
-  /** 创建预测：官方模型走 /models/{owner}/{name}/predictions */
+  /** Create a prediction: official models use /models/{owner}/{name}/predictions */
   private async createPrediction(
     modelId: string,
     input: Record<string, unknown>
@@ -119,7 +119,7 @@ export class ReplicateProvider extends BaseProvider {
     if (status === 'completed' && p.output != null) {
       const urls = Array.isArray(p.output) ? p.output : [p.output]
       const duration = p.metrics?.predict_time ? Math.round(p.metrics.predict_time * 1000) : undefined
-      // 用扩展名粗判图片/视频
+      // use file extension to roughly determine image vs. video
       const isVideo = urls.some((u) => /\.(mp4|webm|mov)(\?|$)/i.test(u))
       base.result = isVideo
         ? ({ taskId, videoUrls: urls, modelId: '', processingTime: duration } as VideoResult)
@@ -146,9 +146,9 @@ export class ReplicateProvider extends BaseProvider {
   }
 
   async listModels(mediaType?: MediaType): Promise<Model[]> {
-    // 基于 Replicate 官方模型库精选（owner/name 形式，2026-06）
+    // curated selection from the official Replicate model library (owner/name format, 2026-06)
     const models: Model[] = [
-      // ==================== 图片生成 ====================
+      // ==================== image generation ====================
       {
         id: 'black-forest-labs/flux-1.1-pro',
         name: 'FLUX 1.1 Pro',
@@ -189,7 +189,7 @@ export class ReplicateProvider extends BaseProvider {
         mediaType: 'image',
         provider: this.name,
       },
-      // ==================== 视频生成 ====================
+      // ==================== video generation ====================
       {
         id: 'kwaivgi/kling-v2.1',
         name: 'Kling v2.1',

@@ -1,7 +1,8 @@
 /**
- * 有界并发 map（无依赖、保序、可单测）。
- * 用 `limit` 个 worker 轮流取下一个项处理，避免一次性打爆下游 API / 连接池，又比串行快。
- * 结果按输入顺序返回（results[idx]）。某项 fn 抛错则整体 reject。
+ * Bounded-concurrency map (no dependencies, order-preserving, unit-testable).
+ * Uses `limit` workers that each pull the next item in turn, avoiding a thundering-herd
+ * against downstream APIs / connection pools while still being faster than serial execution.
+ * Results are returned in input order (results[idx]). If any fn throws, the whole call rejects.
  */
 export async function mapWithConcurrency<T, R>(
   items: readonly T[],

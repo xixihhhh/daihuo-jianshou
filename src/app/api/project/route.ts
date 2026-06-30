@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
-// 获取项目列表
+// fetch project list
 export async function GET() {
   try {
     const db = getDb();
@@ -18,13 +18,13 @@ export async function GET() {
   }
 }
 
-// 创建新项目
+// create a new project
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const db = getDb();
 
-    // 视频模式 / 来源类型做枚举白名单校验，非法值回退默认
+    // validate videoMode / sourceType against enum allowlists; fall back to default for invalid values
     const VIDEO_MODES = ["product_closeup", "graphic_montage", "scene_demo", "live_presenter"];
     const videoMode = VIDEO_MODES.includes(body.videoMode) ? body.videoMode : undefined;
     const sourceType = body.sourceType === "clone" ? "clone" : undefined;

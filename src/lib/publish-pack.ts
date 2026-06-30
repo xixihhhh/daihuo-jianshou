@@ -1,24 +1,24 @@
 /**
- * 免 Key 发布文案包 —— 不配 LLM 也能在导出页「复制即发」。
- * 按品类 + 平台映射热门话题标签，用痛点/数字/情绪钩子模板拼标题与种草文案。
- * 纯函数、确定性（同输入同输出），可单测；配了 LLM 的用户仍走 /api/llm/publish 拿更优文案。
+ * Key-free publish copy pack — works on the export page as "copy and post" even without an LLM configured.
+ * Maps category + platform to trending hashtags and assembles titles and promo copy using pain-point / number / emotion hook templates.
+ * Pure function, deterministic (same input → same output), unit-testable; users with an LLM still go through /api/llm/publish for higher-quality copy.
  */
 
 export interface PublishPack {
   titles: string[];
-  hashtags: string[]; // 已带 # 前缀、去重
+  hashtags: string[]; // already prefixed with # and deduplicated
   caption: string;
 }
 
 export interface PublishPackInput {
   productName?: string;
   category?: string; // beauty/food/home/fashion/digital/other
-  sellingPoints?: string; // 卖点/描述，可多句
+  sellingPoints?: string; // selling points / description, may be multiple sentences
   platform?: string; // douyin/kuaishou/xiaohongshu/tiktok
-  locale?: "zh" | "en"; // 文案语言，默认 zh；en 出海用英文标题/话题/CTA（避免英文用户拿到中文文案）
+  locale?: "zh" | "en"; // copy language, defaults to zh; en uses English titles/hashtags/CTA for overseas markets (avoids delivering Chinese copy to English-speaking users)
 }
 
-// 品类热门话题（贴合抖音/快手/小红书带货语境）
+// Category trending hashtags (tuned for Douyin/Kuaishou/Xiaohongshu commerce context)
 const CATEGORY_TAGS: Record<string, string[]> = {
   beauty: ["好物分享", "美妆", "护肤", "变美", "平价好物", "种草"],
   food: ["美食", "好吃推荐", "零食", "吃货日常", "干饭人", "种草"],
@@ -28,7 +28,7 @@ const CATEGORY_TAGS: Record<string, string[]> = {
   other: ["好物推荐", "种草", "好物分享", "值得买", "宝藏好物", "日常分享"],
 };
 
-// 品类热门话题（英文 TikTok/Reels 带货语境）
+// Category trending hashtags (English TikTok/Reels commerce context)
 const CATEGORY_TAGS_EN: Record<string, string[]> = {
   beauty: ["BeautyTok", "SkincareRoutine", "MakeupHacks", "BeautyFinds", "GlowUp", "TikTokMadeMeBuyIt"],
   food: ["FoodTok", "FoodieFinds", "SnackHaul", "TikTokFood", "MustTry", "TikTokMadeMeBuyIt"],
@@ -38,7 +38,7 @@ const CATEGORY_TAGS_EN: Record<string, string[]> = {
   other: ["TikTokMadeMeBuyIt", "MustHave", "ProductReview", "WorthIt", "TikTokFinds", "DailyFinds"],
 };
 
-// 平台热门话题
+// Platform trending hashtags
 const PLATFORM_TAGS: Record<string, string[]> = {
   douyin: ["抖音好物", "抖音电商"],
   kuaishou: ["快手好物", "快手电商"],
@@ -46,23 +46,23 @@ const PLATFORM_TAGS: Record<string, string[]> = {
   tiktok: ["TikTokMadeMeBuyIt", "TikTokShop"],
 };
 
-/** 取第一条卖点：按中英标点/换行切，去空白，限长（英文卖点更长，故 max 可调） */
+/** Extract the first selling point: split on CJK/ASCII punctuation and newlines, trim whitespace, clip to max length (English points are longer, so max is tunable) */
 function firstSellingPoint(sp: string | undefined, max: number): string {
   if (!sp) return "";
   const first = sp.split(/[。.,，;；\n、]/).map((s) => s.trim()).find((s) => s.length > 0) || "";
   return clip(first, max);
 }
 
-/** 按显示宽度近似裁剪（CJK 记 1，避免标题过长） */
+/** Clip by approximate display width (CJK counts as 1 character, prevents titles from being too long) */
 function clip(s: string, max: number): string {
   const arr = Array.from(s.trim());
   return arr.length <= max ? s.trim() : arr.slice(0, max).join("").trim();
 }
 
 /**
- * 构建发布文案的 LLM 提示词（配了 LLM 的用户走这条拿更优文案）。
- * 跟随 locale：zh 出中文带货文案，en 出英文 TikTok 文案——避免英文用户的 LLM 输出中文。
- * 纯函数，提示词内容可确定性单测（LLM 输出本身依赖 key，不在此测）。
+ * Build the LLM prompt for publish copy (used by users who have an LLM configured for higher-quality results).
+ * Follows locale: zh produces Chinese commerce copy, en produces English TikTok copy — avoids the LLM returning Chinese to English-speaking users.
+ * Pure function; prompt content is deterministically unit-testable (LLM output itself requires a key and is not tested here).
  */
 export function buildPublishPrompt(
   input: { productName: string; category?: string; productDescription?: string; platform?: string },
@@ -99,7 +99,7 @@ export function buildPublishPack(input: PublishPackInput): PublishPack {
   const cat = (input.category || "other").toLowerCase();
   const point = firstSellingPoint(input.sellingPoints, en ? 40 : 12);
 
-  // 标题：情绪 + 卖点/数字钩子，三条不同角度（英文不强裁，CJK 限 22）
+  // Titles: emotion + selling-point/number hook, three different angles (English not hard-clipped; CJK limited to 22 chars)
   const titles = en
     ? [
         `This ${name} is a total game-changer 🤯`,
@@ -112,13 +112,14 @@ export function buildPublishPack(input: PublishPackInput): PublishPack {
         clip(`三个理由让你入手${name}`, 22),
       ];
 
-  // 话题：商品专属标签 + 品类 + 平台，去重、带 #、控制在 ~10 个内。
-  // 商品专属标签放最前——2026 抖音/TikTok 搜索发现高度依赖商品词，通用品类标签(好物分享/BeautyTok)
-  // 曝光泛而不精；加一个商品名标签，让搜该商品的人能精准搜到你的视频。
+  // Hashtags: product-specific tag + category + platform, deduplicated, prefixed with #, capped at ~10.
+  // Product-specific tag goes first — in 2026, Douyin/TikTok discovery relies heavily on product keywords;
+  // generic category tags give broad but unfocused exposure.
+  // Adding a product-name tag lets people searching for that exact product find your video directly.
   const platform = (input.platform || "").toLowerCase();
   const catTags = en ? CATEGORY_TAGS_EN : CATEGORY_TAGS;
   const rawName = (input.productName || "").trim();
-  // 商品名去掉空格/标点（话题标签不能含空格），仅保留字母数字与 CJK，限长
+  // Strip spaces/punctuation from the product name (hashtags cannot contain spaces); keep only letters, digits, and CJK; clip to max length
   const productTag = rawName ? `#${clip(rawName.replace(/[^\p{L}\p{N}]/gu, ""), en ? 24 : 12)}` : "";
   const tagWords = [
     ...(catTags[cat] || catTags.other),
@@ -133,7 +134,7 @@ export function buildPublishPack(input: PublishPackInput): PublishPack {
     if (hashtags.length >= 10) break;
   }
 
-  // 种草文案：口语化 + 行动号召。先裁前半句，再固定拼 CTA，保证 CTA 尾巴不被整体裁断
+  // Promo caption: conversational + call to action. Clip the lead phrase first, then append the fixed CTA so the CTA tail is never truncated
   const cta = en ? " — tap the link below to grab it 🛒" : "，点下方小黄车带走它～";
   const lead = en
     ? `Obsessed with ${name}${point ? ", " + point : ""}`

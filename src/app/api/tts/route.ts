@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSpeech, type TTSConfig } from "@/lib/tts";
 
-// TTS 配音试听：返回 mp3 音频字节，供前端预览音色
+// TTS voice preview: return mp3 audio bytes for the frontend to preview a voice
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("TTS 失败:", error);
+    console.error("TTS failed:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "TTS 失败" },
       { status: 500 }

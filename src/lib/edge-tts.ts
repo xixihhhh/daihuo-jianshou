@@ -1,60 +1,66 @@
 /**
- * 免费配音兜底 —— 微软 Edge「大声朗读」在线 TTS，无需任何 API Key。
+ * Free TTS fallback — Microsoft Edge "Read Aloud" online TTS, no API key required.
  *
- * 用 Node 内置 WebSocket + crypto（不引入任何第三方依赖，便于 Electron 打包），
- * 直连 Edge 朗读服务的 websocket 合成中文/多语种语音，产出 mp3 字节。
- * 这是「一句话主题成片」零配置出声的关键：用户没配付费 TTS 时也能有人声旁白。
+ * Uses Node's built-in WebSocket + crypto (zero third-party dependencies, Electron-friendly)
+ * to connect directly to the Edge Read Aloud WebSocket service and synthesize Chinese /
+ * multilingual speech, returning raw mp3 bytes.
+ * This is the key enabler for zero-config voiceovers in "one-sentence topic" videos:
+ * users get narration even without a paid TTS configured.
  *
- * 注意：该服务由微软提供，握手需要带 Sec-MS-GEC 动态令牌 + 一个跟随 Edge 版本号的
- * Sec-MS-GEC-Version。微软偶尔会要求更新版本号（旧版本号会 403）。这里把版本号设为
- * 常量并支持用环境变量 EDGE_TTS_VERSION 覆盖，免改代码即可在线修复。
+ * Note: the service is provided by Microsoft; the WebSocket handshake requires a dynamic
+ * Sec-MS-GEC token plus a Sec-MS-GEC-Version that tracks the current Edge version.
+ * Microsoft occasionally rotates the expected version (old values return 403). The version
+ * is therefore stored as a constant that can be overridden via the EDGE_TTS_VERSION env var,
+ * allowing a fix without a code change.
  */
 
 const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 const WSS_BASE = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
-/** 跟随当前 Edge/Chromium 版本，过期会 403；可用 EDGE_TTS_VERSION 覆盖 */
+/** Tracks the current Edge/Chromium version; returns 403 when expired — override via EDGE_TTS_VERSION */
 const SEC_MS_GEC_VERSION = process.env.EDGE_TTS_VERSION || "1-143.0.3650.75";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0";
 
 /**
- * 精选免费音色（短名 + 标签 + 语言），默认温柔女声小晓。
- * 全球化定位：英文/日/韩/西脚本需对应语言原生发音，不能用中文音色读外文（发音错乱）。
- * 这些都是 Edge keyless 真实可合成的音色（已 server 实测出 18~26KB mp3）；generateSpeechFree
- * 本就接受任意 Edge 音色名，此处只是把非中文音色「列出来」让全球用户/agent 能发现选用。
+ * Curated free voices (short name + label + language). Defaults to the gentle female voice Xiaoxiao.
+ * Global positioning: English/Japanese/Korean/Spanish scripts need native-language voices —
+ * using a Chinese voice for foreign-language text produces garbled output.
+ * All entries are real Edge keyless-synthesisable voices (server-tested to produce 18–26 KB mp3);
+ * generateSpeechFree already accepts any Edge voice name — this list simply makes non-Chinese voices
+ * discoverable for international users and agents.
  */
 export const FREE_TTS_VOICES: { value: string; label: string; gender: "female" | "male"; lang: string }[] = [
-  // 中文（默认市场）
+  // Chinese (default market)
   { value: "zh-CN-XiaoxiaoNeural", label: "晓晓 · 温柔女声", gender: "female", lang: "zh-CN" },
   { value: "zh-CN-XiaoyiNeural", label: "晓伊 · 活泼女声", gender: "female", lang: "zh-CN" },
   { value: "zh-CN-YunxiNeural", label: "云希 · 阳光男声", gender: "male", lang: "zh-CN" },
   { value: "zh-CN-YunyangNeural", label: "云扬 · 专业播报男声", gender: "male", lang: "zh-CN" },
   { value: "zh-CN-YunjianNeural", label: "云健 · 沉稳解说男声", gender: "male", lang: "zh-CN" },
-  // English（出海主力）
+  // English (primary overseas market)
   { value: "en-US-AriaNeural", label: "Aria · US English (female)", gender: "female", lang: "en-US" },
   { value: "en-US-GuyNeural", label: "Guy · US English (male)", gender: "male", lang: "en-US" },
   { value: "en-GB-SoniaNeural", label: "Sonia · UK English (female)", gender: "female", lang: "en-GB" },
-  // 日/韩市场（内置 Noto CJK 字幕字体 public/fonts/subtitle.otf 覆盖假名+谚文，字幕能正常渲染）
+  // Japanese / Korean markets (bundled Noto CJK subtitle font public/fonts/subtitle.otf covers kana + hangul, so subtitles render correctly)
   { value: "ja-JP-NanamiNeural", label: "Nanami · 日本語 (female)", gender: "female", lang: "ja-JP" },
   { value: "ko-KR-SunHiNeural", label: "SunHi · 한국어 (female)", gender: "female", lang: "ko-KR" },
-  // 西语市场（拉丁字形在中文字体覆盖内）
+  // Spanish market (Latin glyphs are covered by the CJK font)
   { value: "es-ES-ElviraNeural", label: "Elvira · Español (female)", gender: "female", lang: "es-ES" },
 ];
 
 export const DEFAULT_FREE_VOICE = "zh-CN-XiaoxiaoNeural";
 
 export interface FreeTTSOptions {
-  /** 音色短名，默认 zh-CN-XiaoxiaoNeural */
+  /** Voice short name, defaults to zh-CN-XiaoxiaoNeural */
   voice?: string;
-  /** 语速，如 "+0%" / "-10%" / "+20%"，默认 "+0%" */
+  /** Speech rate, e.g. "+0%" / "-10%" / "+20%", defaults to "+0%" */
   rate?: string;
-  /** 音调，如 "+0Hz" / "+2st"，默认 "+0Hz" */
+  /** Pitch, e.g. "+0Hz" / "+2st", defaults to "+0Hz" */
   pitch?: string;
-  /** 超时毫秒，默认 20000 */
+  /** Timeout in milliseconds, defaults to 20000 */
   timeoutMs?: number;
 }
 
-/** 转义 SSML 文本中的 XML 特殊字符，避免旁白含 & < > 等字符破坏请求 */
+/** Escape XML special characters in SSML text to prevent voiceover content containing & < > etc. from corrupting the request */
 export function escapeSsml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -73,12 +79,13 @@ async function sha256Upper(str: string): Promise<string> {
 }
 
 /**
- * 生成 Sec-MS-GEC 令牌：.NET ticks（自 1601 的 100ns 间隔）向下取整到最近 300 秒，
- * 拼上信任令牌后做 SHA-256 大写十六进制。与 edge-tts 官方算法一致。
+ * Generate the Sec-MS-GEC token: .NET ticks (100 ns intervals since 1601) rounded down
+ * to the nearest 300-second boundary, concatenated with the trusted client token,
+ * then SHA-256 hashed as uppercase hex. Matches the official edge-tts algorithm.
  */
 async function secMsGec(): Promise<string> {
   let ticks = (Math.floor(Date.now() / 1000) + 11644473600) * 10_000_000;
-  ticks -= ticks % 3_000_000_000; // 300s = 3e9 个 100ns
+  ticks -= ticks % 3_000_000_000; // 300 s = 3e9 × 100 ns
   return sha256Upper(`${ticks}${TRUSTED_CLIENT_TOKEN}`);
 }
 
@@ -91,8 +98,9 @@ function tsString(): string {
 }
 
 /**
- * 用微软 Edge 免费在线 TTS 合成一段语音，返回 mp3 字节（audio-24khz-48kbitrate-mono-mp3）。
- * 失败（网络/403/超时/空音频）会抛错；调用方应捕获后优雅降级（合成可只留字幕）。
+ * Synthesize speech using Microsoft Edge's free online TTS and return the mp3 bytes
+ * (audio-24khz-48kbitrate-mono-mp3). Throws on failure (network / 403 / timeout / empty audio);
+ * callers should catch and gracefully degrade (e.g. produce subtitles only).
  */
 export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}): Promise<Buffer> {
   if (typeof WebSocket === "undefined") {
@@ -111,8 +119,8 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
     `${WSS_BASE}?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}` +
     `&Sec-MS-GEC=${gec}&Sec-MS-GEC-Version=${SEC_MS_GEC_VERSION}&ConnectionId=${uuidNoDash()}`;
 
-  // Node 的全局 WebSocket(undici) 支持非标准 headers 选项；带上 UA/Origin/muid 更稳
-  // （muid 随机 cookie 是新版 edge-tts 端口对部分风控的兜底，便宜的保险）
+  // Node's global WebSocket (undici) accepts a non-standard headers option; sending UA/Origin/muid improves stability.
+  // (The random muid cookie is a cheap safety net against some rate-limiting checks in newer edge-tts endpoints.)
   const muid = Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
@@ -136,7 +144,7 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      try { ws.close(); } catch { /* 忽略关闭异常 */ }
+      try { ws.close(); } catch { /* ignore close errors */ }
       fn();
     };
     const timer = setTimeout(() => finish(() => reject(new Error("Edge TTS 超时"))), timeoutMs);
@@ -146,7 +154,7 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
         `X-Timestamp:${tsString()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
         `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`;
       ws.send(cfg);
-      // voice/pitch/rate 同样转义：它们落在单引号 SSML 属性里，未转义的 ' 可越界注入 SSML（防御纵深，兜底所有调用方）
+      // voice/pitch/rate are also escaped: they appear inside single-quoted SSML attributes, so an unescaped ' could break out and inject SSML (defense-in-depth, covers all callers)
       const ssml =
         `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='zh-CN'>` +
         `<voice name='${escapeSsml(voice)}'><prosody pitch='${escapeSsml(pitch)}' rate='${escapeSsml(rate)}' volume='+0%'>${escapeSsml(clean)}</prosody></voice></speak>`;
@@ -163,7 +171,7 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
           finish(() => (chunks.length ? resolve(Buffer.concat(chunks)) : reject(new Error("Edge TTS 未返回音频"))));
         }
       } else {
-        // 二进制帧：前 2 字节大端 = header 长度；header 含 Path:audio 时其后为音频
+        // Binary frame: first 2 bytes big-endian = header length; payload after header is audio when header contains Path:audio
         const buf = Buffer.from(data as ArrayBuffer);
         if (buf.length < 2) return;
         const headerLen = buf.readUInt16BE(0);
@@ -174,7 +182,7 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
 
     ws.onerror = () => finish(() => reject(new Error("Edge TTS 连接失败（可能是网络或令牌版本过期）")));
     ws.onclose = (ev: CloseEvent) => {
-      // 正常结束时一般已在 turn.end 处 resolve；此处兜底
+      // On a clean close the promise is usually already resolved at turn.end; this is the fallback
       finish(() => (chunks.length ? resolve(Buffer.concat(chunks)) : reject(new Error(`Edge TTS 连接关闭(code=${ev?.code ?? "?"})`))));
     };
   });

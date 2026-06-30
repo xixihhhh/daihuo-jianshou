@@ -1,6 +1,6 @@
 /**
- * 食品零食品类脚本模板
- * 包含经典爆款脚本结构，适用于零食、饮品、预制菜、调味料等
+ * Food & snacks category script templates
+ * Classic viral script structures for snacks, beverages, ready meals, condiments, etc.
  */
 
 import type { Shot } from "@/lib/db/schema";
@@ -102,7 +102,7 @@ export const foodTemplates: ScriptTemplate[] = [
   },
 ];
 
-/** 食品品类特有的 prompt 指令 */
+/** Prompt directive specific to the food category */
 export const foodPromptDirective = `
 你正在为【食品零食】品类创作短视频带货脚本。请注意以下要点：
 1. 食欲感是第一要义：画面描述中要突出色泽、蒸汽、汁水、质地等细节

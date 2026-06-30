@@ -1,8 +1,9 @@
 /**
- * 极简熔断器（无依赖、可单测）。
- * 连续失败达阈值即「打开」，冷却期内 isOpen() 为真——调用方据此 fail-fast，
- * 避免下游挂掉时每个请求都各自超时拖垮整批。一次成功即复位；冷却期后自动半开重试。
- * 注入 `now` 便于测冷却（默认 Date.now）。
+ * Minimal circuit breaker (no dependencies, unit-testable).
+ * Opens when consecutive failures reach the threshold; while open, isOpen() returns true so callers
+ * can fail-fast and avoid every request individually timing out when a downstream service is down.
+ * A single success resets the breaker; after the cooldown period it automatically half-opens for retry.
+ * `now` is injectable for testing the cooldown behavior (defaults to Date.now).
  */
 export class CircuitBreaker {
   private fails = 0;

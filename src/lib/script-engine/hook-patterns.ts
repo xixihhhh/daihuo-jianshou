@@ -1,29 +1,30 @@
 /**
- * 黄金3秒钩子模式库（带货语境）。
+ * Golden-3-second hook pattern library (e-commerce context).
  *
- * 把「钩子」当成一个 3 秒留人结构、而非一句俏皮话：
- *   0–1s 截停拇指 → 1–3s 证明相关 → 3–7s 接到产品；并按品类优选机制、标注慎用场景。
+ * Treat a "hook" as a 3-second retention structure, not just a catchy line:
+ *   0–1s stop the thumb → 1–3s prove relevance → 3–7s bridge to product;
+ *   patterns are ranked by category preference and annotated with caution notes.
  *
- * 纯数据 + 选择/渲染函数，可单测；由 script-engine prompts 注入 LLM。
+ * Pure data + selection/render functions, unit-testable; injected into the LLM via script-engine prompts.
  */
 import { categoryNameMap, type ProductCategory } from "./templates";
 
 export interface HookPattern {
   id: string;
   name: string;
-  /** 0–1s 怎么截停拇指 */
+  /** 0–1s: how to stop the thumb */
   stop: string;
-  /** 1–3s 怎么证明和观众相关 */
+  /** 1–3s: how to prove relevance to the viewer */
   prove: string;
-  /** 3–7s 怎么自然接到产品 */
+  /** 3–7s: how to naturally bridge to the product */
   bridge: string;
-  /** 唤醒度：high 更抓人但更易翻车 */
+  /** arousal level: high is more attention-grabbing but riskier */
   arousal: "high" | "mid";
-  /** 强势品类（命中则优先）；省略=通用 */
+  /** strong-fit categories (matched entries take priority); omit = universal */
   categories?: ProductCategory[];
-  /** 慎用场景（避免硬套翻车） */
+  /** situations to avoid (prevents awkward forced fits) */
   avoidWhen?: string;
-  /** 原创示例文案 */
+  /** original example copy */
   example: string;
 }
 
@@ -137,7 +138,7 @@ export const HOOK_PATTERNS: HookPattern[] = [
   },
 ];
 
-/** 按品类优选钩子机制：命中该品类的卡片优先，再补通用卡片，去重取前 n */
+/** Category-preference hook selection: matched-category patterns first, then universal ones; deduplicated, top n returned */
 export function selectHookPatterns(category: ProductCategory, n = 5): HookPattern[] {
   const matched = HOOK_PATTERNS.filter((p) => p.categories?.includes(category));
   const universal = HOOK_PATTERNS.filter((p) => !p.categories);
@@ -152,7 +153,7 @@ export function selectHookPatterns(category: ProductCategory, n = 5): HookPatter
   return out;
 }
 
-/** 渲染成注入 LLM 的「三拍结构 + 品类优选机制」提示片段 */
+/** Renders into a "three-beat structure + category-preference" prompt snippet for LLM injection */
 export function buildHookGuidance(category: ProductCategory, n = 5): string {
   const patterns = selectHookPatterns(category, n);
   const cards = patterns

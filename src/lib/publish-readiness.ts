@@ -1,9 +1,11 @@
 /**
- * 发布前「限流自检」体检 —— 出片前对脚本做一次有据可循的逐项检查（违禁词 / 钩子 / 时长 /
- * 字幕可读性 / 行动号召 / 带货三段式 / AIGC 标签），每项给 ✓⚠✗ + 具体可操作改法。
+ * Pre-publish "throttle-risk" health check — runs a traceable, item-by-item check on the script before rendering
+ * (banned words / hook / duration / subtitle readability / call to action / e-commerce three-act structure / AIGC label),
+ * giving a pass/warn/fail result plus concrete, actionable advice for each item.
  *
- * 刻意不打「73 分」这种假精确分数：带货能不能爆受太多外部因素影响，谎报一个数字是误导。
- * 这里只做「有据可循、能照着改」的体检项。纯函数、可单测；UI 在脚本页展示。
+ * Deliberately avoids fake-precise scores like "73 points": whether a commerce video goes viral depends on too many external
+ * factors — reporting a number would be misleading. Only evidence-based, actionable check items are included.
+ * Pure function, unit-testable; displayed on the script page in the UI.
  */
 import { checkScriptCompliance } from "./ad-compliance";
 import type { Shot } from "./db/schema";
@@ -22,28 +24,28 @@ export interface ReadinessReport {
   pass: number;
   warn: number;
   fail: number;
-  /** 整体就绪度：有 fail=needsWork（建议改），仅 warn=risky（有风险），全 pass=ready */
+  /** Overall readiness: any fail → needsWork (fix recommended); only warns → risky; all pass → ready */
   overall: "ready" | "risky" | "needsWork";
 }
 
 export interface ReadinessOptions {
-  /** 是否会烧录 AIGC 合规标签；undefined 表示不检该项 */
+  /** Whether the AIGC compliance label will be burned in; undefined means skip this check */
   aigcLabel?: boolean;
   locale?: "zh" | "en";
 }
 
-// 带货时长甜区（秒）：太短信息不足促单，太长完播率掉
+// E-commerce duration sweet spot (seconds): too short = insufficient info to drive purchase; too long = completion rate drops
 const DUR_MIN = 15;
 const DUR_SWEET_HI = 45;
 const DUR_MAX = 60;
-// 开场钩子：黄金 3 秒，留 1s 余量到 4s 才告警
+// Opening hook: golden 3-second window, with 1s tolerance — warn at 4s
 const HOOK_MAX_SEC = 4;
-// 字幕可读速度上限（CJK 字/秒），超了读不完
+// Maximum subtitle reading speed (CJK chars/second); exceeding this makes subtitles unreadable
 const READ_CPS = 9;
 
-// 钩子信号：疑问 / 数字 / 痛点 / 反差，任一即算「有钩子」
+// Hook signals: question / number / pain-point / contrast — any one qualifies as "has a hook"
 const HOOK_SIGNAL = /[?？!！]|\d|别再|还在|总是|为什么|怎么|居然|竟然|没想到|原来|你知道|千万别|后悔|踩雷|谁懂|绝了/;
-// 行动号召信号
+// Call-to-action signals
 const CTA_SIGNAL = /小黄车|下方|点击|购买|带走|链接|加购|抢|下单|橱窗|入手|戳|领|tap|link|buy|shop|cart|grab/i;
 
 const cjkLen = (s: string) => Array.from((s || "").replace(/\s+/g, "")).length;
@@ -57,7 +59,7 @@ export function checkPublishReadiness(
   const items: ReadinessItem[] = [];
   const push = (key: CheckKey, status: CheckStatus, message: string) => items.push({ key, status, message });
 
-  // 1) 广告法 / 违禁词
+  // 1) Ad-law / banned words
   const violations = checkScriptCompliance(shots);
   if (violations.length === 0) {
     push("compliance", "pass", en ? "No ad-law risk words" : "无广告法风险词");
@@ -72,7 +74,7 @@ export function checkPublishReadiness(
     );
   }
 
-  // 2) 开场钩子
+  // 2) Opening hook
   const hook = shots.find((s) => s.type === "hook") ?? shots[0];
   if (!hook || !(hook.voiceover || "").trim()) {
     push("hook", "fail", en ? "Missing opening hook (shot 1 should be a hook with voiceover)" : "缺开场钩子（第 1 镜应是 hook，且要有口播）");
@@ -84,7 +86,7 @@ export function checkPublishReadiness(
     push("hook", "pass", en ? "Opening hook is short and punchy" : "开场钩子够短够冲");
   }
 
-  // 3) 时长甜区
+  // 3) Duration sweet spot
   const d = Math.round(totalDuration);
   if (d < DUR_MIN) {
     push("duration", "warn", en ? `Total ${d}s is short — may not be enough to drive a purchase` : `总时长 ${d}s 偏短——信息可能不足以促单`);
@@ -95,7 +97,7 @@ export function checkPublishReadiness(
     push("duration", "pass", en ? `Total ${d}s is in the e-commerce sweet spot${note}` : `总时长 ${d}s 在带货甜区${note}`);
   }
 
-  // 4) 字幕可读性：逐镜口播字数 / 时长，超阅读速度即过密
+  // 4) Subtitle readability: check each shot's voiceover character count / duration; flag if reading speed is exceeded
   const dense = shots
     .filter((s) => s.duration > 0 && cjkLen(s.voiceover) / s.duration > READ_CPS)
     .map((s) => s.shotId);
@@ -111,7 +113,7 @@ export function checkPublishReadiness(
     );
   }
 
-  // 5) 行动号召
+  // 5) Call to action
   const hasCtaShot = shots.some((s) => s.type === "cta");
   const hasCtaWords = shots.some((s) => CTA_SIGNAL.test(s.voiceover || "") || CTA_SIGNAL.test(s.textOverlay?.text || ""));
   if (hasCtaShot || hasCtaWords) {
@@ -120,7 +122,7 @@ export function checkPublishReadiness(
     push("cta", "warn", en ? "No clear call to action (e.g. 'tap the cart below') — hurts conversion" : "缺明确行动号召（如「点下方小黄车」）——转化会打折");
   }
 
-  // 6) 带货三段式：钩子 → 展示/演示 → 号召
+  // 6) E-commerce three-act structure: hook → reveal/demo → CTA
   const types = new Set(shots.map((s) => s.type));
   const missing: string[] = [];
   if (!types.has("hook")) missing.push(en ? "hook" : "钩子");
@@ -138,7 +140,7 @@ export function checkPublishReadiness(
     );
   }
 
-  // 7) AIGC 合规标签（仅在调用方告知开关状态时检）
+  // 7) AIGC compliance label (only checked when the caller provides the toggle state)
   if (opts.aigcLabel === true) {
     push("aigc", "pass", en ? "AIGC compliance label is on" : "已开 AIGC 合规标签");
   } else if (opts.aigcLabel === false) {

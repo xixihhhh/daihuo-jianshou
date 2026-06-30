@@ -1,6 +1,6 @@
 /**
- * 各带货平台的成片规格 —— 多平台导出（重编码到目标比例）的单一事实来源。
- * 抖音 / 快手 / TikTok Shop 为 9:16 竖屏；小红书偏好 3:4。纯数据 + 取值函数，可单测。
+ * Final video specs for each e-commerce platform — single source of truth for multi-platform export (re-encode to target aspect ratio).
+ * Douyin / Kuaishou / TikTok Shop use 9:16 portrait; Xiaohongshu prefers 3:4. Pure data + accessor, unit-testable.
  */
 
 export interface PlatformSpec {
@@ -17,7 +17,7 @@ export const PLATFORM_SPECS: Record<string, PlatformSpec> = {
   tiktok: { name: "TikTok Shop", w: 1080, h: 1920, ratio: "9:16" },
 };
 
-/** 取某平台规格；未知平台返回 undefined。 */
+/** Get the spec for a given platform; returns undefined for unknown platforms. */
 export function getPlatformSpec(platform: string): PlatformSpec | undefined {
   return PLATFORM_SPECS[platform];
 }

@@ -7,8 +7,9 @@ import { splitNarrationIntoShots } from "@/lib/script-import";
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
 
 /**
- * POST /api/project/[id]/import-script —— 用用户自己写好的脚本/旁白直接成片（不经 AI 生成）。
- * 把整段文案按句切成分镜、估算时长，存为当前选中脚本；之后照常自动配画面（或配本地自有素材）+ 配音 + 合成。
+ * POST /api/project/[id]/import-script — Produce a video directly from a user-written script/narration (no AI generation step).
+ * Splits the full copy into shots sentence-by-sentence with estimated durations and saves it as the currently selected script;
+ * then proceeds normally: auto-match visuals (or use local assets) + voiceover + compose.
  * body: { script: string, title?: string }
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     body = await req.json();
   } catch {
-    /* 允许空 body，下面校验 */
+    /* allow empty body; validated below */
   }
   const text = typeof body.script === "string" ? body.script.trim() : "";
   if (text.length < 2) return NextResponse.json({ error: "请提供脚本文案" }, { status: 400 });
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!shots.length) return NextResponse.json({ error: "脚本无法切分出分镜（缺少有效文案）" }, { status: 422 });
   const totalDuration = shots.reduce((sum, s) => sum + s.duration, 0);
 
-  // 取下一个版本号；把旧脚本取消选中，新导入脚本设为当前选中
+  // Get the next version number; deselect old scripts and mark the newly imported script as current
   const [latest] = await db
     .select({ version: scriptsTable.version })
     .from(scriptsTable)

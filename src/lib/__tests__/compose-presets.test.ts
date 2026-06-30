@@ -61,9 +61,9 @@ describe("recommendPreset（内容自适应档位）", () => {
     expect(recommendPreset({ shotCount: 2, totalDuration: 12 }).preset).toBe("fast");
   });
   it("长片/多分镜/多 i2v → hd", () => {
-    expect(recommendPreset({ shotCount: 3, totalDuration: 45 }).preset).toBe("hd"); // 长
-    expect(recommendPreset({ shotCount: 7, totalDuration: 20 }).preset).toBe("hd"); // 多分镜
-    expect(recommendPreset({ shotCount: 3, totalDuration: 20, i2vCount: 3 }).preset).toBe("hd"); // 多 i2v
+    expect(recommendPreset({ shotCount: 3, totalDuration: 45 }).preset).toBe("hd"); // long duration
+    expect(recommendPreset({ shotCount: 7, totalDuration: 20 }).preset).toBe("hd"); // many shots
+    expect(recommendPreset({ shotCount: 3, totalDuration: 20, i2vCount: 3 }).preset).toBe("hd"); // many i2v
   });
   it("常规 → standard", () => {
     expect(recommendPreset({ shotCount: 4, totalDuration: 25 }).preset).toBe("standard");

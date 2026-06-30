@@ -1,16 +1,19 @@
 /**
- * 商品链接一键 ingest —— 贴一个商品页 URL，自动抽取「标题 / 价格 / 描述 / 商品图」。
+ * One-click product URL ingest — paste a product page URL and automatically extract
+ * title / price / description / product images.
  *
- * 这是 2026 带货工作流的标准入口（Creatify/即创/Pippit 都以「贴商品链接」而非「写提示词」起步）。
- * 抽取优先级：JSON-LD(schema.org Product) > OpenGraph > Twitter Card > <title>/<meta description>。
- * 纯函数（解析与网络分离），可单测；下游交给现有 analyzeProduct + 脚本引擎提炼卖点。
+ * This is the standard entry point for the 2026 e-commerce workflow
+ * (Creatify / JiChuang / Pippit all start with "paste a product URL" rather than "write a prompt").
+ * Extraction priority: JSON-LD (schema.org Product) > OpenGraph > Twitter Card > <title>/<meta description>.
+ * Pure functions (parsing decoupled from network), unit-testable;
+ * downstream hands off to the existing analyzeProduct + script engine for selling-point extraction.
  */
 
 export interface ProductIngest {
   title: string;
   priceText?: string;
   description?: string;
-  images: string[]; // 绝对 URL，已去重
+  images: string[]; // absolute URLs, deduplicated
   sourceUrl: string;
 }
 
@@ -21,9 +24,11 @@ const CURRENCY_SYMBOL: Record<string, string> = {
 const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 
 /**
- * 解码常见 HTML 实体（meta content 里常见 &amp; &#39; 等）。
- * 单趟扫描、每个实体只解一次：链式 replace 会把先还原出的 `&` 再当下一条规则的实体二次解码
- * （如 `&amp;#39;` 本应保留为字面 `&#39;`，链式会错解成 `'`），单趟回调可杜绝。
+ * Decode common HTML entities (e.g. &amp; &#39; frequently found in meta content).
+ * Single-pass scan, each entity decoded exactly once: chained replace() calls would re-interpret
+ * the `&` produced by an earlier replacement as the start of the next entity pattern
+ * (e.g. `&amp;#39;` should remain as the literal `&#39;`, but chaining would wrongly decode it to `'`);
+ * a single-pass callback prevents this.
  */
 export function decodeEntities(s: string): string {
   return s
@@ -43,9 +48,10 @@ function escapeRe(s: string): string {
 }
 
 /**
- * 取某个 meta（property 或 name）的 content，兼容属性顺序两种写法。
- * content 用「开引号反向引用」匹配收尾（(["'])((?:(?!\1).)*)\1），而非 [^"']*——
- * 否则 content="Tom's Mug" 这类内部含另一种引号的会在撇号处被腰斩。content 落在捕获组 2。
+ * Get the content of a meta tag (by property or name), handling both attribute orderings.
+ * content is matched with a backreference to its opening quote: (["'])((?:(?!\1).)*)\1
+ * rather than [^"']* — otherwise content="Tom's Mug" would be cut off at the apostrophe.
+ * The content value lands in capture group 2.
  */
 export function getMeta(html: string, keys: string[]): string | undefined {
   for (const key of keys) {
@@ -58,7 +64,7 @@ export function getMeta(html: string, keys: string[]): string | undefined {
   return undefined;
 }
 
-/** 把可能相对的 URL 解析为绝对 URL；失败返回原值 */
+/** Resolve a potentially relative URL to an absolute URL; returns the original value on failure */
 export function toAbsolute(url: string, base: string): string {
   try {
     return new URL(url, base).href;
@@ -85,7 +91,7 @@ function findProductNode(data: any): any | undefined {
   return undefined;
 }
 
-/** 从 JSON-LD script 块里找 schema.org Product 节点 */
+/** Find the schema.org Product node inside JSON-LD script blocks */
 export function extractJsonLdProduct(html: string): any | undefined {
   const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let m: RegExpExecArray | null;
@@ -94,26 +100,28 @@ export function extractJsonLdProduct(html: string): any | undefined {
       const node = findProductNode(JSON.parse(m[1].trim()));
       if (node) return node;
     } catch {
-      /* 单个块非法 JSON 则跳过 */
+      /* skip blocks with invalid JSON */
     }
   }
   return undefined;
 }
 
 /**
- * 价格格式化：拼货币符号前先判 price 是否已自带符号/字母币种（避免 $$19.99），
- * 并把 0 / 负数 / 非数视为无效（避免产出无意义的「$0」）。jsonLd 与 OG 两路共用。
+ * Price formatting: check whether price already contains a currency symbol or alphabetic currency code
+ * before prepending one (to avoid double-prefixing like $$19.99);
+ * treat 0 / negative / non-numeric values as invalid (to avoid emitting meaningless "$0").
+ * Shared by both the JSON-LD and OpenGraph extraction paths.
  */
 function formatPrice(price: unknown, currency: string | undefined): string | undefined {
   if (price == null) return undefined;
   const raw = String(price).trim();
   if (!raw) return undefined;
-  // 纯数字的 0/负数直接判无效；带符号串（$0 等）再按提取的数值判
+  // pure numeric 0/negative values are immediately invalid; symbol-prefixed strings (e.g. $0) are checked by parsed numeric value
   const asNum = Number(raw);
   if (Number.isFinite(asNum) && asNum <= 0) return undefined;
   const numeric = parseFloat(raw.replace(/[^\d.]/g, ""));
   if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
-  // 已含货币符号或「USD 」类字母币种前缀 → 原样返回，不再重复加符号
+  // already contains a currency symbol or an alphabetic currency prefix like "USD " — return as-is without adding another
   if (/[¥$€£₩]/.test(raw) || /^[A-Za-z]{2,3}[\s ]/.test(raw)) return raw;
   const cur = (currency || "").toUpperCase();
   const sym = CURRENCY_SYMBOL[cur] ?? (cur ? `${cur} ` : "");
@@ -134,13 +142,13 @@ function jsonLdImages(node: any): string[] {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-// ==================== 主解析 ====================
+// ==================== Main parsing ====================
 
-/** 从商品页 HTML 解析出商品信息（JSON-LD 优先，OG/Twitter/title 兜底） */
+/** Parse product info from a product page HTML (JSON-LD first, OG/Twitter/title as fallback) */
 export function parseProductFromHtml(html: string, baseUrl: string): ProductIngest {
   const ld = extractJsonLdProduct(html);
 
-  // 标题
+  // title
   const titleTag = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
   const title =
     (ld?.name && decodeEntities(String(ld.name))) ||
@@ -148,17 +156,17 @@ export function parseProductFromHtml(html: string, baseUrl: string): ProductInge
     (titleTag && decodeEntities(titleTag)) ||
     "";
 
-  // 价格
+  // price
   const ogPrice = getMeta(html, ["product:price:amount", "og:price:amount"]);
   const ogCur = getMeta(html, ["product:price:currency", "og:price:currency"]);
   const priceText = (ld && jsonLdPrice(ld)) || formatPrice(ogPrice, ogCur);
 
-  // 描述
+  // description
   const description =
     (ld?.description && decodeEntities(String(ld.description))) ||
     getMeta(html, ["og:description", "twitter:description", "description"]);
 
-  // 图片：JSON-LD + OG + Twitter，全部转绝对、去重、取前若干
+  // images: JSON-LD + OG + Twitter, all converted to absolute URLs, deduplicated
   const raw: string[] = [
     ...jsonLdImages(ld ?? {}),
     ...(getMeta(html, ["og:image", "og:image:secure_url"]) ? [getMeta(html, ["og:image", "og:image:secure_url"])!] : []),

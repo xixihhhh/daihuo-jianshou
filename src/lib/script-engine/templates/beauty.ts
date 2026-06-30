@@ -1,21 +1,21 @@
 /**
- * 美妆护肤品类脚本模板
- * 包含经典爆款脚本结构，适用于护肤品、彩妆、美容仪器等
+ * Beauty & skincare category script templates
+ * Classic viral script structures for skincare, makeup, beauty devices, etc.
  */
 
 import type { Shot } from "@/lib/db/schema";
 
-/** 美妆品类脚本模板结构 */
+/** Script template structure for the beauty category */
 export interface ScriptTemplate {
-  /** 模板名称 */
+  /** template name */
   name: string;
-  /** 模板描述 */
+  /** template description */
   description: string;
-  /** 适用场景 */
+  /** applicable product types */
   suitableFor: string[];
-  /** 分镜结构（不含具体文案，作为骨架） */
+  /** shot structure skeleton (no concrete copy) */
   shotStructure: Array<Pick<Shot, "type" | "duration" | "camera" | "transition">>;
-  /** 参考脚本示例（用于 few-shot prompt） */
+  /** reference script example (used for few-shot prompting) */
   example: string;
 }
 
@@ -96,7 +96,7 @@ export const beautyTemplates: ScriptTemplate[] = [
   },
 ];
 
-/** 美妆品类特有的 prompt 指令 */
+/** Prompt directive specific to the beauty category */
 export const beautyPromptDirective = `
 你正在为【美妆护肤】品类创作短视频带货脚本。请注意以下要点：
 1. 视觉冲击力是核心：妆前妆后对比、质地特写、颜色展示是关键画面

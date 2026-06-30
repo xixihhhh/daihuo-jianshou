@@ -1,30 +1,30 @@
 /**
- * Openverse 素材源（api.openverse.org，WordPress 维护）—— 多源素材引擎的「免 Key」源
+ * Openverse media source (api.openverse.org, maintained by WordPress) — the "no API key" source in the multi-provider media engine
  *
- * 最大价值：检索完全免 Key（匿名即可），覆盖 CC 授权「图片 + 音乐/音效」，是新手零配置首选。
- * 限制：无视频端点；匿名限额 20/min·200/day（量产可选配 OAuth2 token 提额）。
- * 合规：CC 聚合源授权不一，带货=商用，检索强制 license_type=commercial 过滤掉 NC；
- *       归一化保留 license/licenseUrl/attributionText，导出生成 credits。
+ * Primary value: fully key-free search (anonymous access), covering CC-licensed images + music/sound effects — ideal out-of-the-box for new users.
+ * Limitations: no video endpoint; anonymous quota is 20/min · 200/day (OAuth2 token can be configured for higher limits in production).
+ * Compliance: CC-aggregated sources have mixed licenses; since e-commerce = commercial use, searches enforce license_type=commercial to exclude NC licenses;
+ *             normalized output retains license/licenseUrl/attributionText so export can generate credits.
  */
 
 import { type StockCandidate, fetchWithTimeout } from "./stock-types";
 
 const OPENVERSE_API = "https://api.openverse.org/v1";
 
-// ==================== 原始响应类型 ====================
+// ==================== raw response types ====================
 
 export interface OpenverseImage {
   id: string;
   title?: string;
-  url: string; // 媒体直链/原图
-  thumbnail?: string; // 代理缩略图
+  url: string; // direct media URL / original image
+  thumbnail?: string; // proxied thumbnail
   creator?: string;
   creator_url?: string;
-  foreign_landing_url?: string; // 原站详情页
-  license: string; // 如 "by-nc"
+  foreign_landing_url?: string; // original site detail page
+  license: string; // e.g. "by-nc"
   license_version?: string;
   license_url?: string;
-  attribution?: string; // 官方已拼好的署名文本
+  attribution?: string; // pre-formatted attribution text provided by Openverse
   width?: number;
   height?: number;
 }
@@ -41,24 +41,24 @@ export interface OpenverseAudio {
   license_version?: string;
   license_url?: string;
   attribution?: string;
-  duration?: number; // 毫秒
+  duration?: number; // milliseconds
   alt_files?: Array<{ url: string; bit_rate?: number; filetype?: string }>;
 }
 
-// ==================== 纯函数（可单测） ====================
+// ==================== pure functions (unit-testable) ====================
 
-/** CC0 / 公共领域标记无需署名；其余（BY 系）需署名 */
+/** CC0 / public-domain marks require no attribution; everything else (BY family) does */
 export function ccRequiresAttribution(license: string): boolean {
   const l = license.toLowerCase();
   return !(l === "cc0" || l === "pdm");
 }
 
-/** 组合 license 显示值，如 "by-2.0" */
+/** Compose a license display string, e.g. "by-2.0" */
 export function composeLicense(license: string, version?: string): string {
   return version ? `${license}-${version}` : license;
 }
 
-/** 把 Openverse 图片归一化为候选；无直链则返回 null（过滤掉，避免下载崩该分镜） */
+/** Normalize an Openverse image into a candidate; returns null if there is no direct URL (filtered out to prevent a failing download from crashing the clip) */
 export function toOpenverseImageCandidate(img: OpenverseImage): StockCandidate | null {
   if (!img.url) return null;
   return {
@@ -79,13 +79,13 @@ export function toOpenverseImageCandidate(img: OpenverseImage): StockCandidate |
   };
 }
 
-/** 把 Openverse 音频归一化为候选（取最高码率 alt_files，否则 url；时长毫秒→秒） */
+/** Normalize an Openverse audio track into a candidate (picks the highest-bitrate alt_files entry, falls back to url; duration converted from ms to seconds) */
 export function toOpenverseAudioCandidate(a: OpenverseAudio): StockCandidate | null {
   const best =
     (a.alt_files || [])
       .slice()
       .sort((x, y) => (y.bit_rate ?? 0) - (x.bit_rate ?? 0))[0]?.url || a.url;
-  if (!best) return null; // 无可用直链 → 跳过，避免后续 undefined 下载崩该分镜
+  if (!best) return null; // no usable direct URL → skip to avoid an undefined download crashing the clip
   return {
     source: "openverse",
     mediaType: "audio",
@@ -103,16 +103,16 @@ export function toOpenverseAudioCandidate(a: OpenverseAudio): StockCandidate | n
   };
 }
 
-// ==================== 网络函数 ====================
+// ==================== network functions ====================
 
-/** 可选 Bearer token（提额用，非必须） */
+/** Optional Bearer token (used to increase rate limits; not required) */
 function authHeaders(token?: string): HeadersInit {
   const h: Record<string, string> = { "User-Agent": "daihuo-jianshou/1.0 (stock media)" };
   if (token) h.Authorization = `Bearer ${token}`;
   return h;
 }
 
-/** 搜索 Openverse 图片（默认只取可商用，过滤 NC） */
+/** Search Openverse images (commercial-use only by default; NC licenses filtered out) */
 export async function searchOpenverseImages(
   query: string,
   opts: { token?: string; perPage?: number; commercialOnly?: boolean } = {}
@@ -138,7 +138,7 @@ export async function searchOpenverseImages(
     .filter((c): c is StockCandidate => c !== null);
 }
 
-/** 搜索 Openverse 音频（音乐/音效，默认可商用） */
+/** Search Openverse audio (music/sound effects; commercial-use only by default) */
 export async function searchOpenverseAudio(
   query: string,
   opts: { token?: string; perPage?: number; commercialOnly?: boolean; category?: "music" | "sound_effect" } = {}

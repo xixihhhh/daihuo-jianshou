@@ -5,9 +5,9 @@ import { join } from "path";
 import { classifyMaterial } from "@/lib/providers/local-stock";
 
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
-/** 单文件上限 80MB（视频较大，与素材下载上限一致） */
+/** Single-file size limit: 80 MB (videos can be large; matches the asset-download limit) */
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
-/** 允许的视频/图片 MIME 白名单 */
+/** Allowlist of accepted video/image MIME types */
 const ALLOWED_MIME = new Set([
   "video/mp4",
   "video/webm",
@@ -17,12 +17,12 @@ const ALLOWED_MIME = new Set([
   "image/webp",
 ]);
 
-/** 项目本地素材池目录：uploads/{id}/materials/ */
+/** Project-local material pool directory: uploads/{id}/materials/ */
 function materialsDir(projectId: string) {
   return join(getDataDir(), "uploads", projectId, "materials");
 }
 
-/** GET /api/project/[id]/materials —— 列出该项目本地素材池（自带 B-roll） */
+/** GET /api/project/[id]/materials —— list the project's local material pool (built-in B-roll) */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return NextResponse.json({ error: "无效的项目ID" }, { status: 400 });
@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   try {
     names = await readdir(materialsDir(id));
   } catch {
-    /* 无目录 = 空池 */
+    /* no directory = empty pool */
   }
   const materials = names
     .map((name) => ({ name, mediaType: classifyMaterial(name) }))
@@ -40,9 +40,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 /**
- * POST /api/project/[id]/materials —— 上传自有视频/图片 B-roll 到本地素材池。
- * 用自拍/自有素材配画面：上传到项目素材池，免网络免 Key。
- * multipart：files=<File[]>。落到 uploads/{id}/materials/，文件名重命名（不用原名，防安全问题）。
+ * POST /api/project/[id]/materials —— upload user-owned video/image B-roll to the local material pool.
+ * Use self-shot or personally owned footage for scene visuals: uploaded to the project pool, no network or API key needed.
+ * multipart: files=<File[]>. Written to uploads/{id}/materials/ with renamed filenames (original names not used to avoid security issues).
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!ALLOWED_MIME.has(file.type)) {
       return NextResponse.json({ error: `文件 ${file.name} 类型不支持，仅允许 mp4/webm/mov 视频或 jpg/png/webp 图片` }, { status: 400 });
     }
-    const rawName = file.name.replace(/[/\\]/g, ""); // 去路径分隔符
+    const rawName = file.name.replace(/[/\\]/g, ""); // strip path separators
     const mediaType = classifyMaterial(rawName);
     if (!mediaType) return NextResponse.json({ error: `文件 ${file.name} 扩展名不支持` }, { status: 400 });
 

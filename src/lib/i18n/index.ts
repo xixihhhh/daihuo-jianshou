@@ -1,23 +1,23 @@
 "use client";
 
 /**
- * 轻量级前端国际化（零依赖）。
+ * Lightweight frontend i18n (zero dependencies).
  *
- * 语言存于 zustand settings store（localStorage 持久化），中文为默认。
- * 用法：`const t = useT("home"); <h1>{t("title")}</h1>`，缺词时回退到默认语言再回退到 key。
- * 支持插值：`t("count", { n: 3 })` 对应词条 "共 {n} 个"。
+ * The locale is stored in the zustand settings store (persisted in localStorage); Chinese is the default.
+ * Usage: `const t = useT("home"); <h1>{t("title")}</h1>` — missing keys fall back to the default locale, then to the key itself.
+ * Supports interpolation: `t("count", { n: 3 })` matches an entry like "total: {n} items".
  */
 
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { DEFAULT_LOCALE, type Locale } from "./config";
 import { messages } from "./messages";
 
-/** 读取当前界面语言 */
+/** Returns the current UI locale */
 export function useLocale(): Locale {
   return useSettingsStore((s) => s.locale);
 }
 
-/** 设置界面语言 */
+/** Returns a setter for the UI locale */
 export function useSetLocale(): (locale: Locale) => void {
   return useSettingsStore((s) => s.setLocale);
 }
@@ -30,8 +30,8 @@ function interpolate(tpl: string, vars?: Vars): string {
 }
 
 /**
- * 取某命名空间的翻译函数。
- * @param namespace 词条命名空间（一般对应一个页面，如 "home" / "settings"）
+ * Returns a translation function scoped to the given namespace.
+ * @param namespace Message namespace (typically corresponds to a page, e.g. "home" / "settings")
  */
 export function useT(namespace: string): (key: string, vars?: Vars) => string {
   const locale = useLocale();

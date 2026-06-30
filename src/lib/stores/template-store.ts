@@ -2,39 +2,39 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Shot } from "@/lib/db/schema";
 
-/** 脚本模板 */
+/** Script template */
 export interface ScriptTemplate {
   id: string;
-  /** 模板名称 */
+  /** Template name */
   name: string;
-  /** 模板描述 */
+  /** Template description */
   description?: string;
-  /** 适用品类 */
+  /** Applicable category */
   category?: string;
-  /** 适用视频模式 */
+  /** Applicable video mode */
   videoMode?: string;
-  /** 脚本风格 */
+  /** Script style */
   styleType?: string;
-  /** 脚本结构 */
+  /** Script structure */
   shots: Shot[];
-  /** 总时长 */
+  /** Total duration */
   totalDuration?: number;
-  /** 来源项目ID */
+  /** Source project ID */
   sourceProjectId?: string;
-  /** 使用次数 */
+  /** Usage count */
   useCount: number;
-  /** 创建时间 */
+  /** Creation time */
   createdAt: Date;
 }
 
 interface TemplateState {
-  /** 已保存的模板列表 */
+  /** List of saved templates */
   templates: ScriptTemplate[];
-  /** 添加模板 */
+  /** Add a template */
   addTemplate: (template: ScriptTemplate) => void;
-  /** 删除模板 */
+  /** Remove a template */
   removeTemplate: (id: string) => void;
-  /** 递增使用次数 */
+  /** Increment the usage count */
   incrementUseCount: (id: string) => void;
 }
 
@@ -62,7 +62,7 @@ export const useTemplateStore = create<TemplateState>()(
     }),
     {
       name: "daihuo-jianshou-templates",
-      // JSON 序列化会将 Date 转为字符串，读取时需要还原
+      // JSON serialization converts Date to string; restore it when reading back
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name);

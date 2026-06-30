@@ -12,8 +12,8 @@ describe("selectHookPatterns", () => {
 
   it("不足 n 时补通用卡、去重", () => {
     const sel = selectHookPatterns("tech", 8);
-    expect(new Set(sel.map((p) => p.id)).size).toBe(sel.length); // 无重复
-    // 通用卡（无 categories）会被补进来
+    expect(new Set(sel.map((p) => p.id)).size).toBe(sel.length); // no duplicates
+    // generic cards (no categories) will be filled in
     expect(sel.some((p) => !p.categories)).toBe(true);
   });
 
@@ -35,8 +35,8 @@ describe("buildHookGuidance", () => {
     expect(g).toContain("截停拇指");
     expect(g).toContain("证明相关");
     expect(g).toContain("接到产品");
-    expect(g).toContain("美妆护肤"); // 品类名注入
-    expect(g).toContain("A/B"); // 多脚本各用不同机制
+    expect(g).toContain("美妆护肤"); // category name injected
+    expect(g).toContain("A/B"); // each script uses a different hook mechanism
   });
 });
 

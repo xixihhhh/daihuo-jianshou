@@ -11,7 +11,7 @@ import {
   type PexelsPhoto,
 } from "@/lib/providers/pexels";
 
-// 真实 Pexels 视频响应（2026-06 实采，竖屏咖啡素材），用于驱动纯函数测试
+// Real Pexels video response (sampled 2026-06, portrait coffee footage) used to drive pure-function tests
 const REAL_VIDEO: PexelsVideo = {
   id: 10743047,
   width: 2100,
@@ -52,12 +52,12 @@ describe("pickBestVideoFile", () => {
 
   it("门槛高到没有达标者时回退到分辨率最高一条", () => {
     const f = pickBestVideoFile(REAL_VIDEO.video_files, { orientation: "portrait", minShortSide: 9999 });
-    expect(f?.height).toBe(3734); // 2100x3734 短边最大
+    expect(f?.height).toBe(3734); // 2100x3734 has the largest short side
   });
 
   it("只在横屏方向无匹配时回退全部池", () => {
     const f = pickBestVideoFile(REAL_VIDEO.video_files, { orientation: "landscape", minShortSide: 720 });
-    // 全是竖屏，回退后仍按短边>=720取最小体积
+    // all files are portrait; after fallback still picks smallest file with short side >= 720
     expect(f).not.toBeNull();
   });
 

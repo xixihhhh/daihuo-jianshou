@@ -23,7 +23,7 @@ import {
   type GenMediaType,
 } from "@/lib/gen-params";
 
-// 可挂自定义模型的平台（与 settings.providers 的 key 一致）
+// platforms that support custom model attachment (keys match settings.providers)
 const PROVIDER_OPTIONS: { value: string; label: string }[] = [
   { value: "atlas-cloud", label: "Atlas Cloud" },
   { value: "fal-ai", label: "fal.ai" },
@@ -36,7 +36,7 @@ const PROVIDER_OPTIONS: { value: string; label: string }[] = [
 const labelOf = (opts: { value: string; label: string }[], v: string) =>
   opts.find((o) => o.value === v)?.label ?? v;
 
-/** 数字输入：留空=undefined（用平台默认），否则取数值 */
+/** numeric input: empty = undefined (use platform default), otherwise parse as number */
 function NumberField({
   label,
   value,
@@ -66,8 +66,8 @@ function NumberField({
 }
 
 /**
- * 「自定义模型 + 生成参数」设置卡。自包含读写 settings store，
- * 让用户在已有平台上挂任意 model id，并设置图/视频生成的全局默认参数。
+ * "Custom models + generation params" settings card. Self-contained read/write from the settings store,
+ * allowing users to attach arbitrary model IDs to existing providers and set global default params for image/video generation.
  */
 export function GenerationSettings() {
   const t = useT("generationSettings");
@@ -81,17 +81,17 @@ export function GenerationSettings() {
     setVideoParams,
   } = useSettingsStore();
 
-  // 媒体类型选项（label 需随界面语言）
+  // media type options (labels follow the UI language)
   const MEDIA_OPTIONS: { value: GenMediaType; label: string }[] = [
     { value: "image", label: t("mediaImage") },
     { value: "video", label: t("mediaVideo") },
   ];
 
-  // 画面比例选项：复用 gen-params 的取值，label 走 i18n（与设置页「默认设置」一致）
+  // aspect ratio options: reuse values from gen-params, labels via i18n (consistent with "default settings" on the settings page)
   const ASPECT_KEY: Record<string, string> = { "9:16": "aspect916", "16:9": "aspect169", "1:1": "aspect11" };
   const ASPECT_OPTIONS = ASPECT_RATIO_OPTIONS.map((o) => ({ value: o.value, label: t(ASPECT_KEY[o.value] ?? o.value) }));
 
-  // 新增自定义模型的表单
+  // form state for adding a new custom model
   const [form, setForm] = useState<{ provider: string; modelId: string; name: string; mediaType: GenMediaType; supportsAudio: boolean }>({
     provider: "fal-ai",
     modelId: "",
@@ -117,7 +117,7 @@ export function GenerationSettings() {
 
   return (
     <>
-      {/* 自定义模型 */}
+      {/* custom models */}
       <Card className="glass-card">
         <CardContent className="p-5 space-y-4">
           <div>
@@ -127,7 +127,7 @@ export function GenerationSettings() {
             </p>
           </div>
 
-          {/* 新增表单 */}
+          {/* add new model form */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">{t("fieldProvider")}</Label>
@@ -172,7 +172,7 @@ export function GenerationSettings() {
             </Button>
           </div>
 
-          {/* 已添加列表 */}
+          {/* added models list */}
           {customModels.length > 0 && (
             <div className="space-y-2 pt-2 border-t border-border/50">
               {customModels.map((m) => (
@@ -194,7 +194,7 @@ export function GenerationSettings() {
         </CardContent>
       </Card>
 
-      {/* 生成参数 */}
+      {/* generation params */}
       <Card className="glass-card">
         <CardContent className="p-5 space-y-5">
           <div>
@@ -202,7 +202,7 @@ export function GenerationSettings() {
             <p className="text-xs text-muted-foreground mt-0.5">{t("genParamsDesc")}</p>
           </div>
 
-          {/* 图片参数 */}
+          {/* image params */}
           <div className="space-y-3">
             <p className="text-xs font-medium">{t("imageSection")}</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -228,7 +228,7 @@ export function GenerationSettings() {
             </div>
           </div>
 
-          {/* 视频参数 */}
+          {/* video params */}
           <div className="space-y-3 pt-2 border-t border-border/50">
             <p className="text-xs font-medium">{t("videoSection")}</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

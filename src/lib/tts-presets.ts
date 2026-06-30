@@ -1,9 +1,11 @@
 /**
- * 付费 TTS 平台预设（纯数据，前后端通用，不含任何 server-only 依赖）。
+ * Paid TTS platform presets (pure data, shared between client and server, no server-only dependencies).
  *
- * 统一一个「平台」下拉切换：OpenAI 兼容 / Atlas Cloud / MiniMax / fal.ai。
- * Atlas、fal 的 Key 复用「AI 平台」tab 已填的同名 provider Key；MiniMax 单独填 Key（+可选 GroupId）。
- * 每个平台预置默认 baseUrl/模型/音色，UI 据此条件渲染字段、做音色建议。
+ * Unified "platform" dropdown: OpenAI-compatible / Atlas Cloud / MiniMax / fal.ai.
+ * Atlas and fal reuse the API key already entered under the same provider in the "AI Platform" tab;
+ * MiniMax has its own separate key (plus an optional GroupId).
+ * Each platform provides default baseUrl/model/voice so the UI can conditionally render fields
+ * and offer voice suggestions accordingly.
  */
 
 export type TTSProvider = "openai" | "atlas" | "minimax" | "falai";
@@ -16,31 +18,31 @@ export interface TTSVoiceOption {
 export interface TTSProviderMeta {
   value: TTSProvider;
   label: string;
-  /** 该平台 TTS 端点的默认 baseUrl */
+  /** Default baseUrl for this platform's TTS endpoint */
   baseUrl: string;
-  /** 默认模型 id */
+  /** Default model id */
   defaultModel: string;
-  /** 可选模型（为空表示自由输入，如 OpenAI 兼容） */
+  /** Available models (empty means free-form input, e.g. OpenAI-compatible) */
   models: TTSVoiceOption[];
-  /** 默认音色 id */
+  /** Default voice id */
   defaultVoice: string;
-  /** 音色建议列表 */
+  /** Suggested voice list */
   voices: TTSVoiceOption[];
   /**
-   * Key 来源：
-   * - "tts"：用 TTS 配置自带的 apiKey（OpenAI 兼容 / MiniMax）
-   * - 其它：复用「AI 平台」store 里对应 provider 的 apiKey（atlas-cloud / fal-ai）
+   * Key source:
+   * - "tts": use the apiKey stored in the TTS config itself (OpenAI-compatible / MiniMax)
+   * - others: reuse the apiKey of the matching provider in the "AI Platform" store (atlas-cloud / fal-ai)
    */
   keySource: "tts" | "atlas-cloud" | "fal-ai";
-  /** 是否需要 GroupId（MiniMax 国内端点 api.minimax.chat 需要） */
+  /** Whether a GroupId is required (needed for the MiniMax domestic endpoint api.minimax.chat) */
   needsGroupId?: boolean;
-  /** 是否暴露 baseUrl 输入（OpenAI 兼容、MiniMax 可切区域端点） */
+  /** Whether to expose a baseUrl input field (OpenAI-compatible and MiniMax support switching regional endpoints) */
   editableBaseUrl?: boolean;
-  /** 配置提示 */
+  /** Configuration hint shown in the UI */
   hint?: string;
 }
 
-/** OpenAI 兼容快捷预设（点一下填好 baseUrl + 模型 + 音色） */
+/** OpenAI-compatible quick presets (one click populates baseUrl + model + voice) */
 export const OPENAI_TTS_PRESETS = [
   { label: "硅基流动 CosyVoice", baseUrl: "https://api.siliconflow.cn/v1", model: "FunAudioLLM/CosyVoice2-0.5B", voice: "FunAudioLLM/CosyVoice2-0.5B:alex" },
   { label: "OpenAI tts-1", baseUrl: "https://api.openai.com/v1", model: "tts-1", voice: "alloy" },
@@ -131,12 +133,12 @@ export const TTS_PROVIDERS: TTSProviderMeta[] = [
 
 export const DEFAULT_TTS_PROVIDER: TTSProvider = "openai";
 
-/** 取平台元信息（容错：未知/旧配置回退到 openai） */
+/** Get platform metadata (with fallback: unknown/legacy config falls back to openai) */
 export function getTTSProviderMeta(provider?: string | null): TTSProviderMeta {
   return TTS_PROVIDERS.find((p) => p.value === provider) ?? TTS_PROVIDERS[0];
 }
 
-/** 解析 TTS 配置时所需的最小输入形状（避免与 store 类型循环依赖） */
+/** Minimal input shape required when resolving TTS config (avoids circular dependency with store types) */
 interface TTSSettingLike {
   enabled?: boolean;
   provider?: string;
@@ -149,7 +151,7 @@ interface TTSSettingLike {
 }
 type ProvidersLike = Record<string, { apiKey?: string; baseUrl?: string } | undefined>;
 
-/** 解析后用于实际请求 / 试听的完整 TTS 配置 */
+/** Fully resolved TTS config used for actual requests / preview playback */
 export interface ResolvedTTSConfig {
   provider: TTSProvider;
   baseUrl: string;
@@ -161,14 +163,15 @@ export interface ResolvedTTSConfig {
 }
 
 /**
- * 把「平台选择 + 复用的 AI 平台 Key」解析成一份可直接发给后端的完整 TTS 配置。
- * Atlas/fal 的 Key 从 providers store 取；OpenAI 兼容/MiniMax 用 TTS 自带 Key。
+ * Resolves the "platform selection + reused AI platform key" into a complete TTS config
+ * ready to send to the backend.
+ * Atlas/fal keys are taken from the providers store; OpenAI-compatible/MiniMax use the TTS's own key.
  */
 export function resolveTTSConfig(tts: TTSSettingLike | undefined, providers: ProvidersLike): ResolvedTTSConfig {
   const meta = getTTSProviderMeta(tts?.provider);
-  // baseUrl：可编辑平台用用户填的（空则回退默认），否则强制平台默认端点
+  // baseUrl: for editable platforms use the user-provided value (fall back to default if blank); otherwise force the platform default
   const baseUrl = meta.editableBaseUrl ? (tts?.baseUrl || meta.baseUrl) : meta.baseUrl;
-  // apiKey：复用 AI 平台 Key 或用 TTS 自带
+  // apiKey: reuse the AI platform key or use the TTS-specific key
   const apiKey = meta.keySource === "tts" ? (tts?.apiKey || "") : (providers?.[meta.keySource]?.apiKey || "");
   return {
     provider: meta.value,
@@ -181,7 +184,7 @@ export function resolveTTSConfig(tts: TTSSettingLike | undefined, providers: Pro
   };
 }
 
-/** 付费 TTS 是否已就绪（开关开 + 解析后 Key/模型/音色齐全） */
+/** Whether paid TTS is ready (switch enabled + resolved key/model/voice all present) */
 export function isPaidTTSReady(tts: TTSSettingLike | undefined, providers: ProvidersLike): boolean {
   if (!tts?.enabled) return false;
   const c = resolveTTSConfig(tts, providers);

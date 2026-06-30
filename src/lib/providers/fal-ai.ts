@@ -1,7 +1,7 @@
 /**
- * fal.ai Provider 实现
- * 基于 fal.ai REST API，支持多种图片和视频生成模型
- * 文档参考: https://fal.ai/docs
+ * fal.ai Provider implementation
+ * Built on the fal.ai REST API, supporting a wide range of image and video generation models
+ * API docs: https://fal.ai/docs
  */
 
 import { BaseProvider, ProviderError } from './base'
@@ -17,7 +17,7 @@ import type {
   MediaType,
 } from './types'
 
-// ==================== fal.ai API 响应类型 ====================
+// ==================== fal.ai API response types ====================
 
 interface FalSubmitResponse {
   request_id: string
@@ -41,7 +41,7 @@ interface FalResultResponse {
   [key: string]: unknown
 }
 
-// ==================== Provider 实现 ====================
+// ==================== Provider implementation ====================
 
 export class FalAIProvider extends BaseProvider {
   readonly name = 'fal-ai'
@@ -55,7 +55,7 @@ export class FalAIProvider extends BaseProvider {
   }
 
   /**
-   * 获取认证头 - fal.ai 使用 Key 认证
+   * Get authentication headers - fal.ai uses Key authentication
    */
   protected getAuthHeaders(): Record<string, string> {
     return {
@@ -64,18 +64,18 @@ export class FalAIProvider extends BaseProvider {
   }
 
   /**
-   * 生成图片
+   * Generate an image
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
     const w = options.width ?? 0
     const h = options.height ?? 0
-    // GPT Image 系列不吃 negative_prompt / guidance / steps
+    // GPT Image series does not accept negative_prompt / guidance / steps
     const isGptImage = options.modelId.includes('gpt-image')
-    // gpt-image-1.5：image_size 只接受字符串枚举（1024x1024 / 1536x1024 / 1024x1536）
+    // gpt-image-1.5: image_size only accepts string enum values (1024x1024 / 1536x1024 / 1024x1536)
     const isGptImage15 = options.modelId.includes('gpt-image-1.5')
-    // gpt-image-2：image_size 接受 {width,height}（需 16 的倍数）或预设名
+    // gpt-image-2: image_size accepts {width,height} (must be multiples of 16) or a preset name
     const isGptImage2 = options.modelId.includes('gpt-image-2')
-    // 编辑/图生图端点：gpt-image-1.5/edit、seedream/edit 用 image_urls；gpt-image-2/image-to-image 同样支持 image_urls
+    // edit/image-to-image endpoints: gpt-image-1.5/edit and seedream/edit use image_urls; gpt-image-2/image-to-image also supports image_urls
     const isEdit = options.modelId.includes('/edit') || options.modelId.includes('/image-to-image')
 
     const round16 = (n: number) => Math.max(16, Math.round(n / 16) * 16)
@@ -86,7 +86,7 @@ export class FalAIProvider extends BaseProvider {
         return '1024x1024'
       }
       if (!w || !h) return undefined
-      // gpt-image-2 要求宽高为 16 的倍数
+      // gpt-image-2 requires width and height to be multiples of 16
       return isGptImage2
         ? { width: round16(w), height: round16(h) }
         : { width: w, height: h }
@@ -100,7 +100,7 @@ export class FalAIProvider extends BaseProvider {
       guidance_scale: isGptImage ? undefined : options.guidanceScale,
       num_inference_steps: isGptImage ? undefined : options.steps,
       seed: options.seed,
-      // 编辑/图生图：多图端点用 image_urls 数组；普通图生图用 image_url
+      // edit/image-to-image: multi-image endpoints use image_urls array; regular image-to-image uses image_url
       ...(options.referenceImageUrl && isEdit && {
         image_urls: [options.referenceImageUrl],
       }),
@@ -110,17 +110,18 @@ export class FalAIProvider extends BaseProvider {
       ...options.extra,
     }
 
-    // 提交异步任务
+    // submit async task
     const submitResponse = await this.request<FalSubmitResponse>(
       `/${options.modelId}`,
       { method: 'POST', body }
     )
 
-    // 守卫：submit 偶发不返回 request_id，否则 taskId 变 "model::undefined"、parseTaskId 不报错、后续查询端点却 404
+    // guard: submit occasionally returns no request_id; without this, taskId becomes "model::undefined",
+    // parseTaskId does not throw, but the subsequent status endpoint returns 404
     if (!submitResponse.request_id) {
       throw new ProviderError('未返回请求ID', 'NO_REQUEST_ID', this.name)
     }
-    // getTaskStatus 需要 "modelId::requestId" 格式来定位查询端点，这里拼接好再轮询
+    // getTaskStatus needs the "modelId::requestId" format to locate the query endpoint; assemble it here before polling
     const taskId = `${options.modelId}::${submitResponse.request_id}`
     const finalStatus = await this.pollTaskStatus(taskId, {
       interval: 2000,
@@ -130,13 +131,13 @@ export class FalAIProvider extends BaseProvider {
   }
 
   /**
-   * 生成视频
+   * Generate a video
    */
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
-    // 如果启用音频且有配音文案，将配音信息融入 prompt
+    // if audio is enabled and a voiceover script is provided, merge it into the prompt
     let prompt = options.prompt
     if (options.audioEnabled && options.voiceover) {
-      // 支持音频的模型（如 Veo 3、MiniMax）可以直接在 prompt 中描述音频
+      // models that support audio (e.g., Veo 3, MiniMax) can describe audio directly in the prompt
       prompt = `${options.prompt}. The narrator says: "${options.voiceover}"`
     }
 
@@ -151,15 +152,15 @@ export class FalAIProvider extends BaseProvider {
       motion_strength: options.motionStrength,
       guidance_scale: options.guidanceScale,
       seed: options.seed,
-      // image-to-video 模式
+      // image-to-video mode
       ...(options.firstFrameUrl && {
         image_url: options.firstFrameUrl,
       }),
-      // video-to-video 模式
+      // video-to-video mode
       ...(options.referenceVideoUrl && {
         video_url: options.referenceVideoUrl,
       }),
-      // 音频相关参数（部分模型支持）
+      // audio-related parameters (supported by some models)
       ...(options.audioEnabled && {
         audio: true,
         ...(options.audioPrompt && { audio_prompt: options.audioPrompt }),
@@ -167,17 +168,18 @@ export class FalAIProvider extends BaseProvider {
       ...options.extra,
     }
 
-    // 提交异步任务
+    // submit async task
     const submitResponse = await this.request<FalSubmitResponse>(
       `/${options.modelId}`,
       { method: 'POST', body }
     )
 
-    // 守卫：submit 偶发不返回 request_id，否则 taskId 变 "model::undefined"、parseTaskId 不报错、后续查询端点却 404
+    // guard: submit occasionally returns no request_id; without this, taskId becomes "model::undefined",
+    // parseTaskId does not throw, but the subsequent status endpoint returns 404
     if (!submitResponse.request_id) {
       throw new ProviderError('未返回请求ID', 'NO_REQUEST_ID', this.name)
     }
-    // getTaskStatus 需要 "modelId::requestId" 格式来定位查询端点，这里拼接好再轮询
+    // getTaskStatus needs the "modelId::requestId" format to locate the query endpoint; assemble it here before polling
     const taskId = `${options.modelId}::${submitResponse.request_id}`
     const finalStatus = await this.pollTaskStatus(taskId, {
       interval: 5000,
@@ -187,17 +189,17 @@ export class FalAIProvider extends BaseProvider {
   }
 
   /**
-   * 查询任务状态
-   * fal.ai 使用 queue API 查询状态
+   * Query task status
+   * fal.ai uses the queue API to poll status
    */
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
-    // fal.ai 的 taskId 格式为 "modelId::requestId"
+    // fal.ai taskId format: "modelId::requestId"
     const [modelId, requestId] = this.parseTaskId(taskId)
 
     const statusResponse = await this.request<FalStatusResponse>(
       `/${modelId}/requests/${requestId}/status`,
       {
-        // 使用 fal.ai 的状态查询 baseUrl
+        // use fal.ai status query baseUrl
         headers: {},
       }
     )
@@ -210,7 +212,7 @@ export class FalAIProvider extends BaseProvider {
       progress: statusResponse.progress,
     }
 
-    // 任务完成时获取结果
+    // fetch the result once the task completes
     if (status === 'completed') {
       const result = await this.request<FalResultResponse>(
         `/${modelId}/requests/${requestId}`
@@ -222,14 +224,14 @@ export class FalAIProvider extends BaseProvider {
   }
 
   /**
-   * 获取可用模型列表
-   * fal.ai 的模型是动态的，这里返回常用模型
+   * Get the list of available models
+   * fal.ai models are dynamic; this returns the commonly used ones
    */
   async listModels(mediaType?: MediaType): Promise<Model[]> {
-    // 基于 fal.ai 官方平台确认的模型列表（2026-03）
+    // model list verified against the fal.ai platform (2026-03)
     const models: Model[] = [
-      // ==================== 图片生成 ====================
-      // OpenAI GPT Image 2（fal 端点为 openai/gpt-image-2，强提示词遵循、商品质感好）
+      // ==================== image generation ====================
+      // OpenAI GPT Image 2 (fal endpoint: openai/gpt-image-2; strong prompt adherence, great product quality)
       {
         id: 'openai/gpt-image-2',
         name: 'GPT Image 2',
@@ -246,7 +248,7 @@ export class FalAIProvider extends BaseProvider {
         mediaType: 'image',
         provider: this.name,
       },
-      // 兼容保留上一代 gpt-image-1.5
+      // kept for backward compatibility with the previous generation gpt-image-1.5
       {
         id: 'fal-ai/gpt-image-1.5',
         name: 'GPT Image 1.5',
@@ -304,8 +306,8 @@ export class FalAIProvider extends BaseProvider {
         provider: this.name,
       },
 
-      // ==================== 视频生成 ====================
-      // --- 可灵 Kling 系列 ---
+      // ==================== video generation ====================
+      // --- Kling series ---
       {
         id: 'fal-ai/kling-video/v3/pro/text-to-video',
         name: 'Kling 3.0 Pro (文生视频)',
@@ -325,7 +327,7 @@ export class FalAIProvider extends BaseProvider {
         supportsAudio: true,
       },
 
-      // --- Google Veo 系列 ---
+      // --- Google Veo series ---
       {
         id: 'fal-ai/veo3',
         name: 'Veo 3',
@@ -336,7 +338,7 @@ export class FalAIProvider extends BaseProvider {
         supportsAudio: true,
       },
 
-      // --- MiniMax 海螺系列 ---
+      // --- MiniMax Hailuo series ---
       {
         id: 'fal-ai/minimax/hailuo-02/standard/text-to-video',
         name: 'MiniMax Hailuo-02 (768p)',
@@ -354,7 +356,7 @@ export class FalAIProvider extends BaseProvider {
         provider: this.name,
       },
 
-      // --- Vidu 系列（生数科技） ---
+      // --- Vidu series (Shengshu Tech) ---
       {
         id: 'fal-ai/vidu/q2/image-to-video/pro',
         name: 'Vidu Q2 Pro (图生视频)',
@@ -380,7 +382,7 @@ export class FalAIProvider extends BaseProvider {
         provider: this.name,
       },
 
-      // --- MiniMax 海螺 2.3 系列（最新） ---
+      // --- MiniMax Hailuo 2.3 series (latest) ---
       {
         id: 'fal-ai/minimax/hailuo-2.3/standard/text-to-video',
         name: 'Hailuo 2.3 Standard (文生视频)',
@@ -406,7 +408,7 @@ export class FalAIProvider extends BaseProvider {
         provider: this.name,
       },
 
-      // --- Luma Ray 2 系列 ---
+      // --- Luma Ray 2 series ---
       {
         id: 'fal-ai/luma-dream-machine/ray-2',
         name: 'Luma Ray 2 (文生视频)',
@@ -424,7 +426,7 @@ export class FalAIProvider extends BaseProvider {
         provider: this.name,
       },
 
-      // --- 万相 Wan 系列 ---
+      // --- Wan series (Alibaba Wanxiang) ---
       {
         id: 'fal-ai/wan/v2.2-a14b/image-to-video',
         name: 'Wan 2.2 (图生视频)',
@@ -442,9 +444,9 @@ export class FalAIProvider extends BaseProvider {
     return models
   }
 
-  // ==================== 私有方法 ====================
+  // ==================== private methods ====================
 
-  /** 映射 fal.ai 任务状态 */
+  /** Map fal.ai task status to unified status */
   private mapStatus(falStatus: string): TaskStatusEnum {
     const statusMap: Record<string, TaskStatusEnum> = {
       IN_QUEUE: 'pending',
@@ -456,8 +458,8 @@ export class FalAIProvider extends BaseProvider {
   }
 
   /**
-   * 解析 taskId
-   * fal.ai 的任务 ID 编码为 "modelId::requestId"
+   * Parse a taskId
+   * fal.ai task IDs are encoded as "modelId::requestId"
    */
   private parseTaskId(taskId: string): [string, string] {
     const separatorIndex = taskId.indexOf('::')
@@ -474,13 +476,13 @@ export class FalAIProvider extends BaseProvider {
     ]
   }
 
-  /** 解析 fal.ai 返回结果为统一格式 */
+  /** Parse fal.ai response into the unified result format */
   private parseResult(
     taskId: string,
     result: FalResultResponse,
     modelId: string
   ): ImageResult | VideoResult {
-    // 图片结果
+    // image result
     if (result.images && result.images.length > 0) {
       return {
         taskId,
@@ -491,7 +493,7 @@ export class FalAIProvider extends BaseProvider {
       }
     }
 
-    // 视频结果（单个视频）
+    // video result (single video)
     if (result.video) {
       return {
         taskId,
@@ -501,7 +503,7 @@ export class FalAIProvider extends BaseProvider {
       }
     }
 
-    // 视频结果（多个视频）
+    // video result (multiple videos)
     if (result.videos && result.videos.length > 0) {
       return {
         taskId,

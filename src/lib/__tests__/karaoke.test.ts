@@ -46,7 +46,7 @@ describe("buildKaraokeAss", () => {
     expect(ass).toContain("[V4+ Styles]");
     expect(ass).toContain("Style: K,");
     expect(ass).toContain("Dialogue: 0,0:00:00.00,0:00:03.00,K,");
-    expect(ass).toContain("{\\k"); // 逐字卡拉OK标签
+    expect(ass).toContain("{\\k"); // per-character karaoke tag
     expect(ass).toContain("立");
   });
 
@@ -54,7 +54,7 @@ describe("buildKaraokeAss", () => {
     const ass = buildKaraokeAss([{ text: "立省五折闭眼入", startTime: 0, endTime: 3 }]);
     const dialogue = ass.split("\n").find((l) => l.startsWith("Dialogue:"))!;
     const ks = [...dialogue.matchAll(/\\k(\d+)/g)].map((m) => Number(m[1]));
-    expect(ks.length).toBe(7); // 7 个字
+    expect(ks.length).toBe(7); // 7 characters
     expect(ks.reduce((a, b) => a + b, 0)).toBe(300); // 3s = 300cs
   });
 
@@ -66,9 +66,9 @@ describe("buildKaraokeAss", () => {
 
   it("默认 MarginV 走安全区（PlayResY 1920 → 326，避开平台底部 UI），可被显式覆盖", () => {
     const f = buildKaraokeAss(lines).split("\n").find((l) => l.startsWith("Style: K,"))!.split(",");
-    expect(Number(f[f.length - 2])).toBe(326); // 安全区 marginV（旧值 240 落在死区内）
+    expect(Number(f[f.length - 2])).toBe(326); // safe-zone marginV (old value 240 fell inside the dead zone)
     const f2 = buildKaraokeAss(lines, { marginV: 100 }).split("\n").find((l) => l.startsWith("Style: K,"))!.split(",");
-    expect(Number(f2[f2.length - 2])).toBe(100); // 显式指定优先
+    expect(Number(f2[f2.length - 2])).toBe(100); // explicit override takes precedence
   });
 
   it("含数字单位自动强调：放大字号 + 热色 \\1c（价格/折扣突出）", () => {
@@ -76,9 +76,9 @@ describe("buildKaraokeAss", () => {
       .split("\n")
       .find((l) => l.startsWith("Dialogue:"))!;
     const fsVals = [...d.matchAll(/\\fs(\d+)/g)].map((m) => Number(m[1]));
-    expect(new Set(fsVals).size).toBeGreaterThan(1); // 强调字号 ≠ 普通字号
-    expect(Math.max(...fsVals)).toBeGreaterThan(Math.min(...fsVals)); // 数字被放大
-    expect(d).toContain("&H0050FF&"); // 橙红强调色出现
+    expect(new Set(fsVals).size).toBeGreaterThan(1); // emphasis font size differs from normal font size
+    expect(Math.max(...fsVals)).toBeGreaterThan(Math.min(...fsVals)); // numeric units are enlarged
+    expect(d).toContain("&H0050FF&"); // orange-red emphasis color is present
   });
 
   it("emphasizeNumbers:false 关闭数字强调", () => {
@@ -86,8 +86,8 @@ describe("buildKaraokeAss", () => {
       .split("\n")
       .find((l) => l.startsWith("Dialogue:"))!;
     const fsVals = [...d.matchAll(/\\fs(\d+)/g)].map((m) => Number(m[1]));
-    expect(new Set(fsVals).size).toBe(1); // 全同字号
-    expect(d).not.toContain("&H0050FF&"); // 无强调色
+    expect(new Set(fsVals).size).toBe(1); // all characters use the same font size
+    expect(d).not.toContain("&H0050FF&"); // no emphasis color
   });
 
   it("单位数 > 总厘秒数（极短时长+长旁白）不产生负 \\k", () => {
@@ -96,7 +96,7 @@ describe("buildKaraokeAss", () => {
       .find((l) => l.startsWith("Dialogue:"))!;
     const ks = [...d.matchAll(/\\k(-?\d+)/g)].map((m) => Number(m[1]));
     expect(ks.length).toBeGreaterThan(0);
-    expect(ks.every((k) => k >= 1)).toBe(true); // 无负 \k
+    expect(ks.every((k) => k >= 1)).toBe(true); // no negative \k values
   });
 
   it("过滤非法行（endTime<=startTime / 空文本）", () => {

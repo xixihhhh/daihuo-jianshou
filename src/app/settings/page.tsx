@@ -33,20 +33,20 @@ import {
 import { mergeCustomModels } from "@/lib/gen-params";
 import { GenerationSettings } from "@/components/generation-settings";
 
-// 默认分辨率选项
+// default resolution options
 const resolutionOptions = [
   { value: "720p", label: "720p (1280x720)" },
   { value: "1080p", label: "1080p (1920x1080)" },
 ];
 
-// 默认画面比例选项（labelKey 在组件内按语言渲染）
+// default aspect ratio options (labelKey is rendered per language inside the component)
 const aspectRatioOptions = [
   { value: "9:16", labelKey: "aspect916" },
   { value: "16:9", labelKey: "aspect169" },
   { value: "1:1", labelKey: "aspect11" },
 ];
 
-// AI 平台配置信息
+// AI platform configuration list
 const AI_PROVIDERS = [
   {
     key: "atlas-cloud",
@@ -149,16 +149,16 @@ const AI_PROVIDERS = [
   },
 ];
 
-// 中文厂商名按 key 映射到 i18n 显示名（英文用户原本看到硬编码中文「火山引擎/阿里百炼/硅基流动」）。
-// 只覆盖中文名的厂商；其余（Atlas Cloud/OpenAI 等）名字本就是英文品牌、直接用 platform.name。
-// 注意：platform.name 仍作身份用于 enabledNames 自定义模型过滤，故不改 name、只改显示。
+// Map Chinese vendor names by key to i18n display names (English users would otherwise see hard-coded Chinese like "火山引擎/阿里百炼/硅基流动").
+// Only overrides vendors with Chinese names; others (Atlas Cloud/OpenAI, etc.) already use English brand names and use platform.name directly.
+// Note: platform.name is still used as the identity for enabledNames custom model filtering, so we only change the display, not name.
 const PROVIDER_NAME_KEYS: Record<string, string> = {
   volcengine: "providerVolcengineName",
   alibaba: "providerAlibabaName",
   siliconflow: "providerSiliconflowName",
 };
 
-// 密码输入框（可切换显示/隐藏）
+// password input field with show/hide toggle
 function PasswordInput({
   value,
   onChange,
@@ -187,7 +187,7 @@ function PasswordInput({
         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
       >
         {visible ? (
-          // 隐藏图标
+          // hide icon
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
             <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
@@ -195,7 +195,7 @@ function PasswordInput({
             <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
           </svg>
         ) : (
-          // 显示图标
+          // show icon
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
             <circle cx="12" cy="12" r="3" />
@@ -206,7 +206,7 @@ function PasswordInput({
   );
 }
 
-// 自定义开关组件
+// custom toggle switch component
 function Toggle({
   checked,
   onChange,
@@ -235,7 +235,7 @@ function Toggle({
 
 export default function SettingsPage() {
   const t = useT("settings");
-  // 从 store 读取设置
+  // read settings from store
   const {
     providers,
     llm,
@@ -255,7 +255,7 @@ export default function SettingsPage() {
     applyAtlasOneKey,
   } = useSettingsStore();
 
-  // 新手一键接入 Atlas：一个 Key 自动配好 LLM/生图/生视频/配音
+  // one-click Atlas onboarding: a single Key auto-configures LLM/image-gen/video-gen/TTS
   const [atlasOneKey, setAtlasOneKey] = useState("");
   const [atlasApplied, setAtlasApplied] = useState(false);
   const applyOneKey = () => {
@@ -264,7 +264,7 @@ export default function SettingsPage() {
     setAtlasApplied(true);
   };
 
-  // TTS 试听状态
+  // TTS preview playback state
   const [ttsTestStatus, setTtsTestStatus] = useState<"idle" | "testing" | "error">("idle");
   const testTTS = async () => {
     setTtsTestStatus("testing");
@@ -272,7 +272,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // 发解析后的完整配置（含按平台复用的 Key / 默认 baseUrl / 模型）
+        // send the fully resolved config (including per-platform reused Key / default baseUrl / model)
         body: JSON.stringify({ text: t("ttsSample"), ttsConfig: resolveTTSConfig(tts, providers) }),
       });
       if (!res.ok) throw new Error();
@@ -284,7 +284,7 @@ export default function SettingsPage() {
     }
   };
 
-  // AI 平台 Key 连通性测试（真实鉴权探针，非假测试）
+  // AI platform key connectivity test (real auth probe, not a fake test)
   const [providerTest, setProviderTest] = useState<Record<string, { state: "idle" | "testing" | "ok" | "invalid" | "unknown"; msg?: string }>>({});
   const testProvider = async (key: string) => {
     const p = providers[key];
@@ -303,7 +303,7 @@ export default function SettingsPage() {
     }
   };
 
-  // TTS 平台元信息 / 就绪态 / 切换平台时重置模型·音色·baseUrl 为该平台默认
+  // TTS provider metadata / ready state / reset model, voice, and baseUrl to provider defaults when switching providers
   const ttsMeta = getTTSProviderMeta(tts.provider);
   const ttsReady = isPaidTTSReady(tts, providers);
   const onChangeTTSProvider = (provider: TTSProvider) => {
@@ -311,22 +311,22 @@ export default function SettingsPage() {
     setTTS({ ...tts, provider, baseUrl: meta.baseUrl, model: meta.defaultModel, voice: meta.defaultVoice });
   };
 
-  // 保存时的提示状态
+  // save feedback state
   const [saved, setSaved] = useState(false);
 
-  // 可选模型列表（按启用平台从后端聚合拉取）
+  // available model list (fetched from backend aggregated by enabled providers)
   const [imageModels, setImageModels] = useState<{ id: string; name: string; provider: string }[]>([]);
   const [videoModels, setVideoModels] = useState<{ id: string; name: string; provider: string }[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
 
-  // 已启用且填了 key 的平台（用于拉取模型列表）
+  // providers that are enabled and have an API key (used to fetch model list)
   const enabledProviders = Object.entries(providers)
     .filter(([, p]) => p.enabled && p.apiKey)
     .map(([name, p]) => ({ name, apiKey: p.apiKey, baseUrl: p.baseUrl }));
-  // 用平台名集合作为依赖，避免每次渲染都重新请求
+  // use provider name set as dependency to avoid re-fetching on every render
   const enabledKey = enabledProviders.map((p) => p.name).sort().join(",");
 
-  // 启用平台变化时，拉取可选的生图/生视频模型
+  // fetch available image/video models when enabled providers change
   useEffect(() => {
     if (enabledProviders.length === 0) {
       setImageModels([]);
@@ -361,13 +361,13 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabledKey]);
 
-  // 把用户自定义模型并入下拉（仅已启用平台），让自定义模型可被选作默认
+  // merge user custom models into dropdowns (enabled providers only), so custom models can be selected as default
   const enabledNames = new Set(enabledProviders.map((p) => p.name));
   const imageModelOptions = mergeCustomModels(imageModels, customModels, "image", enabledNames);
   const videoModelOptions = mergeCustomModels(videoModels, customModels, "video", enabledNames);
 
-  // 启用平台后自动选默认模型：当前没选(或所选已失效)且有可选项时，自动落到第一个
-  // —— 避免新手「配了 Key 却因没选默认模型而生成失败」的坑
+  // auto-select a default model after enabling a provider: if nothing is selected (or the selection is gone) and options exist, fall back to the first one
+  // — prevents the beginner trap of "set up a Key but generation fails because no default model was chosen"
   const imageIds = imageModelOptions.map((m) => m.id).join(",");
   const videoIds = videoModelOptions.map((m) => m.id).join(",");
   useEffect(() => {
@@ -383,16 +383,16 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoIds]);
 
-  // LLM 连接测试状态
+  // LLM connection test state
   const [llmTestStatus, setLlmTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
 
-  // 测试 LLM 连接
+  // test LLM connection
   const [llmTestError, setLlmTestError] = useState("");
   const testLLMConnection = async () => {
     setLlmTestStatus("testing");
     setLlmTestError("");
     try {
-      // 走服务端测试：浏览器直连厂商 API 会被 CORS 拦截而误报失败
+      // use server-side test: browser direct calls to provider APIs would be blocked by CORS and falsely report failure
       const res = await fetch("/api/llm/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -408,11 +408,11 @@ export default function SettingsPage() {
     setTimeout(() => setLlmTestStatus("idle"), 5000);
   };
 
-  // 计算 AI 平台配置状态
+  // compute AI provider configuration status
   const hasAnyProvider = Object.values(providers).some(p => p.enabled && p.apiKey);
   const enabledCount = Object.values(providers).filter(p => p.enabled && p.apiKey).length;
 
-  // 处理保存（zustand persist 会自动保存，这里主要做 UI 反馈）
+  // handle save (zustand persist saves automatically; this is mainly for UI feedback)
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -420,7 +420,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* 顶部导航 */}
+      {/* top navigation */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
@@ -448,7 +448,7 @@ export default function SettingsPage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-10">
-        {/* 页面标题 */}
+        {/* page title */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight">{t("pageTitle")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -456,7 +456,7 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {/* 新手一键接入：一个 Atlas Key 自动配好 LLM/生图/生视频/配音，免去逐项设置 */}
+        {/* beginner one-click setup: a single Atlas Key auto-configures LLM/image-gen/video-gen/TTS, skipping manual item-by-item setup */}
         <div className="mb-8 rounded-2xl border border-primary/30 bg-primary/5 p-5">
           <div className="flex items-center gap-2 mb-1">
             <LuZap className="w-4 h-4 text-primary" />
@@ -488,7 +488,7 @@ export default function SettingsPage() {
           </a>
         </div>
 
-        {/* 标签页 */}
+        {/* tabs */}
         <Tabs defaultValue={0}>
           <TabsList className="mb-6 max-w-full overflow-x-auto">
             <TabsTrigger value={0}>
@@ -522,7 +522,7 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab 1: AI 平台配置 */}
+          {/* Tab 1: AI provider configuration */}
           <TabsContent value={0}>
             <div className="space-y-4">
               {AI_PROVIDERS.map((platform) => {
@@ -535,7 +535,7 @@ export default function SettingsPage() {
                   <Card key={platform.key} className="glass-card">
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between gap-4">
-                        {/* 平台信息 */}
+                        {/* provider info */}
                         <div className="flex items-start gap-3 flex-1 min-w-0">
                           <div
                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${platform.iconBg} text-white shadow-lg`}
@@ -560,7 +560,7 @@ export default function SettingsPage() {
                           </div>
                         </div>
 
-                        {/* 启用开关 */}
+                        {/* enable toggle */}
                         <Toggle
                           checked={provider.enabled}
                           onChange={(enabled) =>
@@ -572,7 +572,7 @@ export default function SettingsPage() {
                         />
                       </div>
 
-                      {/* API Key 输入 */}
+                      {/* API Key input */}
                       <div className="mt-4">
                         <Label className="text-xs text-muted-foreground mb-1.5">
                           API Key
@@ -587,7 +587,7 @@ export default function SettingsPage() {
                           }
                           placeholder={t("apiKeyPlaceholder", { name: platform.name })}
                         />
-                        {/* Key 连通性测试：真实鉴权探针 ✓/✗/⚠ */}
+                        {/* Key connectivity test: real auth probe ✓/✗/⚠ */}
                         <div className="mt-2 flex items-center gap-2">
                           <Button
                             variant="outline"
@@ -608,7 +608,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
-                      {/* 自定义接入点（代理/自建端点，选填）——收进折叠，默认不打扰新手 */}
+                      {/* custom endpoint (proxy/self-hosted, optional) — collapsed by default so beginners are not disturbed */}
                       <details className="mt-3">
                         <summary className="text-xs text-muted-foreground/70 cursor-pointer list-none select-none hover:text-muted-foreground">
                           {t("providerBaseUrlLabel")}
@@ -634,10 +634,10 @@ export default function SettingsPage() {
             </div>
           </TabsContent>
 
-          {/* Tab 2: LLM 配置 */}
+          {/* Tab 2: LLM configuration */}
           <TabsContent value={1}>
             <div className="space-y-6">
-              {/* LLM Provider 配置 */}
+              {/* LLM Provider configuration */}
               <Card className="glass-card">
                 <CardContent className="p-5">
                   <div className="flex items-center gap-2 mb-4">
@@ -649,7 +649,7 @@ export default function SettingsPage() {
                     <h3 className="font-semibold text-sm">{t("llmProvider")}</h3>
                   </div>
 
-                  {/* 快捷预设 */}
+                  {/* quick presets */}
                   <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
                     <p className="text-xs text-muted-foreground mb-2">{t("llmPresetHint")}</p>
                     <div className="flex flex-wrap gap-2">
@@ -678,7 +678,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="grid gap-4">
-                    {/* API 地址 */}
+                    {/* API base URL */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
                         {t("llmBaseUrlLabel")}
@@ -705,7 +705,7 @@ export default function SettingsPage() {
                       />
                     </div>
 
-                    {/* 模型名称 */}
+                    {/* model name */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">
@@ -738,7 +738,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    {/* 测试连接按钮 */}
+                    {/* test connection button */}
                     <div className="pt-3 mt-3 border-t border-border/50">
                       <Button
                         variant="outline"
@@ -772,7 +772,7 @@ export default function SettingsPage() {
 
               <Separator />
 
-              {/* TTS 配音 */}
+              {/* TTS voiceover */}
               <Card className="glass-card">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-4">
@@ -794,7 +794,7 @@ export default function SettingsPage() {
 
                   {tts.enabled && (
                     <div className="space-y-4">
-                      {/* 配音平台选择 */}
+                      {/* TTS provider selection */}
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">{t("ttsProviderLabel")}</Label>
                         <Select value={tts.provider ?? "openai"} onValueChange={(v) => onChangeTTSProvider((v ?? "openai") as TTSProvider)}>
@@ -814,7 +814,7 @@ export default function SettingsPage() {
 
                       {ttsMeta.value === "openai" ? (
                         <>
-                          {/* OpenAI 兼容：快捷预设 + baseUrl + Key + 自由模型/音色 */}
+                          {/* OpenAI-compatible: quick presets + baseUrl + Key + free model/voice */}
                           <div>
                             <p className="text-xs text-muted-foreground mb-2">{t("ttsPresetHint")}</p>
                             <div className="flex flex-wrap gap-2">
@@ -850,7 +850,7 @@ export default function SettingsPage() {
                         </>
                       ) : (
                         <>
-                          {/* Atlas / MiniMax / fal：Key（复用或自填）+ 可选 GroupId/baseUrl + 模型/音色下拉 */}
+                          {/* Atlas / MiniMax / fal: Key (reused or custom) + optional GroupId/baseUrl + model/voice dropdowns */}
                           {ttsMeta.keySource === "tts" ? (
                             <div className="space-y-1.5">
                               <Label className="text-xs text-muted-foreground">{t("apiKeyLabel")}</Label>
@@ -906,7 +906,7 @@ export default function SettingsPage() {
                         </>
                       )}
 
-                      {/* 试听 */}
+                      {/* preview playback */}
                       <div className="pt-3 mt-1 border-t border-border/50">
                         <Button variant="outline" size="sm" onClick={testTTS} disabled={!ttsReady || ttsTestStatus === "testing"} className={`text-xs ${ttsTestStatus === "error" ? "text-destructive" : ""}`}>
                           {ttsTestStatus === "testing" ? t("ttsTesting") : ttsTestStatus === "error" ? t("ttsTestError") : t("ttsTestButton")}
@@ -920,7 +920,7 @@ export default function SettingsPage() {
 
               <Separator />
 
-              {/* 默认设置 */}
+              {/* default settings */}
               <Card className="glass-card">
                 <CardContent className="p-5">
                   <div className="flex items-center gap-2 mb-4">
@@ -934,7 +934,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* 默认分辨率 */}
+                    {/* default resolution */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
                         {t("defaultResolution")}
@@ -946,7 +946,7 @@ export default function SettingsPage() {
                         }
                       >
                         <SelectTrigger className="w-full">
-                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                          {/* Base UI Select.Value shows the raw value by default; use a function child to map it to a label */}
                           <SelectValue>
                             {(value: string) => resolutionOptions.find((o) => o.value === value)?.label ?? value}
                           </SelectValue>
@@ -961,7 +961,7 @@ export default function SettingsPage() {
                       </Select>
                     </div>
 
-                    {/* 默认画面比例 */}
+                    {/* default aspect ratio */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
                         {t("defaultAspectRatio")}
@@ -975,7 +975,7 @@ export default function SettingsPage() {
                         }
                       >
                         <SelectTrigger className="w-full">
-                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为按语言渲染的标签 */}
+                          {/* Base UI Select.Value shows the raw value by default; use a function child to map it to a language-specific label */}
                           <SelectValue>
                             {(value: string) => {
                               const o = aspectRatioOptions.find((o) => o.value === value);
@@ -993,7 +993,7 @@ export default function SettingsPage() {
                       </Select>
                     </div>
 
-                    {/* 默认生图模型 */}
+                    {/* default image generation model */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
                         {t("defaultImageModel")}
@@ -1004,7 +1004,7 @@ export default function SettingsPage() {
                         disabled={imageModelOptions.length === 0}
                       >
                         <SelectTrigger className="w-full">
-                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为模型名 */}
+                          {/* Base UI Select.Value shows the raw value by default; use a function child to map it to the model name */}
                           <SelectValue>
                             {(value: string) =>
                               imageModelOptions.find((m) => m.id === value)?.name ??
@@ -1022,7 +1022,7 @@ export default function SettingsPage() {
                       </Select>
                     </div>
 
-                    {/* 默认生视频模型 */}
+                    {/* default video generation model */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
                         {t("defaultVideoModel")}
@@ -1033,7 +1033,7 @@ export default function SettingsPage() {
                         disabled={videoModelOptions.length === 0}
                       >
                         <SelectTrigger className="w-full">
-                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为模型名 */}
+                          {/* Base UI Select.Value shows the raw value by default; use a function child to map it to the model name */}
                           <SelectValue>
                             {(value: string) =>
                               videoModelOptions.find((m) => m.id === value)?.name ??
@@ -1054,7 +1054,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              {/* 自定义模型接入点 + 生成参数（高级，默认折叠，不打扰新手） */}
+              {/* custom model endpoints + generation params (advanced, collapsed by default, does not disturb beginners) */}
               <details className="group rounded-xl border border-border/50 bg-card/30">
                 <summary className="flex items-center justify-between cursor-pointer list-none select-none px-5 py-3.5 text-sm font-medium text-muted-foreground hover:text-foreground">
                   <span>{t("advancedSection")}</span>
@@ -1066,19 +1066,19 @@ export default function SettingsPage() {
               </details>
             </div>
           </TabsContent>
-          {/* Tab 3: 出镜人物管理 */}
+          {/* Tab 3: character management */}
           <TabsContent value={2}>
             <CharacterManager />
           </TabsContent>
-          {/* Tab 4: 品牌设置 */}
+          {/* Tab 4: brand settings */}
           <TabsContent value={3}>
             <BrandSettings />
           </TabsContent>
         </Tabs>
 
-        {/* 底部保存按钮 */}
+        {/* bottom save button */}
         <div className="mt-8 flex items-center justify-between gap-3">
-          {/* 配置状态摘要 */}
+          {/* configuration status summary */}
           <div className="text-xs text-muted-foreground space-y-1">
             <p className={llm.apiKey ? "text-emerald-600" : "text-amber-600"}>
               {llm.apiKey ? t("llmConfigured") : t("llmNotConfigured")}
@@ -1113,7 +1113,7 @@ export default function SettingsPage() {
   );
 }
 
-// ==================== 出镜人物管理组件 ====================
+// ==================== character management component ====================
 
 function CharacterManager() {
   const t = useT("settings");
@@ -1258,9 +1258,9 @@ function CharacterManager() {
   );
 }
 
-// ==================== 品牌设置组件 ====================
+// ==================== brand settings component ====================
 
-// 水印位置选项（labelKey 在组件内按语言渲染）
+// watermark position options (labelKey is rendered per language inside the component)
 const WATERMARK_POSITIONS = [
   { value: "top-left" as const, labelKey: "brandPositionTopLeft" },
   { value: "top-right" as const, labelKey: "brandPositionTopRight" },
@@ -1274,7 +1274,7 @@ function BrandSettings() {
 
   return (
     <div className="space-y-6">
-      {/* 店铺基本信息 */}
+      {/* shop basic info */}
       <Card className="glass-card">
         <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -1288,7 +1288,7 @@ function BrandSettings() {
           </div>
 
           <div className="grid gap-4">
-            {/* 店铺名称 */}
+            {/* shop name */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">{t("brandNameLabel")}</Label>
               <Input
@@ -1299,7 +1299,7 @@ function BrandSettings() {
               />
             </div>
 
-            {/* Logo 上传区 */}
+            {/* Logo upload area */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Logo</Label>
               <div className="flex items-center gap-4">
@@ -1327,7 +1327,7 @@ function BrandSettings() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          // 将选择的图片转为 Data URL 存储
+                          // convert the selected image to a Data URL for storage
                           const reader = new FileReader();
                           reader.onload = (ev) => {
                             updateBrand({ logoUrl: ev.target?.result as string });
@@ -1356,7 +1356,7 @@ function BrandSettings() {
         </CardContent>
       </Card>
 
-      {/* 品牌色设置 */}
+      {/* brand color settings */}
       <Card className="glass-card">
         <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -1367,7 +1367,7 @@ function BrandSettings() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* 主色 */}
+            {/* primary color */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">{t("brandPrimaryColor")}</Label>
               <div className="flex items-center gap-2">
@@ -1392,7 +1392,7 @@ function BrandSettings() {
               </div>
             </div>
 
-            {/* 辅色 */}
+            {/* secondary color */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">{t("brandSecondaryColor")}</Label>
               <div className="flex items-center gap-2">
@@ -1420,7 +1420,7 @@ function BrandSettings() {
         </CardContent>
       </Card>
 
-      {/* 水印设置 */}
+      {/* watermark settings */}
       <Card className="glass-card">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
@@ -1440,7 +1440,7 @@ function BrandSettings() {
 
           {brand.watermark.enabled && (
             <div className="space-y-4 pt-2">
-              {/* 水印位置 */}
+              {/* watermark position */}
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">{t("brandWatermarkPosition")}</Label>
                 <div className="grid grid-cols-4 gap-2">
@@ -1460,7 +1460,7 @@ function BrandSettings() {
                 </div>
               </div>
 
-              {/* 透明度 */}
+              {/* opacity */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs text-muted-foreground">{t("brandWatermarkOpacity")}</Label>
@@ -1489,7 +1489,7 @@ function BrandSettings() {
         </CardContent>
       </Card>
 
-      {/* 片尾设置 */}
+      {/* outro settings */}
       <Card className="glass-card">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">

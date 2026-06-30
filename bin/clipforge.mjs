@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 /**
- * ClipForge CLI —— 命令行一句话出片：给一个主题，自动写脚本、配画面、配音、合成成片。
+ * ClipForge CLI — generate a video from a topic in one command: auto-write script, match footage, add voiceover, and compose.
  *
- * 是 ClipForge HTTP API 的薄封装（与 mcp/clipforge-mcp.mjs 同一套编排：DB / FFmpeg / 免费 TTS / 免费素材），
- * 零第三方依赖、纯 Node。需先启动实例（pnpm dev / pnpm start）。素材+配音全程免 Key，只有写脚本要一个 LLM Key。
+ * Thin wrapper around the ClipForge HTTP API (same orchestration as mcp/clipforge-mcp.mjs: DB / FFmpeg / free TTS / free stock),
+ * zero third-party deps, pure Node. Requires a running instance (pnpm dev / pnpm start). Stock + voiceover need no API key; only script generation needs an LLM key.
  *
- * 用法：
+ * Usage:
  *   node bin/clipforge.mjs create --topic "在家手冲咖啡" [--duration 25] [--style knowledge]
  *        [--footage auto|image|video] [--voice <id>] [--aspect 9:16|16:9|1:1]
  *        [--quality fast|standard|hd] [--bgm] [--bgm-mood upbeat] [--karaoke] [--cta "👇 点击下方下单"] [--json]
- *   node bin/clipforge.mjs compose --project <id> [上述同款成片选项]   为已有脚本+素材的项目出片
- *   node bin/clipforge.mjs list                     列出项目
- *   node bin/clipforge.mjs voices                   列出免费音色
- *   node bin/clipforge.mjs get --project <id>       查最新成片地址
+ *   node bin/clipforge.mjs compose --project <id> [same compose options]   compose an existing project with script + assets
+ *   node bin/clipforge.mjs list                     list projects
+ *   node bin/clipforge.mjs voices                   list free voices
+ *   node bin/clipforge.mjs get --project <id>       fetch the latest composed video URL
  *   node bin/clipforge.mjs --help | --version
  *
- * 环境变量（与 MCP 一致）：
- *   CLIPFORGE_BASE_URL（默认 http://localhost:3000）
- *   CLIPFORGE_LLM_BASE_URL / CLIPFORGE_LLM_API_KEY / CLIPFORGE_LLM_MODEL（create 必需，OpenAI 兼容）
- *   CLIPFORGE_PEXELS_KEY / CLIPFORGE_PIXABAY_KEY（可选，补充付费高质量视频源）
+ * Environment variables (same as MCP):
+ *   CLIPFORGE_BASE_URL (default http://localhost:3000)
+ *   CLIPFORGE_LLM_BASE_URL / CLIPFORGE_LLM_API_KEY / CLIPFORGE_LLM_MODEL (required for create, OpenAI-compatible)
+ *   CLIPFORGE_PEXELS_KEY / CLIPFORGE_PIXABAY_KEY (optional, for supplemental paid high-quality video sources)
  */
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -40,7 +40,7 @@ const ASPECT_RATIOS = ["9:16", "16:9", "1:1"];
 const QUALITY_PRESETS = ["fast", "standard", "hd"];
 const BGM_MOODS = ["upbeat", "chill", "energetic", "emotional"];
 
-/** 读自身 package 版本（bin/ 上一级即仓库根） */
+/** Read own package version (parent of bin/ is the repo root) */
 function readVersion() {
   try {
     const here = dirname(fileURLToPath(import.meta.url));
@@ -52,8 +52,8 @@ function readVersion() {
 }
 
 /**
- * 极简 argv 解析（零依赖）：首个非 --flag 词作为子命令；--key value 取值，--flag 置 true。
- * 导出便于单测（见 __tests__）。
+ * Minimal argv parser (zero deps): first non-flag token becomes the subcommand; --key value reads a value, --flag sets true.
+ * Exported for unit testing (see __tests__).
  */
 export function parseArgs(argv) {
   const out = { _: [], flags: {} };
@@ -63,13 +63,13 @@ export function parseArgs(argv) {
       const eqBody = tok.slice(2);
       const eq = eqBody.indexOf("=");
       if (eq !== -1) {
-        out.flags[eqBody.slice(0, eq)] = eqBody.slice(eq + 1); // --key=value 写法
+        out.flags[eqBody.slice(0, eq)] = eqBody.slice(eq + 1); // --key=value syntax
         continue;
       }
       const key = eqBody;
       const next = argv[i + 1];
       if (next === undefined || next.startsWith("--")) {
-        out.flags[key] = true; // 布尔开关
+        out.flags[key] = true; // boolean flag
       } else {
         out.flags[key] = next;
         i++;
@@ -81,7 +81,7 @@ export function parseArgs(argv) {
   return out;
 }
 
-/** 由 flags 拼 compose 请求体（与 MCP composeBody 同义，命令行风格入参） */
+/** Build a compose request body from flags (equivalent to MCP composeBody, CLI-style input) */
 export function composeBodyFromFlags(flags) {
   const body = { freeTts: { enabled: true } };
   if (typeof flags.voice === "string") body.freeTts.voice = flags.voice;
@@ -97,7 +97,7 @@ export function composeBodyFromFlags(flags) {
   return body;
 }
 
-/** 按主题书写系统挑默认免费音色（与 MCP defaultVoiceForTopic 同逻辑），null=用服务端中文默认 */
+/** Pick a default free voice based on topic language (same logic as MCP defaultVoiceForTopic); null = use server-side Chinese default */
 export function defaultVoiceForTopic(topic) {
   const t = String(topic || "");
   if (/[぀-ヿ]/.test(t)) return "ja-JP-NanamiNeural";
@@ -106,7 +106,7 @@ export function defaultVoiceForTopic(topic) {
   return "en-US-AriaNeural";
 }
 
-/** 调 ClipForge HTTP API；非 2xx 抛带后端 error 文案的异常 */
+/** Call the ClipForge HTTP API; throws with the backend error message on non-2xx responses */
 async function api(path, { method = "GET", body, timeoutMs = 600000 } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -135,7 +135,7 @@ async function api(path, { method = "GET", body, timeoutMs = 600000 } = {}) {
   return data;
 }
 
-/** 轮询合成结果直到 done/failed */
+/** Poll the compose result until done/failed */
 async function pollCompose(projectId, { timeoutMs = 300000, intervalMs = 2500 } = {}) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -149,7 +149,7 @@ async function pollCompose(projectId, { timeoutMs = 300000, intervalMs = 2500 } 
 }
 
 const absVideoUrl = (c) => (c?.url ? `${BASE_URL}${c.url}` : null);
-/** 进度走 stderr（stdout 留给最终结果，便于脚本管道取 videoUrl） */
+/** Progress goes to stderr (stdout is reserved for the final result, so scripts can pipe the videoUrl) */
 const step = (m) => process.stderr.write(`· ${m}\n`);
 
 function requireLlm() {
@@ -245,7 +245,7 @@ async function cmdVoices() {
   return { ok: true, default: res.default, voices: res.voices ?? [] };
 }
 
-// 热点选题：拉某地区每日热搜，建议该做什么主题（再 create --topic 出片）
+// Trending topics: fetch daily trending searches for a region and suggest what topic to produce next (then use create --topic)
 async function cmdTrends(flags) {
   const geo = typeof flags.geo === "string" ? flags.geo : "US";
   const res = await api(`/api/trends?geo=${encodeURIComponent(geo)}`);
@@ -263,7 +263,7 @@ async function cmdGet(flags) {
   return { ok: true, projectId, status: composition.status, videoUrl: absVideoUrl(composition) };
 }
 
-// 自带脚本导入：把你写好的稿子切成分镜存为当前脚本，之后用 compose 出片（配合本地素材即全自主成片）
+// Import your own script: split a pre-written script into shots and save as the current script, then use compose to render (combine with local assets for a fully self-sufficient pipeline)
 async function cmdImport(flags) {
   const projectId = String(flags.project || "").trim();
   if (!projectId) throw new Error("--project 不能为空");
@@ -278,7 +278,7 @@ async function cmdImport(flags) {
   return { ok: true, projectId, ...res };
 }
 
-// 配音译制：把当前脚本翻成目标语种存为译制版，再用推荐音色 compose 即得换语种配音版（出海）
+// Dubbing / localization: translate the current script into the target language and save as a dubbed version; compose with the recommended voice to produce a localized voiceover (for international distribution)
 async function cmdDub(flags) {
   requireLlm();
   const projectId = String(flags.project || "").trim();
@@ -344,7 +344,7 @@ async function main() {
   return 0;
 }
 
-// 仅作为入口运行时执行（被单测 import 时不跑）
+// Only run when executed as an entry point (not when imported by unit tests)
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   main()
     .then((code) => process.exit(code ?? 0))

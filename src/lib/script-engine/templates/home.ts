@@ -1,6 +1,6 @@
 /**
- * 家居日用品类脚本模板
- * 包含经典爆款脚本结构，适用于清洁用品、收纳、厨房用具、家纺等
+ * Home & daily-use product script templates
+ * Classic viral script structures for cleaning supplies, storage, kitchenware, home textiles, etc.
  */
 
 import type { Shot } from "@/lib/db/schema";
@@ -83,7 +83,7 @@ export const homeTemplates: ScriptTemplate[] = [
   },
 ];
 
-/** 家居品类特有的 prompt 指令 */
+/** Prompt directive specific to the home & daily-use category */
 export const homePromptDirective = `
 你正在为【家居日用】品类创作短视频带货脚本。请注意以下要点：
 1. Before/After对比是最强说服力：脏vs干净、乱vs整齐、旧vs新

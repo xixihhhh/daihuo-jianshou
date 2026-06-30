@@ -7,9 +7,11 @@ import { translateShots, defaultVoiceForLang, langName } from "@/lib/script-engi
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
 
 /**
- * POST /api/project/[id]/dub —— 把当前选中脚本翻成目标语种，存为新选中脚本版本（译制版）。
- * 之后用返回的 recommendedVoice 走正常 compose，即得换语种配音版（出海：同片发不同市场）。
- * 画面检索字段保持原文，译制版沿用同样画面，只换声音/字幕。
+ * POST /api/project/[id]/dub — Translate the currently selected script into a target language
+ * and save it as a new selected script version (dubbed version).
+ * Run a normal compose with the returned recommendedVoice to produce a re-voiced localized version
+ * (for overseas distribution: same footage, different markets).
+ * Visual search fields retain the original language; the dubbed version reuses the same visuals with only the audio/subtitles swapped.
  * body: { targetLang: string, llmConfig: {baseUrl,apiKey,model}, title? }
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     body = await req.json();
   } catch {
-    /* 允许空 body，下面校验 */
+    /* allow empty body; validated below */
   }
   const targetLang = typeof body.targetLang === "string" ? body.targetLang.trim() : "";
   if (!targetLang) return NextResponse.json({ error: "请指定 targetLang（如 en/ja/ko/es）" }, { status: 400 });
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const totalDuration = translated.reduce((sum, sh) => sum + sh.duration, 0);
 
-  // 取下一版本号；旧脚本取消选中，译制版设为当前
+  // Get the next version number; deselect old scripts and mark the dubbed version as current
   const [latest] = await db
     .select({ version: scriptsTable.version })
     .from(scriptsTable)

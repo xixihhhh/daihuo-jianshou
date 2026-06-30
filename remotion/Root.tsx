@@ -3,7 +3,7 @@ import { Composition } from "remotion";
 import { TitleCard } from "./TitleCard";
 import { KineticCaption } from "./KineticCaption";
 
-// 元素合成的尺寸/时长可由 props 覆盖（render-element.mjs 按 --aspect / --duration 传入），默认 9:16。
+// Element composition dimensions/duration can be overridden via props (render-element.mjs passes --aspect / --duration), defaulting to 9:16.
 type ElementProps = {
   text: string;
   subtitle?: string;

@@ -1,30 +1,33 @@
 /**
- * 效果回流：把「发布后人工录入的各条数据」聚合成洞察反哺生成——
- * 既能看「哪种脚本风格更能卖」(按 style)，也能看「哪个钩子机制更能卖」(按 hookId，配合钩子 A/B)。
- * 带货最关心转化（成交/播放），其次互动（赞评转/播放）。纯函数、可单测；DB/UI 在外层。
+ * Performance feedback loop: aggregates manually-entered post-publish metrics into insights
+ * that feed back into content generation —
+ * shows "which script style sells best" (by style) and "which hook mechanism sells best"
+ * (by hookId, paired with hook A/B testing).
+ * E-commerce cares most about conversion (orders/views), then engagement (likes+comments+shares/views).
+ * Pure functions, unit-testable; DB/UI live in outer layers.
  */
 
-/** 单条投放数据（DB 行的最小子集，聚合只需这些） */
+/** Single campaign record (minimal subset of a DB row; only these fields are needed for aggregation) */
 export interface MetricInput {
-  /** 脚本风格 key（pain_point/scene/comparison/story/custom），录入时定格 */
+  /** Script style key (pain_point/scene/comparison/story/custom), locked at entry time */
   style: string;
-  /** 钩子机制 id（= HookPattern.id），录入时定格；钩子 A/B 回流用，可空 */
+  /** Hook mechanism id (= HookPattern.id), locked at entry time; used for hook A/B feedback, nullable */
   hookId?: string;
   views: number;
   likes?: number;
   comments?: number;
   shares?: number;
-  /** 成交单数 */
+  /** Number of orders (conversions) */
   orders?: number;
 }
 
 interface GroupStats {
-  /** 样本数（发了几条） */
+  /** Number of samples (posts published) */
   samples: number;
   avgViews: number;
-  /** 互动率 (赞+评+转)/播放，0..1 */
+  /** Engagement rate: (likes + comments + shares) / views, 0..1 */
   engagementRate: number;
-  /** 转化率 成交/播放，0..1 */
+  /** Conversion rate: orders / views, 0..1 */
   conversionRate: number;
   totalOrders: number;
 }
@@ -39,7 +42,7 @@ export interface HookInsight extends GroupStats {
 
 const sum = (rs: MetricInput[], f: (r: MetricInput) => number) => rs.reduce((a, r) => a + (f(r) || 0), 0);
 
-/** 按某 key 分组聚合，转化率降序（带货优先「能不能卖」）、并列按样本数；key 为空的记录跳过 */
+/** Group and aggregate by a given key, sorted by conversion rate descending (e-commerce prioritizes "can it sell"), ties broken by sample count; records with empty key are skipped */
 function aggregateBy(
   records: MetricInput[],
   getKey: (r: MetricInput) => string | undefined
@@ -70,23 +73,23 @@ function aggregateBy(
   return out.sort((a, b) => b.conversionRate - a.conversionRate || b.samples - a.samples);
 }
 
-/** 按脚本风格聚合 */
+/** Aggregate by script style */
 export function aggregateByStyle(records: MetricInput[]): StyleInsight[] {
   return aggregateBy(records, (r) => r.style).map(({ key, ...rest }) => ({ style: key, ...rest }));
 }
 
-/** 按钩子机制聚合（钩子 A/B：哪个机制更能卖）；无 hookId 的记录不计入 */
+/** Aggregate by hook mechanism (hook A/B: which mechanism sells better); records without hookId are excluded */
 export function aggregateByHook(records: MetricInput[]): HookInsight[] {
   return aggregateBy(records, (r) => r.hookId).map(({ key, ...rest }) => ({ hookId: key, ...rest }));
 }
 
-/** 推荐「最能卖」的风格：需达最小样本数（默认 2，避免单条偶然）且转化率 > 0；不足返回 null 不给误导 */
+/** Returns the top-converting style: requires minimum sample count (default 2, to avoid single-post flukes) and conversion rate > 0; returns null when insufficient data to avoid misleading results */
 export function topConvertingStyle(records: MetricInput[], minSamples = 2): StyleInsight | null {
   const ranked = aggregateByStyle(records).filter((i) => i.samples >= minSamples && i.conversionRate > 0);
   return ranked[0] ?? null;
 }
 
-/** 推荐「最能卖」的钩子机制（同样要够样本、转化 > 0） */
+/** Returns the top-converting hook mechanism (same requirements: sufficient samples and conversion rate > 0) */
 export function topConvertingHook(records: MetricInput[], minSamples = 2): HookInsight | null {
   const ranked = aggregateByHook(records).filter((i) => i.samples >= minSamples && i.conversionRate > 0);
   return ranked[0] ?? null;

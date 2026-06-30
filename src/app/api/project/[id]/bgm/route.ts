@@ -5,7 +5,7 @@ import { join } from "path";
 
 const ALLOWED = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/aac", "audio/mp4", "audio/x-m4a"];
 
-// 上传背景音乐（合成时混入并自动压低，让位配音）
+// Upload background music (mixed in during composition with auto-ducking to make room for voiceover)
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -20,7 +20,7 @@ export async function POST(
     if (!file) return NextResponse.json({ error: "未收到音频文件" }, { status: 400 });
     const ext = file.name.split(".").pop()?.toLowerCase() || "mp3";
     const ALLOWED_EXT = ["mp3", "wav", "aac", "m4a"];
-    // mime 或扩展名任一匹配即可（部分上传不带准确 mime）
+    // Accept if either MIME type or extension matches (some uploads lack an accurate MIME type)
     if (!ALLOWED.includes(file.type) && !ALLOWED_EXT.includes(ext)) {
       return NextResponse.json({ error: "仅支持 mp3/wav/aac/m4a 音频" }, { status: 400 });
     }

@@ -1,26 +1,27 @@
 /**
- * 素材匹配辅助 —— 服务"无商品也能成片，且永远有画面"的目标
+ * Stock-matching helpers — in service of the goal "produce a video even without a product, and always have footage"
  *
- * broadenQuery：当某个英文检索词在素材库一无所获时，产出由具体到宽泛的回退检索词，
- * 直到能命中素材（避免新手输入的生僻主题导致某个分镜没有任何画面可用）。
+ * broadenQuery: when an English search term returns no results from the stock library,
+ * generates a sequence of progressively broader fallback queries until something matches
+ * (prevents obscure topics entered by beginners from leaving a shot with no footage at all).
  */
 
-/** 万能兜底检索词：任何免费素材库都有大量结果 */
+/** Universal fallback queries: every free stock library has plenty of results for these */
 const UNIVERSAL_FALLBACKS = ["abstract background", "lifestyle", "nature", "light"];
 
 /**
- * 给一个英文检索词，产出由具体到宽泛的回退检索词序列（不含原词、已去重）。
- * 例：broadenQuery("quantum entanglement physics")
+ * Given an English search query, produces a sequence of fallback queries from specific to broad (original excluded, deduplicated).
+ * Example: broadenQuery("quantum entanglement physics")
  *   → ["entanglement physics", "physics", "abstract background", "lifestyle", "nature", "light"]
- * 纯函数，便于单测。
+ * Pure function — easy to unit-test.
  */
 export function broadenQuery(query: string): string[] {
   const q = (query || "").trim();
   const words = q.split(/\s+/).filter(Boolean);
   const out: string[] = [];
 
-  if (words.length > 2) out.push(words.slice(-2).join(" ")); // 末两词
-  if (words.length > 1) out.push(words[words.length - 1]); // 末词（通常是主体名词）
+  if (words.length > 2) out.push(words.slice(-2).join(" ")); // last two words
+  if (words.length > 1) out.push(words[words.length - 1]); // last word (typically the main noun)
   out.push(...UNIVERSAL_FALLBACKS);
 
   const seen = new Set<string>([q.toLowerCase()]);
@@ -32,35 +33,36 @@ export function broadenQuery(query: string): string[] {
   });
 }
 
-/** 拼出某个分镜的素材检索词：优先英文 stockKeywords，回退到画面描述/配音 */
+/** Build a stock search query for a shot: prefers English stockKeywords, falls back to the visual description or voiceover */
 export function shotQuery(shot: { stockKeywords?: string[]; description?: string; voiceover?: string }): string {
   if (shot.stockKeywords?.length) return shot.stockKeywords.join(" ");
   return (shot.description || shot.voiceover || "").trim();
 }
 
-// ==================== 候选择优打分 ====================
-// 现状只取检索命中的第一条，易配错画面/整片重复同图。下面在多候选里按
-// 关键词重合 + 竖屏方向 + 与相邻分镜去重 打分选最优。纯函数、可单测。
+// ==================== candidate scoring ====================
+// Currently only the first search result is used, which often picks the wrong footage or repeats the same image throughout.
+// The code below scores multiple candidates by keyword overlap + portrait orientation + cross-shot deduplication to select the best one.
+// Pure functions — unit-testable.
 
 type ShotLike = { stockKeywords?: string[]; description?: string; voiceover?: string };
 
 export interface CandidateLike {
-  /** 唯一标识，用于相邻分镜去重 */
+  /** Unique identifier, used for cross-shot deduplication */
   id?: string;
-  /** 素材自带标签 */
+  /** Tags provided by the stock asset */
   tags?: string[];
-  /** 标题/描述 */
+  /** Title or description */
   title?: string;
   orientation?: "portrait" | "landscape" | "square";
   type?: "image" | "video";
 }
 
 export interface ScoreOpts {
-  /** 偏好竖屏(9:16)，默认 true */
+  /** Prefer portrait (9:16) orientation, default true */
   preferPortrait?: boolean;
-  /** 偏好动态视频 B-roll，默认 false */
+  /** Prefer dynamic video B-roll, default false */
   preferVideo?: boolean;
-  /** 已用过的候选 id（相邻分镜去重，避免整片同图） */
+  /** IDs of candidates already used (cross-shot deduplication to avoid the same image repeating) */
   usedIds?: Set<string>;
 }
 
@@ -70,25 +72,25 @@ const terms = (s: string) =>
     .split(/[^a-z0-9一-鿿]+/)
     .filter(Boolean);
 
-/** 给一个候选打分（越高越合适）。纯函数。 */
+/** Score a single candidate (higher = better fit). Pure function. */
 export function scoreCandidate(shot: ShotLike, candidate: CandidateLike, opts: ScoreOpts = {}): number {
   const wantTerms = new Set([...(shot.stockKeywords ?? []), ...terms(shotQuery(shot))].flatMap((t) => terms(t)));
   const candTerms = new Set([...(candidate.tags ?? []), ...terms(candidate.title ?? "")].flatMap((t) => terms(t)));
   let overlap = 0;
   for (const t of candTerms) if (wantTerms.has(t)) overlap++;
-  let score = overlap * 10; // 关键词命中权重最高
+  let score = overlap * 10; // keyword match carries the highest weight
 
   if (opts.preferPortrait !== false) {
     if (candidate.orientation === "portrait") score += 5;
-    else if (candidate.orientation === "landscape") score -= 3; // 横屏铺竖屏会糊/留黑边
+    else if (candidate.orientation === "landscape") score -= 3; // landscape stretched to portrait gets blurry or leaves black bars
   }
   if (opts.preferVideo && candidate.type === "video") score += 4;
-  if (candidate.id && opts.usedIds?.has(candidate.id)) score -= 8; // 整片别重复同一素材
+  if (candidate.id && opts.usedIds?.has(candidate.id)) score -= 8; // avoid reusing the same asset across the whole video
 
   return score;
 }
 
-/** 从多个候选里选最优（无候选返回 undefined）。挑中后调用方可把其 id 加入 usedIds 供后续去重。 */
+/** Pick the best candidate from a list (returns undefined when the list is empty). After selecting, the caller can add the winner's id to usedIds for subsequent deduplication. */
 export function pickBestCandidate<T extends CandidateLike>(shot: ShotLike, candidates: T[], opts: ScoreOpts = {}): T | undefined {
   let best: T | undefined;
   let bestScore = -Infinity;

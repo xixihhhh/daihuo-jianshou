@@ -20,13 +20,13 @@ import { broadenQuery } from "@/lib/stock-matcher";
 import { getDb } from "@/lib/db";
 import { assets as assetsTable } from "@/lib/db/schema";
 
-/** 校验 projectId 防路径穿越（与 upload 路由一致） */
+/** validate projectId to prevent path traversal (consistent with the upload route) */
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
 
 const VALID_SOURCES = new Set(STOCK_SOURCES.map((s) => s.id));
 
 /**
- * GET /api/stock/search —— 列出可用素材源（前端据此渲染源选择/标注 keyless）
+ * GET /api/stock/search —— list available stock sources (used by the frontend to render source selector / mark keyless sources)
  */
 export async function GET() {
   const available = getAvailableSources().map((s) => s.id);
@@ -38,23 +38,23 @@ export async function GET() {
       mediaTypes: s.mediaTypes,
       signupUrl: s.signupUrl,
       note: s.note,
-      available: available.includes(s.id), // 当前环境(env key 或 keyless)是否可直接用
+      available: available.includes(s.id), // whether the source is ready to use in the current environment (env key present or keyless)
     })),
   });
 }
 
 /**
- * POST /api/stock/search —— 多源检索版权素材，可选下载落库到 assets。
+ * POST /api/stock/search —— search licensed stock media from multiple sources; optionally download and persist to assets.
  *
  * body: {
- *   query: string,                 // 检索词（建议英文）
- *   source?: "pexels"|"pixabay"|"openverse"|"all",  // 默认 pexels（向后兼容）
- *   mediaType?: "video"|"image"|"audio",            // 默认 video
- *   orientation?: "portrait"|"landscape"|"square",  // 默认 portrait
+ *   query: string,                 // search query (English recommended for better recall)
+ *   source?: "pexels"|"pixabay"|"openverse"|"all",  // default: pexels (backward-compatible)
+ *   mediaType?: "video"|"image"|"audio",            // default: video
+ *   orientation?: "portrait"|"landscape"|"square",  // default: portrait
  *   perPage?: number, minSec?: number, maxSec?: number,
  *   download?: boolean, projectId?: string, shotId?: number, count?: number,
- *   apiKeys?: { pexels?, pixabay?, openverse? },     // 多源 Key
- *   apiKey?: string                // 向后兼容：作用于 source 单源
+ *   apiKeys?: { pexels?, pixabay?, openverse? },     // per-source API keys
+ *   apiKey?: string                // backward-compat: applies to the single source specified by `source`
  * }
  */
 export async function POST(req: NextRequest) {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   const minSec = body.minSec != null ? Number(body.minSec) : undefined;
   const maxSec = body.maxSec != null ? Number(body.maxSec) : undefined;
 
-  // 组装多源 Key：apiKeys 对象优先；向后兼容 apiKey 作用于单源
+  // build per-source key map: apiKeys object takes priority; fall back to legacy apiKey for single-source requests
   const apiKeys: Partial<Record<StockSourceId, string>> =
     (body.apiKeys as Partial<Record<StockSourceId, string>>) ?? {};
   if (body.apiKey && source !== "all" && !apiKeys[source]) {
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   const searchOpts = { apiKeys, mediaType, perPage, orientation, minSec, maxSec };
 
-  // 检索
+  // search
   let candidates: StockCandidate[];
   let skippedSources: StockSourceId[] = [];
   try {
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       candidates = agg.candidates;
       skippedSources = agg.skippedSources;
     } else {
-      // 单源：若该源需 Key 而未提供，给精准提示
+      // single source: if the source requires a key that wasn't provided, return a precise error message
       const meta = STOCK_SOURCES.find((s) => s.id === source)!;
       if (!isSourceAvailable(meta, apiKeys)) {
         return NextResponse.json(
@@ -120,17 +120,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `素材检索失败：${msg}` }, { status });
   }
 
-  // 仅预览
+  // preview only
   if (!download) {
     return NextResponse.json({ candidates, skippedSources });
   }
 
-  // 下载落库
+  // download and persist to DB
   const projectId = String(body.projectId ?? "");
   if (!projectId || !SAFE_ID.test(projectId)) {
     return NextResponse.json({ error: "download=true 时需提供合法 projectId" }, { status: 400 });
   }
-  // "永远有素材"兜底：原检索词无果时，用更宽泛的回退词重试，避免新手生僻主题导致某分镜空画面
+  // "always have footage" fallback: when the original query returns nothing, retry with broader fallback terms to prevent blank shots caused by niche topics
   if (candidates.length === 0) {
     for (const bq of broadenQuery(query)) {
       try {
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
             ? (await searchAllStock(bq, searchOpts)).candidates
             : await searchStock(source, bq, searchOpts);
       } catch {
-        /* 单个回退词失败则换下一个 */
+        /* skip to the next fallback term if this one fails */
       }
       if (candidates.length > 0) break;
     }
@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
           type: "stock_footage",
           filePath: publicUrl,
           thumbnailPath: c.previewImage ?? null,
-          provider: c.source, // 记录实际来源（pexels/pixabay/openverse）
+          provider: c.source, // record the actual source (pexels/pixabay/openverse)
           prompt: query,
           sourceUrl: c.pageUrl,
           author: c.author,

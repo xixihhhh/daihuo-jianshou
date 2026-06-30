@@ -1,56 +1,60 @@
 /**
- * 渲染质量预设（快速 / 标准 / 高清）——一键在「出片速度」与「清晰度/体积」之间取舍，
- * 新手不用懂分辨率/编码参数也能选。映射到真实的 FFmpeg 编码参数（分辨率 + x264 -preset + -crf）。
+ * Render quality presets (fast / standard / hd) — one-click trade-off between render speed and
+ * clarity/file size, so beginners don't need to understand resolution or encoding parameters.
+ * Maps to actual FFmpeg encoding parameters (resolution + x264 -preset + -crf).
  *
- * 安全：videoPreset / crf 会拼进 FFmpeg 命令，必须来自这里的白名单，禁止透传用户任意字符串。
+ * Security: videoPreset / crf are interpolated into the FFmpeg command and MUST come from the
+ * whitelist defined here; passing arbitrary user-supplied strings is forbidden.
  */
 
 export type RenderPreset = "fast" | "standard" | "hd";
 
 export interface RenderProfile {
   resolution: "720p" | "1080p";
-  /** x264 -preset：编码速度（越快压缩率越低、文件略大） */
+  /** x264 -preset: encoding speed (faster = lower compression ratio = slightly larger file) */
   videoPreset: "veryfast" | "medium" | "slow";
-  /** x264 -crf：质量（越小越清晰、文件越大；18 视觉无损附近） */
+  /** x264 -crf: quality (lower = sharper = larger file; 18 is near visually lossless) */
   crf: number;
 }
 
 export const RENDER_PRESETS: Record<RenderPreset, RenderProfile> = {
-  // 快速：720p + 最快编码，出片最快、文件最小，适合先看效果 / 批量草稿
+  // Fast: 720p + fastest encoding — quickest render, smallest file, good for previewing or batch drafts
   fast: { resolution: "720p", videoPreset: "veryfast", crf: 26 },
-  // 标准：1080p + 均衡，日常发布推荐
+  // Standard: 1080p + balanced — recommended for everyday publishing
   standard: { resolution: "1080p", videoPreset: "medium", crf: 20 },
-  // 高清：1080p + 慢速高质量编码，画质最好、渲染最慢
+  // HD: 1080p + slow high-quality encoding — best visual quality, slowest render
   hd: { resolution: "1080p", videoPreset: "slow", crf: 17 },
 };
 
 export const DEFAULT_RENDER_PRESET: RenderPreset = "standard";
 
-/** 合法的 x264 preset 白名单（防注入兜底） */
+/** Allowlist of valid x264 presets (injection-prevention safety net) */
 const VALID_X264_PRESETS = new Set([
   "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow",
 ]);
 
-/** 按预设名取渲染配置（非法值回退默认），结果一定是白名单内的安全参数 */
+/** Returns the render profile for a preset name (falls back to default for invalid values); result is always a safe, whitelisted parameter set. */
 export function resolveRenderProfile(preset: string | undefined): RenderProfile {
   return RENDER_PRESETS[preset as RenderPreset] ?? RENDER_PRESETS[DEFAULT_RENDER_PRESET];
 }
 
-/** 判断是否为合法的渲染预设——用于区分「真选了预设」与「传了非法字符串」（后者不应顶掉用户显式分辨率） */
+/** Returns whether a value is a valid render preset — used to distinguish "a preset was genuinely selected" from "an invalid string was passed" (the latter must not override the user's explicit resolution). */
 export function isRenderPreset(v: unknown): v is RenderPreset {
   return typeof v === "string" && v in RENDER_PRESETS;
 }
 
 export interface ContentSignals {
   shotCount: number;
-  /** 用了图生视频(i2v)的分镜数——i2v 已是真视频段，更值得上高画质 */
+  /** Number of shots using image-to-video (i2v) — i2v shots are already real video segments and benefit more from high quality */
   i2vCount?: number;
   totalDuration: number;
 }
 
 /**
- * 按内容复杂度推荐渲染档位 + 一句理由：短而简单→fast 先看效果；长片/多分镜/多 i2v→hd 值得高清；
- * 其余→standard。UI 标「已为你推荐 X（理由）」，用户仍可改；白名单安全机制不变。
+ * Recommends a render tier based on content complexity, along with a one-line reason:
+ * short & simple → fast (preview first); long / many shots / many i2v shots → hd (worth the quality);
+ * otherwise → standard. The UI labels this as "Recommended: X (reason)" and the user can still change it;
+ * the whitelist safety mechanism remains unchanged.
  */
 export function recommendPreset(s: ContentSignals): { preset: RenderPreset; reason: string } {
   const i2v = s.i2vCount ?? 0;
@@ -63,7 +67,7 @@ export function recommendPreset(s: ContentSignals): { preset: RenderPreset; reas
   return { preset: "standard", reason: "常规长度，标准档均衡画质与速度" };
 }
 
-/** 校验并夹取编码参数为合法范围，供合成器最后一道兜底（即使外部直接传也安全） */
+/** Validates and clamps encoding parameters to legal ranges — a final safety net in the composer (safe even if called with externally supplied values). */
 export function safeEncodeParams(videoPreset: string | undefined, crf: number | undefined): {
   videoPreset: string;
   crf: number;

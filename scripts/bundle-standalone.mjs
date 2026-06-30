@@ -1,5 +1,5 @@
-// 构建后补齐 standalone 自包含资源（next build 的 standalone 默认不含 static/public），
-// 拷贝迁移 SQL，并把 standalone 里的 better-sqlite3 副本换成 Electron ABI 的预编译二进制。
+// After build, fill in the standalone self-contained assets (next build's standalone omits static/public by default),
+// copy migration SQL, and replace the better-sqlite3 copy inside standalone with the Electron ABI prebuilt binary.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { execSync } from "child_process";
 import { createRequire } from "module";
@@ -30,13 +30,13 @@ for (const [from, to] of copies) {
   console.log(`✓ ${from} → ${to}`);
 }
 
-// 注：standalone/node_modules 保持 pnpm 原始软链结构（afterPack 用 cp -R 保链整体拷贝，完整不丢依赖）。
+// Note: standalone/node_modules retains pnpm's original symlink structure (afterPack uses cp -R to copy the whole tree with links, so no dependencies are lost).
 
-// === 把 standalone 的 better-sqlite3 副本换成 Electron 运行时的 ABI 预编译 ===
-// 主 node_modules 那份保持系统 Node ABI（next build 的 collect page data 要用它）；
-// 打包后 App 用 Electron 内置 Node fork server.js，需匹配 Electron 的 ABI（如 Electron 42=146），
-// 否则任何 DB 路由都会因 NODE_MODULE_VERSION 不匹配而 500。直接取官方 electron-vXXX 预编译，不编译源码。
-// 注：cp/tar 等命令面向 mac/linux 构建机；Windows 打包(CI matrix)时再按平台分支。
+// === Replace the standalone better-sqlite3 copy with the Electron runtime ABI prebuilt ===
+// The copy in the main node_modules keeps the system Node ABI (needed by next build's collect page data step);
+// the packaged App runs server.js via Electron's built-in Node fork, which must match Electron's ABI (e.g. Electron 42=146),
+// otherwise any DB route will 500 due to NODE_MODULE_VERSION mismatch. Pull the official electron-vXXX prebuilt; do not compile from source.
+// Note: cp/tar commands target mac/linux build machines; add platform branches for Windows packaging (CI matrix) when needed.
 await rebuildBetterSqlite3ForElectron();
 
 async function rebuildBetterSqlite3ForElectron() {
@@ -49,8 +49,8 @@ async function rebuildBetterSqlite3ForElectron() {
   const bsDir = join(pnpmDir, bsEntry, "node_modules", "better-sqlite3");
   const bsVer = JSON.parse(readFileSync(join(bsDir, "package.json"), "utf8")).version;
 
-  // 问 Electron 自己的 module ABI（最可靠，不依赖 node-abi 版本映射）
-  const electronPath = require("electron"); // 返回 Electron 可执行文件绝对路径
+  // Ask Electron itself for its module ABI (most reliable; does not depend on node-abi version mapping)
+  const electronPath = require("electron"); // returns the absolute path to the Electron executable
   const abi = execSync(`"${electronPath}" -e "process.stdout.write(String(process.versions.modules))"`, {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
   })

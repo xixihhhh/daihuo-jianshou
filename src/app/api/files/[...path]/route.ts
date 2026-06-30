@@ -4,20 +4,20 @@ import { readFile } from "fs/promises";
 import { join, normalize, sep } from "path";
 import { existsSync } from "fs";
 
-// 静态文件服务 - 提供上传的图片/视频访问
+// Static file server - serves uploaded images/videos
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
 
-  // 上传根目录
+  // Root directory for uploads
   const uploadsRoot = join(getDataDir(), "uploads");
-  // 解码并归一化路径后再拼接，防止 ..%2f 等编码绕过造成路径穿越
+  // Decode and normalize path segments before joining to prevent path traversal via encodings like ..%2f
   const decodedSegments = path.map((seg) => decodeURIComponent(seg));
   const filePath = normalize(join(uploadsRoot, ...decodedSegments));
 
-  // 校验最终路径必须仍位于上传根目录内
+  // Verify the resolved path is still within the uploads root directory
   if (filePath !== uploadsRoot && !filePath.startsWith(uploadsRoot + sep)) {
     return NextResponse.json({ error: "非法路径" }, { status: 403 });
   }

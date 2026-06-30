@@ -3,7 +3,7 @@ import { getDataDir } from "@/lib/paths";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
-/** 允许上传的文件类型白名单 */
+/** Allowlist of permitted upload MIME types */
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -13,16 +13,16 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/bmp",
 ]);
 
-/** 允许的文件扩展名白名单 */
+/** Allowlist of permitted file extensions */
 const ALLOWED_EXTENSIONS = new Set([
   "jpg", "jpeg", "png", "webp", "gif", "svg", "bmp",
 ]);
 
-/** 单文件最大大小（20MB） */
+/** Maximum size per file (20 MB) */
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-// 上传商品库图片：不绑定 project，按 productId 落盘到 data/uploads/products/<productId>/
-// 返回的 /api/files/products/... 路径可被现有静态文件路由直接读取，刷新/跨页均有效（取代易失效的 blob: URL）
+// Upload product-library images: not tied to a project; written to disk at data/uploads/products/<productId>/ by productId.
+// The returned /api/files/products/... path is served by the existing static-file route and stays valid across page reloads and navigation (replacing short-lived blob: URLs).
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const files = formData.getAll("files") as File[];
@@ -36,19 +36,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "缺少商品ID" }, { status: 400 });
   }
 
-  // 校验 productId 防止路径穿越（只允许 UUID 格式或字母数字连字符）
+  // Validate productId to prevent path traversal (only UUID format or alphanumeric hyphens allowed)
   if (!/^[a-zA-Z0-9\-]+$/.test(productId)) {
     return NextResponse.json({ error: "无效的商品ID格式" }, { status: 400 });
   }
 
-  // 商品图统一放在 uploads/products/<productId>/，与项目上传目录隔离
+  // Product images are stored under uploads/products/<productId>/, isolated from the per-project upload directories
   const uploadDir = join(getDataDir(), "uploads", "products", productId);
   await mkdir(uploadDir, { recursive: true });
 
   const savedPaths: string[] = [];
 
   for (const file of files) {
-    // 校验文件大小
+    // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: `文件 ${file.name} 超过 20MB 大小限制` },
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 校验 MIME 类型
+    // Validate MIME type
     if (!ALLOWED_MIME_TYPES.has(file.type)) {
       return NextResponse.json(
         { error: `文件 ${file.name} 类型不支持，仅允许图片文件` },
@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 从原始文件名提取扩展名并校验（防止路径穿越）
-    const rawName = file.name.replace(/[/\\]/g, ""); // 移除路径分隔符
+    // Extract and validate the extension from the original filename (prevent path traversal)
+    const rawName = file.name.replace(/[/\\]/g, ""); // strip path separators
     const ext = rawName.split(".").pop()?.toLowerCase() || "jpg";
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       return NextResponse.json(
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // 生成唯一文件名（不使用原始文件名，避免安全问题）
+    // Generate a unique filename (do not use the original filename to avoid security issues)
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const filePath = join(uploadDir, fileName);
 

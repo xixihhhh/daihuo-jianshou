@@ -13,7 +13,7 @@ const UA = "Mozilla/5.0 (compatible; ClipForge/1.0; +https://github.com/xixihhhh
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
 const MAX_IMAGES = 3;
 
-/** 经 SSRF 防护下载一张商品图到本地（safeFetch 逐跳校验，杜绝 og:image 指向内网）。 */
+/** Download a single product image to local disk with SSRF protection (safeFetch validates each redirect hop to block og:image pointing to internal addresses). */
 async function safeDownloadImage(url: string, destDir: string, base: string): Promise<string> {
   const res = await safeFetch(url, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`图片下载失败 ${res.status}`);
@@ -28,9 +28,9 @@ async function safeDownloadImage(url: string, destDir: string, base: string): Pr
 }
 
 /**
- * POST /api/ingest/product —— 商品链接一键导入。
- * body: { url, createProject? }（createProject 默认 true：建带货项目 + 下载前 3 张商品图）
- * 抓取商品页 → 解析 标题/价格/描述/图 → （可选）建项目落地，前端/MCP 拿到 projectId 直接走脚本→出片。
+ * POST /api/ingest/product — one-click product link import.
+ * body: { url, createProject? } (createProject defaults to true: create a commerce project + download the first 3 product images)
+ * Fetch product page → parse title/price/description/images → (optionally) persist as a project; the frontend/MCP can then use the projectId to go straight to script → video generation.
  */
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
@@ -46,12 +46,12 @@ export async function POST(req: NextRequest) {
   }
   const createProject = body.createProject !== false;
 
-  // 抓取 HTML（描述性 UA + 超时 + 体积上限）
+  // Fetch HTML (descriptive UA + timeout + size cap)
   let html: string;
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
-    // safeFetch：禁内网/元数据地址 + 逐跳校验重定向（防 SSRF）
+    // safeFetch: blocks internal/metadata addresses + validates each redirect hop (SSRF prevention)
     const res = await safeFetch(url, {
       headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml,*/*" },
       signal: ctrl.signal,
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
   if (!createProject) return NextResponse.json({ product });
 
-  // 建带货项目 + 下载前若干张商品图落库
+  // Create a commerce project + download the first few product images and persist them
   const db = getDb();
   const name = (product.title || "导入的商品").slice(0, 60);
   const [proj] = await db
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       const filePath = await safeDownloadImage(img, destDir, `ingest_${Date.now()}_${i}`);
       saved.push(`/api/files/${proj.id}/${basename(filePath)}`);
     } catch {
-      /* 单张图下载失败 / 被 SSRF 拦截则跳过 */
+      /* Skip images that fail to download or are blocked by SSRF protection */
     }
   }
   if (saved.length > 0) {

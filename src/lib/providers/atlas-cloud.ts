@@ -1,13 +1,13 @@
 /**
- * Atlas Cloud Provider 实现
- * 基于 Atlas Cloud REST API，支持图片和视频生成
- * 文档参考: https://www.atlascloud.ai/docs
+ * Atlas Cloud Provider implementation
+ * Built on the Atlas Cloud REST API, supports image and video generation
+ * Docs: https://www.atlascloud.ai/docs
  *
- * API 协议（已通过官方 MCP/文档实测确认，2026-06）：
- * - 提交生图:   POST /model/generateImage  -> { code, data: { id } }
- * - 提交生视频: POST /model/generateVideo  -> { code, data: { id } }
- * - 查询结果:   GET  /model/prediction/{id} -> { id, status, outputs: string[] }
- *   状态值: created | processing | completed | succeeded | failed | timeout
+ * API protocol (confirmed via official MCP / docs, 2026-06):
+ * - Submit image:   POST /model/generateImage  -> { code, data: { id } }
+ * - Submit video:   POST /model/generateVideo  -> { code, data: { id } }
+ * - Query result:   GET  /model/prediction/{id} -> { id, status, outputs: string[] }
+ *   Status values: created | processing | completed | succeeded | failed | timeout
  */
 
 import { BaseProvider, ProviderError } from './base'
@@ -23,9 +23,9 @@ import type {
   MediaType,
 } from './types'
 
-// ==================== Atlas Cloud API 响应类型 ====================
+// ==================== Atlas Cloud API response types ====================
 
-/** 创建任务响应（外层 code/data 包裹） */
+/** Create-task response (outer code/data wrapper) */
 interface AtlasCreateResponse {
   code?: number
   message?: string
@@ -33,29 +33,29 @@ interface AtlasCreateResponse {
     id: string
     [key: string]: unknown
   }
-  // 部分接口（enable_sync_mode）会直接返回 prediction 对象
+  // some endpoints (enable_sync_mode) return the prediction object directly
   id?: string
   [key: string]: unknown
 }
 
-/** 任务查询响应 */
+/** Task query response */
 interface AtlasPredictionResponse {
   code?: number
   message?: string
   data?: AtlasPrediction
-  // 兼容直接返回 prediction 对象的情况
+  // also compatible with a response that returns the prediction object directly
   id?: string
   status?: string
   outputs?: string[]
   [key: string]: unknown
 }
 
-/** 预测任务对象 */
+/** Prediction task object */
 interface AtlasPrediction {
   id: string
   model?: string
   status: string
-  /** 生成结果 URL 列表（图片/视频） */
+  /** List of generated output URLs (images / videos) */
   outputs?: string[]
   error?: string | { message?: string; code?: string }
   created_at?: string
@@ -63,7 +63,7 @@ interface AtlasPrediction {
   [key: string]: unknown
 }
 
-// ==================== Provider 实现 ====================
+// ==================== Provider implementation ====================
 
 export class AtlasCloudProvider extends BaseProvider {
   readonly name = 'atlas-cloud'
@@ -77,19 +77,19 @@ export class AtlasCloudProvider extends BaseProvider {
   }
 
   /**
-   * 生成图片
+   * Generate an image
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
     const body = {
       model: options.modelId,
       prompt: options.prompt,
-      // Atlas Cloud 使用 "宽x高" 字符串表示尺寸
+      // Atlas Cloud uses a "widthxheight" string for dimensions
       ...(options.width && options.height && {
         size: `${options.width}x${options.height}`,
       }),
       ...(options.negativePrompt && { negative_prompt: options.negativePrompt }),
       ...(options.seed !== undefined && { seed: options.seed }),
-      // image-to-image / 编辑模式（如 openai/gpt-image-2/edit）使用 images 数组传参考图
+      // image-to-image / edit mode (e.g. openai/gpt-image-2/edit) passes the reference image as an images array
       ...(options.referenceImageUrl && {
         images: [options.referenceImageUrl],
       }),
@@ -104,7 +104,7 @@ export class AtlasCloudProvider extends BaseProvider {
 
     const taskId = this.extractTaskId(response)
 
-    // 异步任务模式，轮询获取结果
+    // async task mode: poll until result is ready
     const finalStatus = await this.pollTaskStatus(taskId, { interval: 2000 })
 
     const outputs = this.extractOutputs(finalStatus)
@@ -118,10 +118,10 @@ export class AtlasCloudProvider extends BaseProvider {
   }
 
   /**
-   * 生成视频
+   * Generate a video
    */
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
-    // 支持音频的模型（如 Seedance 2.0）将配音文案融入 prompt
+    // models that support audio (e.g. Seedance 2.0) embed the voiceover copy into the prompt
     let prompt = options.prompt
     if (options.audioEnabled && options.voiceover) {
       prompt = `${options.prompt}. 旁白: "${options.voiceover}"`
@@ -130,18 +130,18 @@ export class AtlasCloudProvider extends BaseProvider {
     const body = {
       model: options.modelId,
       prompt,
-      // image-to-video 模式的首帧图
+      // first frame for image-to-video mode
       ...(options.firstFrameUrl && { image: options.firstFrameUrl }),
-      // 尾帧图（Seedance 2.0 / Vidu 首尾帧过渡）
+      // last frame (Seedance 2.0 / Vidu start-end transition)
       ...(options.lastFrameUrl && { last_image: options.lastFrameUrl }),
       ...(options.duration && { duration: options.duration }),
-      // Atlas Cloud 视频接口使用 resolution + ratio 而非 width/height
+      // Atlas Cloud video API uses resolution + ratio instead of width/height
       ...(options.width && options.height && {
         resolution: this.mapResolution(options.width, options.height),
         ratio: this.mapRatio(options.width, options.height),
       }),
       ...(options.seed !== undefined && { seed: options.seed }),
-      // 音频开关（Seedance 2.0 默认生成音频，未启用时显式关闭）
+      // audio toggle (Seedance 2.0 generates audio by default; explicitly disable when not enabled)
       generate_audio: options.audioEnabled ?? false,
       watermark: false,
       ...options.extra,
@@ -155,7 +155,7 @@ export class AtlasCloudProvider extends BaseProvider {
 
     const taskId = this.extractTaskId(response)
 
-    // 视频生成耗时较长，拉长轮询间隔
+    // video generation takes longer; use a longer polling interval
     const finalStatus = await this.pollTaskStatus(taskId, { interval: 5000 })
 
     const outputs = this.extractOutputs(finalStatus)
@@ -171,14 +171,14 @@ export class AtlasCloudProvider extends BaseProvider {
   }
 
   /**
-   * 查询任务状态
+   * Query task status
    */
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
     const response = await this.request<AtlasPredictionResponse>(
       `/model/prediction/${taskId}`
     )
 
-    // 兼容 { code, data: {...} } 包裹和直接返回 prediction 两种格式
+    // compatible with both { code, data: {...} } wrapper format and direct prediction object
     const prediction: AtlasPrediction =
       (response.data as AtlasPrediction | undefined) ??
       (response as unknown as AtlasPrediction)
@@ -191,17 +191,17 @@ export class AtlasCloudProvider extends BaseProvider {
       createdAt: prediction.created_at,
     }
 
-    // 任务完成时解析结果（outputs 为 URL 数组，由调用方区分图片/视频）
+    // parse result when task completes (outputs is a URL array; caller distinguishes image vs video)
     if (status === 'completed' && prediction.outputs && prediction.outputs.length > 0) {
       const urls = prediction.outputs
-      // 简单按扩展名判断媒体类型，默认视频
+      // infer media type from file extension; default to video
       const isImage = urls.every((u) => /\.(png|jpe?g|webp|gif|bmp)(\?|$)/i.test(u))
       taskStatus.result = isImage
         ? { taskId: taskStatus.taskId, imageUrls: urls, modelId: prediction.model ?? '' }
         : { taskId: taskStatus.taskId, videoUrls: urls, modelId: prediction.model ?? '' }
     }
 
-    // 任务失败时填充错误信息
+    // populate error info when the task fails
     if (status === 'failed') {
       if (typeof prediction.error === 'string') {
         taskStatus.error = prediction.error
@@ -217,22 +217,22 @@ export class AtlasCloudProvider extends BaseProvider {
   }
 
   /**
-   * 获取可用模型列表
-   * 基于 Atlas Cloud 官方模型列表确认（2026-06，通过官方 MCP 实测）
+   * List available models
+   * Confirmed from Atlas Cloud official model list (2026-06, verified via official MCP)
    */
   async listModels(mediaType?: MediaType): Promise<Model[]> {
     let models: Model[] = [
-      // ==================== 视频生成 ====================
-      // --- 豆包 Seedance 2.0（最新，原生音频） ---
+      // ==================== Video generation ====================
+      // --- Doubao Seedance 2.0 (latest, native audio) ---
       { id: 'bytedance/seedance-2.0/text-to-video', name: 'Seedance 2.0 (文生视频)', description: '字节最新视频模型，原生音频，4-15秒，最高1440p', modes: ['text-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
       { id: 'bytedance/seedance-2.0/image-to-video', name: 'Seedance 2.0 (图生视频)', description: '首帧/尾帧图生视频，原生音频', modes: ['image-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
       { id: 'bytedance/seedance-2.0/reference-to-video', name: 'Seedance 2.0 (参考生视频)', description: '多模态参考图/视频/音频生成，支持视频编辑', modes: ['image-to-video', 'video-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
       { id: 'bytedance/seedance-2.0-fast/text-to-video', name: 'Seedance 2.0 Fast (文生视频)', description: 'Seedance 2.0 快速版，原生音频', modes: ['text-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
       { id: 'bytedance/seedance-2.0-fast/image-to-video', name: 'Seedance 2.0 Fast (图生视频)', description: 'Seedance 2.0 快速版图生视频', modes: ['image-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      // --- 豆包 Seedance 1.5 ---
+      // --- Doubao Seedance 1.5 ---
       { id: 'bytedance/seedance-v1.5-pro/text-to-video', name: 'Seedance 1.5 Pro (文生视频)', modes: ['text-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
       { id: 'bytedance/seedance-v1.5-pro/image-to-video', name: 'Seedance 1.5 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      // --- 可灵 Kling 3.0 ---
+      // --- Kling 3.0 ---
       { id: 'kwaivgi/kling-v3.0-pro/text-to-video', name: 'Kling 3.0 Pro (文生视频)', modes: ['text-to-video'], mediaType: 'video', provider: this.name },
       { id: 'kwaivgi/kling-v3.0-pro/image-to-video', name: 'Kling 3.0 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
       { id: 'kwaivgi/kling-v3.0-std/text-to-video', name: 'Kling 3.0 Std (文生视频)', modes: ['text-to-video'], mediaType: 'video', provider: this.name },
@@ -242,13 +242,13 @@ export class AtlasCloudProvider extends BaseProvider {
       { id: 'vidu/q3-pro/image-to-video', name: 'Vidu Q3 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
       { id: 'vidu/q3-pro/start-end-to-video', name: 'Vidu Q3 Pro (首尾帧过渡)', description: '指定首尾帧生成过渡视频', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
       { id: 'vidu/q3-turbo/image-to-video', name: 'Vidu Q3 Turbo (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
-      // --- 万相 Wan ---
+      // --- Wan (Wanxiang) ---
       { id: 'alibaba/wan-2.6/image-to-video-flash', name: '万相 2.6 Flash (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
-      // ==================== 图片生成 ====================
-      // --- OpenAI GPT Image 2（最新） ---
+      // ==================== Image generation ====================
+      // --- OpenAI GPT Image 2 (latest) ---
       { id: 'openai/gpt-image-2/text-to-image', name: 'GPT Image 2 (文生图)', description: 'OpenAI 最新生图模型，支持任意分辨率，商品图质感好', modes: ['text-to-image'], mediaType: 'image', provider: this.name },
       { id: 'openai/gpt-image-2/edit', name: 'GPT Image 2 (图片编辑)', description: '自然语言精准编辑：换背景、调光线、改文字', modes: ['image-to-image'], mediaType: 'image', provider: this.name },
-      // --- 其他生图模型 ---
+      // --- Other image generation models ---
       { id: 'bytedance/seedream-v5.0-lite', name: 'Seedream 5.0 Lite (文生图)', modes: ['text-to-image'], mediaType: 'image', provider: this.name },
       { id: 'google/nano-banana-2/text-to-image', name: 'Nano Banana 2 (文生图)', modes: ['text-to-image'], mediaType: 'image', provider: this.name },
     ]
@@ -259,9 +259,9 @@ export class AtlasCloudProvider extends BaseProvider {
     return models
   }
 
-  // ==================== 私有方法 ====================
+  // ==================== Private methods ====================
 
-  /** 从创建任务响应中提取任务 ID（兼容包裹/非包裹两种格式） */
+  /** Extract task ID from the create-task response (compatible with both wrapped and unwrapped formats) */
   private extractTaskId(response: AtlasCreateResponse): string {
     const taskId = response.data?.id ?? response.id
     if (!taskId) {
@@ -274,7 +274,7 @@ export class AtlasCloudProvider extends BaseProvider {
     return taskId
   }
 
-  /** 从最终任务状态中提取输出 URL 列表 */
+  /** Extract the list of output URLs from the final task status */
   private extractOutputs(finalStatus: TaskStatus): string[] {
     const result = this.requireResult(finalStatus.result)
     const urls = 'imageUrls' in result ? result.imageUrls : result.videoUrls
@@ -284,7 +284,7 @@ export class AtlasCloudProvider extends BaseProvider {
     return urls
   }
 
-  /** 映射 Atlas Cloud 任务状态到统一状态 */
+  /** Map Atlas Cloud task status to the unified status enum */
   private mapStatus(atlasStatus: string): TaskStatusEnum {
     const statusMap: Record<string, TaskStatusEnum> = {
       created: 'pending',
@@ -302,7 +302,7 @@ export class AtlasCloudProvider extends BaseProvider {
     return statusMap[atlasStatus] ?? 'pending'
   }
 
-  /** 根据宽高映射到 Atlas Cloud 的 resolution 档位 */
+  /** Map width/height to the Atlas Cloud resolution tier */
   private mapResolution(width: number, height: number): string {
     const minSide = Math.min(width, height)
     if (minSide >= 1080) return '1080p'
@@ -310,7 +310,7 @@ export class AtlasCloudProvider extends BaseProvider {
     return '480p'
   }
 
-  /** 根据宽高映射到最接近的 ratio 档位 */
+  /** Map width/height to the nearest ratio tier */
   private mapRatio(width: number, height: number): string {
     const candidates: Array<[string, number]> = [
       ['16:9', 16 / 9],

@@ -1,41 +1,42 @@
 /**
- * 转场策略
- * 核心思路：用 AI 首尾帧拼接实现自然过渡，而非 FFmpeg 模板转场
+ * Transition strategy
+ * Core idea: achieve natural transitions by stitching AI-generated start/end frames,
+ * rather than using FFmpeg template transitions.
  *
- * 工作流程：
- * 1. 生成第一个片段的视频
- * 2. 提取最后一帧作为"结束帧"
- * 3. 生成下一个片段的"开始帧"（可以是 AI 生图或商品图）
- * 4. 用支持首尾帧的模型（Vidu start-end / Kling start-end）生成过渡片段
- * 5. 或者直接让 AI 在生成下一个片段时以上一个片段的最后一帧为参考
+ * Workflow:
+ * 1. Generate the video for the first clip
+ * 2. Extract the last frame as the "end frame"
+ * 3. Generate the "start frame" for the next clip (can be an AI image or product image)
+ * 4. Use a model that supports start/end frames (Vidu start-end / Kling start-end) to generate the transition clip
+ * 5. Or directly let the AI use the last frame of the previous clip as a reference when generating the next clip
  */
 
-// 转场模式
+// transition mode
 export type TransitionMode =
-  | "ai_start_end"    // AI 首尾帧过渡（推荐，效果最好）
-  | "ai_reference"    // AI 参考上一帧生成（次选）
-  | "direct_concat"   // 直接拼接（硬切）
-  | "ffmpeg_fade";    // FFmpeg 淡入淡出（保底方案）
+  | "ai_start_end"    // AI start/end frame transition (recommended, best quality)
+  | "ai_reference"    // AI generation with reference to previous frame (second choice)
+  | "direct_concat"   // direct concatenation (hard cut)
+  | "ffmpeg_fade";    // FFmpeg fade in/out (fallback option)
 
 export interface TransitionConfig {
   mode: TransitionMode;
   label: string;
   description: string;
-  // 支持该转场模式的模型
+  // models that support this transition mode
   supportedModels: string[];
 }
 
-// 转场方案列表
+// list of transition configurations
 export const TRANSITIONS: Record<TransitionMode, TransitionConfig> = {
   ai_start_end: {
     mode: "ai_start_end",
     label: "AI 智能过渡",
     description: "提取前一片段最后一帧和后一片段首帧，用 AI 生成自然转场视频",
     supportedModels: [
-      // Seedance 2.0（支持首帧 image + 尾帧 last_image）
+      // Seedance 2.0 (supports start frame image + end frame last_image)
       "bytedance/seedance-2.0/image-to-video",
       "bytedance/seedance-2.0-fast/image-to-video",
-      // Vidu Q3 系列
+      // Vidu Q3 series
       "vidu/q3-pro/start-end-to-video",
       "vidu/q3-turbo/start-end-to-video",
       "vidu/start-end-to-video-2.0",
@@ -46,7 +47,7 @@ export const TRANSITIONS: Record<TransitionMode, TransitionConfig> = {
     label: "AI 参考过渡",
     description: "将前一片段最后一帧作为参考图，生成下一个片段时自动衔接",
     supportedModels: [
-      // Kling 3.0 O3 系列（最新）
+      // Kling 3.0 O3 series (latest)
       "kwaivgi/kling-video-o3-pro/reference-to-video",
       "kwaivgi/kling-video-o3-std/reference-to-video",
       // Kling 3.0 Pro/Std
@@ -58,7 +59,7 @@ export const TRANSITIONS: Record<TransitionMode, TransitionConfig> = {
       // Vidu
       "vidu/reference-to-video-q1",
       "vidu/reference-to-video-2.0",
-      // Seedance 2.0（多模态参考生视频）
+      // Seedance 2.0 (multimodal reference-to-video)
       "bytedance/seedance-2.0/reference-to-video",
       "bytedance/seedance-2.0-fast/reference-to-video",
       // Seedance v1.5
@@ -81,25 +82,25 @@ export const TRANSITIONS: Record<TransitionMode, TransitionConfig> = {
   },
 };
 
-// 获取转场列表
+// get the list of all transitions
 export function getTransitionList(): TransitionConfig[] {
   return Object.values(TRANSITIONS);
 }
 
-// 根据用户已配置的 Provider 推荐最佳转场方案
+// recommend the best transition mode based on the user's configured providers
 export function recommendTransition(availableModels: string[]): TransitionMode {
-  // 优先用 AI 首尾帧
+  // prefer AI start/end frame transition
   const hasStartEnd = TRANSITIONS.ai_start_end.supportedModels.some((m) =>
     availableModels.includes(m)
   );
   if (hasStartEnd) return "ai_start_end";
 
-  // 次选 AI 参考
+  // second choice: AI reference transition
   const hasReference = TRANSITIONS.ai_reference.supportedModels.some((m) =>
     availableModels.includes(m)
   );
   if (hasReference) return "ai_reference";
 
-  // 保底淡入淡出
+  // fallback: fade in/out
   return "ffmpeg_fade";
 }

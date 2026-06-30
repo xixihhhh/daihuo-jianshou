@@ -1,250 +1,250 @@
 /**
- * AI Provider 统一类型定义
- * 定义所有 AI 平台的通用接口和数据类型
+ * AI Provider unified type definitions
+ * Defines common interfaces and data types for all AI platforms
  */
 
-// ==================== 枚举 ====================
+// ==================== enums ====================
 
-/** 生成模式 */
+/** Generation mode */
 export type GenerationMode =
-  | 'text-to-image'     // 文本生成图片
-  | 'image-to-image'    // 图片生成图片（风格转换等）
-  | 'text-to-video'     // 文本生成视频
-  | 'image-to-video'    // 图片生成视频
-  | 'video-to-video'    // 视频生成视频（风格转换等）
+  | 'text-to-image'     // text to image
+  | 'image-to-image'    // image to image (style transfer, etc.)
+  | 'text-to-video'     // text to video
+  | 'image-to-video'    // image to video
+  | 'video-to-video'    // video to video (style transfer, etc.)
 
-/** 任务状态枚举 */
+/** Task status enum */
 export type TaskStatusEnum =
-  | 'pending'       // 排队中
-  | 'processing'    // 生成中
-  | 'completed'     // 已完成
-  | 'failed'        // 失败
-  | 'cancelled'     // 已取消
+  | 'pending'       // queued
+  | 'processing'    // generating
+  | 'completed'     // done
+  | 'failed'        // failed
+  | 'cancelled'     // cancelled
 
-/** 媒体类型 */
+/** Media type */
 export type MediaType = 'image' | 'video'
 
-// ==================== 配置类型 ====================
+// ==================== config types ====================
 
-/** Provider 配置 */
+/** Provider configuration */
 export interface ProviderConfig {
-  /** 平台名称标识 */
+  /** Platform identifier name */
   name: string
-  /** API 密钥 */
+  /** API key */
   apiKey: string
-  /** API 基础地址 */
+  /** API base URL */
   baseUrl: string
-  /** 请求超时时间（毫秒），默认 30000 */
+  /** Request timeout in milliseconds; default 30000 */
   timeout?: number
-  /** 额外的请求头 */
+  /** Additional request headers */
   headers?: Record<string, string>
-  /** 平台特有配置 */
+  /** Platform-specific configuration */
   extra?: Record<string, unknown>
 }
 
-// ==================== 模型类型 ====================
+// ==================== model types ====================
 
-/** 模型信息 */
+/** Model information */
 export interface Model {
-  /** 模型 ID */
+  /** Model ID */
   id: string
-  /** 模型名称 */
+  /** Model name */
   name: string
-  /** 模型描述 */
+  /** Model description */
   description?: string
-  /** 支持的生成模式 */
+  /** Supported generation modes */
   modes: GenerationMode[]
-  /** 支持的媒体类型 */
+  /** Supported media type */
   mediaType: MediaType
-  /** 模型所属平台 */
+  /** Platform this model belongs to */
   provider: string
-  /** 是否支持生成带音频的视频（配音/音效） */
+  /** Whether the model supports generating video with an audio track (voiceover/sound effects) */
   supportsAudio?: boolean
-  /** 额外的模型信息 */
+  /** Additional model metadata */
   extra?: Record<string, unknown>
 }
 
-// ==================== 图片相关类型 ====================
+// ==================== image-related types ====================
 
-/** 图片生成选项 */
+/** Image generation options */
 export interface ImageOptions {
-  /** 使用的模型 ID */
+  /** Model ID to use */
   modelId: string
-  /** 生成模式 */
+  /** Generation mode */
   mode: 'text-to-image' | 'image-to-image'
-  /** 文本提示词 */
+  /** Text prompt */
   prompt: string
-  /** 反向提示词 */
+  /** Negative prompt */
   negativePrompt?: string
-  /** 输出宽度 */
+  /** Output width */
   width?: number
-  /** 输出高度 */
+  /** Output height */
   height?: number
-  /** 生成数量 */
+  /** Number of images to generate */
   count?: number
-  /** 参考图片 URL（image-to-image 模式） */
+  /** Reference image URL (image-to-image mode) */
   referenceImageUrl?: string
-  /** 引导系数，控制与提示词的匹配程度 */
+  /** Guidance scale; controls how closely the output follows the prompt */
   guidanceScale?: number
-  /** 推理步数 */
+  /** Number of inference steps */
   steps?: number
-  /** 随机种子 */
+  /** Random seed */
   seed?: number
-  /** 额外参数 */
+  /** Additional parameters */
   extra?: Record<string, unknown>
 }
 
-/** 图片生成结果 */
+/** Image generation result */
 export interface ImageResult {
-  /** 任务 ID */
+  /** Task ID */
   taskId: string
-  /** 生成的图片 URL 列表 */
+  /** List of generated image URLs */
   imageUrls: string[]
-  /** 生成耗时（毫秒） */
+  /** Generation time (milliseconds) */
   duration?: number
-  /** 模型 ID */
+  /** Model ID */
   modelId: string
-  /** 使用的种子值 */
+  /** Seed value used */
   seed?: number
-  /** 额外的返回信息 */
+  /** Additional response data */
   extra?: Record<string, unknown>
 }
 
-// ==================== 视频相关类型 ====================
+// ==================== video-related types ====================
 
-/** 视频生成选项 */
+/** Video generation options */
 export interface VideoOptions {
-  /** 使用的模型 ID */
+  /** Model ID to use */
   modelId: string
-  /** 生成模式 */
+  /** Generation mode */
   mode: 'text-to-video' | 'image-to-video' | 'video-to-video'
-  /** 文本提示词 */
+  /** Text prompt */
   prompt: string
-  /** 反向提示词 */
+  /** Negative prompt */
   negativePrompt?: string
-  /** 输出宽度 */
+  /** Output width */
   width?: number
-  /** 输出高度 */
+  /** Output height */
   height?: number
-  /** 视频时长（秒） */
+  /** Video duration (seconds) */
   duration?: number
-  /** 帧率 */
+  /** Frame rate */
   fps?: number
-  /** 首帧图片 URL（image-to-video 模式） */
+  /** First-frame image URL (image-to-video mode) */
   firstFrameUrl?: string
-  /** 尾帧图片 URL（部分平台支持） */
+  /** Last-frame image URL (supported by some platforms) */
   lastFrameUrl?: string
-  /** 参考视频 URL（video-to-video 模式） */
+  /** Reference video URL (video-to-video mode) */
   referenceVideoUrl?: string
-  /** 运动强度，控制视频运动幅度 */
+  /** Motion strength; controls the magnitude of motion in the video */
   motionStrength?: number
-  /** 引导系数 */
+  /** Guidance scale */
   guidanceScale?: number
-  /** 随机种子 */
+  /** Random seed */
   seed?: number
-  /** 配音文案（支持音频的模型会生成带配音的视频） */
+  /** Voiceover script (models that support audio will produce a video with narration) */
   voiceover?: string
-  /** 音频提示词（描述音效/音乐风格，部分模型支持） */
+  /** Audio prompt (describes sound effects / music style; supported by some models) */
   audioPrompt?: string
-  /** 是否启用音频生成 */
+  /** Whether to enable audio generation */
   audioEnabled?: boolean
-  /** 额外参数 */
+  /** Additional parameters */
   extra?: Record<string, unknown>
 }
 
-/** 视频生成结果 */
+/** Video generation result */
 export interface VideoResult {
-  /** 任务 ID */
+  /** Task ID */
   taskId: string
-  /** 生成的视频 URL 列表 */
+  /** List of generated video URLs */
   videoUrls: string[]
-  /** 封面图 URL */
+  /** Cover image URL */
   coverImageUrl?: string
-  /** 视频时长（秒） */
+  /** Video duration (seconds) */
   duration?: number
-  /** 生成耗时（毫秒） */
+  /** Generation time (milliseconds) */
   processingTime?: number
-  /** 模型 ID */
+  /** Model ID */
   modelId: string
-  /** 视频是否包含音频轨道 */
+  /** Whether the video contains an audio track */
   hasAudio?: boolean
-  /** 额外的返回信息 */
+  /** Additional response data */
   extra?: Record<string, unknown>
 }
 
-// ==================== 任务状态类型 ====================
+// ==================== task status types ====================
 
-/** 任务状态信息 */
+/** Task status information */
 export interface TaskStatus {
-  /** 任务 ID */
+  /** Task ID */
   taskId: string
-  /** 当前状态 */
+  /** Current status */
   status: TaskStatusEnum
-  /** 进度百分比（0-100） */
+  /** Progress percentage (0-100) */
   progress?: number
-  /** 结果数据（完成时） */
+  /** Result data (when completed) */
   result?: ImageResult | VideoResult
-  /** 错误信息（失败时） */
+  /** Error message (when failed) */
   error?: string
-  /** 错误码 */
+  /** Error code */
   errorCode?: string
-  /** 任务创建时间 */
+  /** Task creation time */
   createdAt?: string
-  /** 任务更新时间 */
+  /** Task last-updated time */
   updatedAt?: string
-  /** 额外信息 */
+  /** Additional info */
   extra?: Record<string, unknown>
 }
 
-// ==================== Provider 接口 ====================
+// ==================== Provider interface ====================
 
-/** AI Provider 统一接口 */
+/** AI Provider unified interface */
 export interface AIProvider {
-  /** 平台名称 */
+  /** Platform identifier name */
   readonly name: string
 
-  /** 平台显示名称 */
+  /** Platform display name */
   readonly displayName: string
 
   /**
-   * 生成图片
-   * @param options 图片生成选项
-   * @returns 图片生成结果或任务 ID（异步模式）
+   * Generate an image
+   * @param options Image generation options
+   * @returns Image generation result or task ID (async mode)
    */
   generateImage(options: ImageOptions): Promise<ImageResult>
 
   /**
-   * 生成视频
-   * @param options 视频生成选项
-   * @returns 视频生成结果或任务 ID（异步模式）
+   * Generate a video
+   * @param options Video generation options
+   * @returns Video generation result or task ID (async mode)
    */
   generateVideo(options: VideoOptions): Promise<VideoResult>
 
   /**
-   * 查询任务状态
-   * @param taskId 任务 ID
-   * @returns 任务状态信息
+   * Query task status
+   * @param taskId Task ID
+   * @returns Task status information
    */
   getTaskStatus(taskId: string): Promise<TaskStatus>
 
   /**
-   * 获取可用模型列表
-   * @param mediaType 可选过滤媒体类型
-   * @returns 模型列表
+   * Get the list of available models
+   * @param mediaType Optional media type filter
+   * @returns List of models
    */
   listModels(mediaType?: MediaType): Promise<Model[]>
 }
 
-// ==================== 工厂类型 ====================
+// ==================== factory types ====================
 
-/** Provider 注册信息 */
+/** Provider registration entry */
 export interface ProviderRegistration {
-  /** 平台名称标识 */
+  /** Platform identifier name */
   name: string
-  /** 平台显示名称 */
+  /** Platform display name */
   displayName: string
-  /** 平台描述 */
+  /** Platform description */
   description: string
-  /** 工厂函数 */
+  /** Factory function */
   factory: (config: ProviderConfig) => AIProvider
 }

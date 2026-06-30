@@ -10,20 +10,21 @@ import { buildAigcMetadataArgs } from "@/lib/compliance-metadata";
 import { CAPTION_SAFE_BOTTOM_RATIO, CAPTION_SAFE_BOTTOM_RATIO_NOCARD } from "./safe-zone";
 
 /**
- * 探测一个可用的中文字体文件路径
- * drawtext 不指定 fontfile 时，默认字体不含中文字形，中文字幕会渲染成方块/空白
- * 优先项目内置字体（部署可控），再回退到 macOS / Linux 常见中文字体
+ * Detect an available Chinese font file path.
+ * Without an explicit fontfile, drawtext falls back to a default font that lacks CJK glyphs,
+ * causing Chinese subtitles to render as boxes/blanks.
+ * Prefers the project's bundled font (deployment-stable), then falls back to common macOS/Linux fonts.
  */
 function resolveChineseFontFile(): string | undefined {
   const candidates = [
-    // 项目内置字体（推荐：把一个中文 ttf 放到 public/fonts 保证部署一致）
+    // bundled project font (recommended: place a CJK ttf in public/fonts for consistent deployment)
     join(process.cwd(), "public", "fonts", "subtitle.ttf"),
     join(process.cwd(), "public", "fonts", "subtitle.otf"),
-    // macOS 常见中文字体
+    // common macOS Chinese fonts
     "/System/Library/Fonts/PingFang.ttc",
     "/System/Library/Fonts/STHeiti Medium.ttc",
     "/Library/Fonts/Arial Unicode.ttf",
-    // Linux 常见中文字体（服务器部署）
+    // common Linux Chinese fonts (server deployment)
     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
@@ -32,26 +33,26 @@ function resolveChineseFontFile(): string | undefined {
 }
 
 /**
- * 转义 FFmpeg drawtext 滤镜中的特殊字符
- * drawtext 使用 : 作为参数分隔符，需要转义文本中的特殊字符
+ * Escape special characters in FFmpeg drawtext filter values.
+ * drawtext uses : as the parameter separator, so special characters in text must be escaped.
  */
 function escapeDrawText(text: string): string {
   return text
-    .replace(/\\/g, "\\\\\\\\")  // 反斜杠
-    .replace(/'/g, "\u2019")      // 单引号替换为右单引号（避免 shell 嵌套转义问题）
-    .replace(/:/g, "\\\\:")       // 冒号（FFmpeg drawtext 参数分隔符）
-    // 不转义 %：drawtext 配 expansion=none 后 % 为字面量；带货文案高频含「立省50%」「50% off」，
-    // 若转成 \% 则 ffmpeg 8.0 报 `Stray %` 致整条字幕/贴片渲染为空白（静默失效）。
-    .replace(/\[/g, "\\\\[")      // 方括号（FFmpeg filter 流标记）
+    .replace(/\\/g, "\\\\\\\\")  // backslash
+    .replace(/'/g, "\u2019")      // replace single quote with right single quote (avoids shell nested-escape issues)
+    .replace(/:/g, "\\\\:")       // colon (FFmpeg drawtext parameter separator)
+    // do NOT escape %: with expansion=none % is a literal; e-commerce copy frequently contains "save 50%" / "50% off",
+    // and converting to \% causes ffmpeg 8.0 to report `Stray %`, silently rendering the entire subtitle/overlay blank.
+    .replace(/\[/g, "\\\\[")      // square bracket (FFmpeg filter stream label)
     .replace(/\]/g, "\\\\]");
 }
 
-/** 转义 subtitles/ass 滤镜的路径：反斜杠→正斜杠、转义冒号(Windows 盘符)与单引号，避免破坏 filtergraph */
+/** Escape a path for the subtitles/ass filter: backslash → forward slash, escape colons (Windows drive letters) and single quotes to avoid breaking the filtergraph */
 function escapeSubtitlesPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
 }
 
-/** drawtext 滤镜参数（text/fontFile 在内部强制转义，新加贴片不会再漏转义——审计曾因字体路径用错转义器出过 bug） */
+/** drawtext filter options (text/fontFile are escaped internally, so new overlays can't miss escaping — an audit once caught a bug caused by using the wrong escaper for font paths) */
 export interface DrawtextOpts {
   fontFile?: string;
   text: string;
@@ -62,13 +63,14 @@ export interface DrawtextOpts {
   box?: { color: string; borderW: number };
   x: string;
   y: string;
-  /** 整段 enable 表达式，如 enable='between(t,0,3)'（可空） */
+  /** full enable expression, e.g. enable='between(t,0,3)' (optional) */
   enable?: string;
 }
 
 /**
- * 统一构建 drawtext 滤镜串：把「文本→escapeDrawText、字体路径→escapeSubtitlesPath」的转义收口到一处。
- * 字段顺序与各贴片站点历史顺序一致（可选字段缺省即不输出），对现有命令字节等价。
+ * Unified drawtext filter string builder: centralises escaping of text (via escapeDrawText)
+ * and font paths (via escapeSubtitlesPath) so no new overlay can accidentally skip escaping.
+ * Field order matches the historical order across all overlay sites; optional fields are omitted when absent; byte-equivalent to existing commands.
  */
 export function buildDrawtext(o: DrawtextOpts): string {
   const p: string[] = [];
@@ -90,11 +92,12 @@ export function buildDrawtext(o: DrawtextOpts): string {
   return `drawtext=${p.join(":")}`;
 }
 
-/** 由探测到的中文字体文件推断其 ASS Fontname（libass 跨平台按名匹配；macOS CoreText 一般也能兜底） */
+/** Infer the ASS Fontname from the detected Chinese font file path (libass resolves by name cross-platform; macOS CoreText usually serves as a fallback) */
 export function resolveChineseFontFamily(): string {
   const p = (resolveChineseFontFile() || "").toLowerCase();
-  // 项目内置全 CJK 字幕字体（public/fonts/subtitle.*）即 Noto Sans CJK SC——
-  // 卡拉OK 走 libass 按 Fontname 匹配，必须回这个内部族名才能用上内置字体（否则会去找系统 PingFang，韩文又成豆腐块）
+  // the bundled CJK subtitle font (public/fonts/subtitle.*) is Noto Sans CJK SC —
+  // karaoke uses libass font matching by Fontname, so we must return this internal family name
+  // to use the bundled font (otherwise libass looks for system PingFang and Korean glyphs become boxes)
   if (p.includes("fonts/subtitle") || p.includes("fonts\\subtitle")) return "Noto Sans CJK SC";
   if (p.includes("pingfang")) return "PingFang SC";
   if (p.includes("stheiti")) return "STHeiti";
@@ -105,21 +108,24 @@ export function resolveChineseFontFamily(): string {
   return "PingFang SC";
 }
 
-/** 判断是否为 CJK（中日韩）字符——用于估算字宽与换行策略 */
+/** Returns true for CJK (Chinese/Japanese/Korean) characters — used to estimate character width and line-breaking strategy */
 function isCJK(ch: string): boolean {
   return /[⺀-鿿豈-﫿＀-￯　-〿가-힣]/.test(ch);
 }
 
 /**
- * 字幕自动换行：按画面宽度把长文案折成多行（插入真实换行符，drawtext 原生支持）。
- * 解决全球化后英文配音字幕过长溢出画面两侧的问题（英文同时长字符数远多于中文）。
- * 估宽：CJK 字 ≈ fontSize，拉丁字符 ≈ fontSize×0.55；拉丁按单词断行（不拆词），CJK 按字断行。
- * 纯函数，便于单测。
+ * Auto-wrap subtitle text: fold long copy into multiple lines based on frame width
+ * (inserts real newlines, which drawtext supports natively).
+ * Solves the issue of localised English subtitles overflowing the frame edges
+ * (English subtitle strings are far longer than their Chinese equivalents).
+ * Width estimation: CJK char ≈ fontSize, Latin char ≈ fontSize×0.55;
+ * Latin breaks on word boundaries (no mid-word splits), CJK breaks per character.
+ * Pure function for easy unit testing.
  */
 export function wrapCaption(text: string, fontSize: number, frameWidth: number): string {
   const clean = (text || "").replace(/\s+/g, " ").trim();
   if (!clean) return clean;
-  const maxWidth = frameWidth * 0.86; // 两侧留边距
+  const maxWidth = frameWidth * 0.86; // side margins
   const charW = (ch: string) => (isCJK(ch) ? fontSize : fontSize * 0.55);
   const strW = (s: string) => Array.from(s).reduce((w, c) => w + charW(c), 0);
 
@@ -136,7 +142,7 @@ export function wrapCaption(text: string, fontSize: number, frameWidth: number):
   };
   for (const token of clean.split(" ")) {
     if (strW(token) > maxWidth) {
-      // 单个 token 自身超宽（长 CJK 串或超长单词）→ 按字硬切
+      // single token exceeds max width (long CJK string or very long word) → hard-break per character
       hardBreak(token);
       continue;
     }
@@ -153,9 +159,13 @@ export function wrapCaption(text: string, fontSize: number, frameWidth: number):
 }
 
 /**
- * 把一句旁白切成「短句卡」并在 [startTime,endTime] 内顺序排布——rapid 短字幕是 2026 muted 观看 / 带货留存的标配，
- * 替代「一整句静态显示一镜到底」。目标 ~1.2s 一块（封顶 8 块）；CJK 按字、Latin 按词均分，时间按块长比例分配。
- * 纯函数可单测；返回的多段字幕由现有 composer 逐段 drawtext 渲染（互不重叠，一次只显一块）。
+ * Split a narration sentence into rapid "caption cards" distributed evenly within [startTime, endTime].
+ * Rapid short captions are the 2026 standard for muted viewing / e-commerce retention,
+ * replacing the pattern of displaying a full sentence statically for an entire shot.
+ * Target: ~1.2s per card (max 8 cards); CJK splits per character, Latin splits per word;
+ * time is allocated proportionally to card length.
+ * Pure function for unit testing; the returned multi-segment subtitles are rendered by the
+ * existing composer one segment at a time via drawtext (non-overlapping, one card shown at a time).
  */
 export function chunkCaption(
   text: string,
@@ -167,7 +177,7 @@ export function chunkCaption(
   const total = Math.max(endTime - startTime, 0.1);
   const n = Math.max(1, Math.min(Math.round(total / 1.2), 8));
   if (n === 1) return [{ text: clean, startTime, endTime }];
-  const cjk = /[぀-ヿ一-鿿가-힯]/.test(clean); // 假名/汉字/谚文
+  const cjk = /[぀-ヿ一-鿿가-힯]/.test(clean); // kana / CJK / hangul
   const units = cjk ? Array.from(clean) : clean.split(/\s+/);
   if (units.length <= n) return [{ text: clean, startTime, endTime }];
   const per = Math.ceil(units.length / n);
@@ -184,14 +194,14 @@ export function chunkCaption(
 }
 
 /**
- * 转义 shell 双引号字符串中的特殊字符
- * 防止文件路径包含特殊字符时导致命令注入
+ * Escape special characters inside a shell double-quoted string.
+ * Prevents command injection when file paths contain special characters.
  */
 function escapeShellPath(filePath: string): string {
   return filePath.replace(/["$`\\!]/g, "\\$&");
 }
 
-// 视频合成配置
+// video composition configuration
 export interface ComposeConfig {
   projectId: string;
   clips: ClipInput[];
@@ -200,75 +210,75 @@ export interface ComposeConfig {
     aspectRatio: "9:16" | "16:9" | "1:1";
     bgmPath?: string;
     bgmVolume?: number; // 0-1
-    /** BGM 结尾淡出秒数（默认 3，0=不淡出）：避免 aloop 铺满后被硬切收尾生硬 */
+    /** BGM fade-out duration in seconds (default 3, 0 = no fade): prevents a hard cut at the end after aloop fills the full duration */
     bgmFadeOutSec?: number;
-    /** BGM 跳过前奏秒数（opt-in，默认 0）：跳过开头空白/前奏；设过大且 BGM 短会被清空，故默认 0 */
+    /** BGM intro skip in seconds (opt-in, default 0): skips leading silence/intro; setting too large on a short BGM will wipe it out, so default is 0 */
     bgmIntroSkipSec?: number;
-    /** 旁白闪避（opt-in，默认 false）：sidechaincompress 让旁白一响就压低 BGM、停顿回升，旁白更清晰 */
+    /** narration ducking (opt-in, default false): sidechaincompress lowers BGM whenever narration plays and restores it during pauses, making narration clearer */
     bgmDuck?: boolean;
-    /** x264 编码 preset（渲染质量预设映射，缺省 medium）；只接受白名单值 */
+    /** x264 encoding preset (render quality preset mapping, default medium); only allowlisted values are accepted */
     videoPreset?: string;
-    /** x264 -crf 质量（缺省 18）；会被夹取到合法范围 */
+    /** x264 -crf quality (default 18); clamped to a valid range */
     crf?: number;
   };
   subtitle?: {
     texts: { text: string; startTime: number; endTime: number }[];
     fontFamily?: string;
-    /** 中文字体文件绝对路径（不指定则自动探测系统中文字体） */
+    /** absolute path to a Chinese font file (if omitted, the system Chinese font is auto-detected) */
     fontFile?: string;
     fontSize?: number;
     color?: string;
     strokeColor?: string;
     strokeWidth?: number;
     position?: "bottom" | "center" | "top";
-    /** 卡拉OK逐字字幕（opt-in）：传入已写好的 ASS 文件路径则改用 libass 烧录，替代逐句 drawtext */
+    /** karaoke per-character subtitles (opt-in): providing a pre-built ASS file path switches to libass burn-in instead of per-sentence drawtext */
     karaokeAssPath?: string;
   };
-  /** 文字贴片：价格贴/卖点贴/标题贴，叠在画面上方区域（带货常见样式） */
+  /** text overlays: price tag / selling-point tag / title tag, placed in the upper portion of the frame (common e-commerce style) */
   overlays?: {
     text: string;
     style: "title" | "highlight" | "price";
     startTime: number;
     endTime: number;
   }[];
-  /** 带货商品卡贴片（opt-in）：左下角商品图缩略 + 商品名 + 价格，开头若干秒展示，营造「挂车」感 */
+  /** e-commerce product card overlay (opt-in): bottom-left thumbnail + product name + price, shown for the first few seconds to simulate a "shopping cart link" */
   productCard?: {
-    imagePath: string; // 商品图本地路径
+    imagePath: string; // local path to product image
     name?: string;
-    price?: string; // 价格文案，如「¥39.9」
+    price?: string; // price text, e.g. "¥39.9"
   };
 }
 
 export interface ClipInput {
-  type: "video" | "image"; // 视频片段或静态图+运动
+  type: "video" | "image"; // video clip or static image with motion
   filePath: string;
-  duration: number; // 秒
-  transition: string; // 转场类型
-  motion?: string; // 仅 image 类型，运动效果
-  /** 该片段是否包含原生音频（模型生成的带配音视频） */
+  duration: number; // seconds
+  transition: string; // transition type
+  motion?: string; // image type only — camera motion effect
+  /** whether this clip contains native audio (model-generated video with built-in voice-over) */
   hasAudio?: boolean;
-  /** 该片段的配音音频文件路径（TTS 生成）。会按片段时长对齐（不足补静音、超出截断） */
+  /** path to the TTS voice-over audio file for this clip; aligned to clip duration (padded with silence if shorter, trimmed if longer) */
   audioPath?: string;
 }
 
-// 分辨率映射
+// resolution mapping
 const RESOLUTIONS: Record<string, Record<string, { width: number; height: number }>> = {
   "9:16": { "720p": { width: 720, height: 1280 }, "1080p": { width: 1080, height: 1920 } },
   "16:9": { "720p": { width: 1280, height: 720 }, "1080p": { width: 1920, height: 1080 } },
   "1:1": { "720p": { width: 720, height: 720 }, "1080p": { width: 1080, height: 1080 } },
 };
 
-// 片段归一化滤镜：把每个 [v{i}] 统一成相同的像素格式 / 方形像素(SAR=1) / 30fps / 标准时基，
-// 让后续 concat / xfade 的所有输入完全一致——这是混用真实素材（不同来源、不同像素格式）时
-// 避免 FFmpeg「Error reinitializing filters」合成崩溃的关键。
+// segment normalisation filter: standardises every [v{i}] to the same pixel format / square pixels (SAR=1) / 30fps / standard timebase
+// so that all inputs to subsequent concat/xfade are completely identical — this is the key to avoiding
+// FFmpeg "Error reinitializing filters" crashes when mixing real stock footage from different sources with different pixel formats.
 const SEGMENT_NORM = "format=yuv420p,setsar=1,fps=30,settb=AVTB";
 
-/** ffmpeg_fade 转场的交叉淡化时长（秒）。视频 xfade / 音频 acrossfade / 字幕时间轴必须用同一个值，否则音画字失步 */
+/** cross-fade duration in seconds for ffmpeg_fade transitions. video xfade / audio acrossfade / subtitle timeline must all use this same value; otherwise audio, video, and subtitles drift out of sync */
 export const FADE_DURATION = 0.5;
 
-// 生成 FFmpeg 合成命令
+// build the FFmpeg composition command
 export function buildComposeCommand(config: ComposeConfig): string {
-  // 空 clips 会让后续 -map "[v0]" 指向从未创建的流，ffmpeg 报晦涩错误；这里提前给出可读错误
+  // empty clips would cause the subsequent -map "[v0]" to reference a stream that was never created, producing a cryptic ffmpeg error; fail early with a readable message instead
   if (!config.clips || config.clips.length === 0) {
     throw new Error("没有可合成的片段（clips 为空）——请先为分镜配好画面素材再合成");
   }
@@ -279,61 +289,64 @@ export function buildComposeCommand(config: ComposeConfig): string {
   const inputs: string[] = [];
   const filterParts: string[] = [];
 
-  // 判断是否有任何片段带音频（原生音频 或 TTS 配音）
+  // check whether any clip carries audio (native audio or TTS voice-over)
   const hasAnyAudio = config.clips.some(
     (c) => (c.hasAudio && c.type === "video") || c.audioPath
   );
 
-  // 处理每个片段
+  // process each clip
   config.clips.forEach((clip, i) => {
     if (clip.type === "image") {
-      // 商品原图 + 运动效果。运镜键无效时回退到默认运镜，绝不跳过片段
-      // （否则 inputs/filter 数量与下方 concat 引用的 [v${i}] 不一致，导致 ffmpeg 崩溃）
+      // product image + motion effect. falls back to default motion when the motion key is invalid; never skips the clip
+      // (otherwise the inputs/filter count would mismatch the [v${i}] references in the concat below, crashing ffmpeg)
       const motion = (clip.motion && MOTIONS[clip.motion]) || MOTIONS[DEFAULT_MOTION];
       inputs.push(`-loop 1 -t ${clip.duration} -i "${escapeShellPath(clip.filePath)}"`);
-      // 关键：zoompan 对每个输入帧输出 d 帧。-loop 产生多帧输入会导致帧数爆炸、视频被拉长数十倍，
-      // 因此先 trim 取首帧，再用 zoompan 的 d=duration*fps 控制总输出帧数。
-      // 末尾 SEGMENT_NORM 统一像素格式/SAR/帧率/时基：免费素材库的真实图片像素格式各异
-      // （yuvj420p/yuv420p/yuvj444p…），不归一会让 concat/xfade 报「Error reinitializing filters」而合成失败。
-      // zoompan 的 d=duration*fps 取整后会比 clip.duration 短 1~2 帧，多段图片累计后视频比音频/字幕短一截（漂移）。
-      // 与视频段一致地用 tpad 克隆末帧补足、再 trim 到精确 duration，保证每段图片恒等于 clip.duration。
+      // key: zoompan outputs d frames per input frame. -loop produces many input frames which causes frame count explosion
+      // and stretches the video tens of times longer than intended; use trim to grab only the first frame, then let
+      // zoompan's d=duration*fps control total output frame count.
+      // trailing SEGMENT_NORM normalises pixel format/SAR/fps/timebase: real images from free stock libraries have
+      // varying pixel formats (yuvj420p/yuv420p/yuvj444p…); without normalisation concat/xfade throws
+      // "Error reinitializing filters" and composition fails.
+      // zoompan's integer-rounded d=duration*fps may be 1–2 frames shorter than clip.duration; accumulated across
+      // multiple image clips the video ends up shorter than audio/subtitles (drift). Use tpad to clone the last
+      // frame to reach exactly clip.duration — consistent with how video clips are handled.
       filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,trim=end_frame=1,setpts=PTS-STARTPTS,${motion.getFilter(width, height, clip.duration)},tpad=stop_mode=clone:stop_duration=${clip.duration},trim=duration=${clip.duration},setpts=PTS-STARTPTS,${SEGMENT_NORM}[v${i}]`);
     } else {
-      // 视频片段：缩放铺满 + 按分镜时长对齐。免费素材库（Wikimedia 等）真实视频长度不一，
-      // 短于分镜时长的片段若只 trim 会留黑尾、并使音画/字幕错位——先 tpad 克隆末帧补到目标时长，
-      // 再 trim 截断，保证视频段恒等于 clip.duration。
+      // video clip: scale to fill + align to shot duration. real stock library videos (Wikimedia etc.) vary in length;
+      // clips shorter than the shot duration would leave a black tail and cause audio/subtitle desync if only trimmed —
+      // use tpad to clone the last frame up to the target duration, then trim, so each video clip is always exactly clip.duration.
       inputs.push(`-i "${escapeShellPath(clip.filePath)}"`);
       filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,fps=30,tpad=stop_mode=clone:stop_duration=${clip.duration},trim=duration=${clip.duration},setpts=PTS-STARTPTS,${SEGMENT_NORM}[v${i}]`);
     }
   });
 
-  // 音频处理：TTS 配音 > 视频原生音频 > 静音；每段都按片段时长对齐，保证音画同步
+  // audio handling: TTS voice-over > native video audio > silence; each segment is aligned to clip duration for audio/video sync
   const audioParts: string[] = [];
   if (hasAnyAudio) {
     config.clips.forEach((clip, i) => {
       if (clip.audioPath) {
-        // TTS 配音：作为额外输入加入，按片段时长补静音/截断对齐
+        // TTS voice-over: added as an extra input, padded with silence / trimmed to clip duration
         const ai = inputs.length;
         inputs.push(`-i "${escapeShellPath(clip.audioPath)}"`);
         audioParts.push(
           `[${ai}:a]aresample=44100,apad,atrim=duration=${clip.duration},asetpts=PTS-STARTPTS[a${i}]`
         );
       } else if (clip.hasAudio && clip.type === "video") {
-        // 提取该片段的原生音轨（模型自带语音/音效），按分镜时长补齐/裁剪对齐
+        // extract the clip's native audio track (model-generated voice/sfx), padded or trimmed to shot duration
         audioParts.push(`[${i}:a]aresample=44100,apad,atrim=duration=${clip.duration},asetpts=PTS-STARTPTS[a${i}]`);
       } else {
-        // 生成等时长的静音音轨（使用 lavfi 虚拟输入）
+        // generate a silent track of the same duration (using a lavfi virtual input)
         audioParts.push(`anullsrc=r=44100:cl=stereo,atrim=duration=${clip.duration},asetpts=PTS-STARTPTS[a${i}]`);
       }
     });
   }
 
-  // 拼接视频转场
-  // 关键：xfade 的 offset 必须相对「已累计拼接后的流」长度，而不是上一个片段的时长。
-  // 否则第 3 个及以后的 xfade 会从很早的时间点开始淡入，把前面已拼好的画面整段截掉
-  // （表现为成片时长莫名缩短一大截）。这里用 accumulated 跟踪当前流的真实时长。
+  // stitch video transitions
+  // key: xfade's offset must be relative to the length of the already-accumulated stream, not the previous clip's duration.
+  // otherwise xfade #3 and beyond would start fading in from a much earlier point, chopping out all previously joined footage
+  // (symptom: final video is inexplicably much shorter than expected). use `accumulated` to track the true length of the current stream.
   let currentVideoStream = "v0";
-  let accumulated = config.clips[0]?.duration ?? 0; // v0 的时长
+  let accumulated = config.clips[0]?.duration ?? 0; // duration of v0
   for (let i = 1; i < config.clips.length; i++) {
     const transitionMode = config.clips[i].transition as TransitionMode;
     const nextStream = `xfade${i}`;
@@ -341,28 +354,29 @@ export function buildComposeCommand(config: ComposeConfig): string {
 
     if (transitionMode === "ffmpeg_fade") {
       const fadeDuration = FADE_DURATION;
-      // 从「当前累计流末尾往前 fadeDuration」开始交叉淡化
+      // start the cross-fade fadeDuration seconds before the end of the current accumulated stream
       const offset = Math.max(accumulated - fadeDuration, 0);
       filterParts.push(
         `[${currentVideoStream}][v${i}]xfade=transition=fade:duration=${fadeDuration}:offset=${offset}[${nextStream}]`
       );
-      // xfade 会重叠 fadeDuration，故累计时长加上新片段后要减去重叠部分。
-      // clamp ≥0：clip 短于 fadeDuration(0.5s) 时该步会让 accumulated 变负、连累后续 offset 与 BGM 淡出/总时长定时（此类极短片段本就退化，clamp 是兜底）
+      // xfade overlaps by fadeDuration, so subtract the overlap from the accumulated total after adding the new clip.
+      // clamp to ≥0: a clip shorter than fadeDuration (0.5s) would make accumulated go negative, corrupting subsequent offsets and BGM fade-out timing (such clips are already degenerate; this clamp is a safety net)
       accumulated = Math.max(0, accumulated + clipDuration - fadeDuration);
     } else {
-      // ai_start_end / ai_reference / direct_concat：直接拼接（不重叠）
+      // ai_start_end / ai_reference / direct_concat: simple concatenation (no overlap)
       filterParts.push(`[${currentVideoStream}][v${i}]concat=n=2:v=1:a=0[${nextStream}]`);
       accumulated = accumulated + clipDuration;
     }
     currentVideoStream = nextStream;
   }
 
-  // 拼接音轨（如果有带音频的片段）
+  // stitch audio tracks (if any clips carry audio)
   let currentAudioStream = "";
   if (hasAnyAudio && audioParts.length > 0) {
     filterParts.push(...audioParts);
-    // 音轨拼接必须镜像视频转场：ffmpeg_fade 用 acrossfade 重叠 FADE_DURATION（与视频 xfade 同步缩短），
-    // 其余转场直接 concat。否则音轨按全时长 concat 会比 xfade 后的视频长 0.5s/转场，造成音画渐进失步。
+    // audio stitching must mirror video transitions: ffmpeg_fade uses acrossfade to overlap by FADE_DURATION
+    // (shortening in sync with video xfade); other transitions use plain concat.
+    // otherwise the audio track would be 0.5s longer per xfade transition than the resulting video, causing progressive audio/video drift.
     let curA = "a0";
     for (let i = 1; i < config.clips.length; i++) {
       const next = `acs${i}`;
@@ -376,25 +390,26 @@ export function buildComposeCommand(config: ComposeConfig): string {
     currentAudioStream = curA;
   }
 
-  // BGM 混音：叠加在片段音频之上
+  // BGM mixing: layered on top of clip audio
   if (config.output.bgmPath) {
-    const bgmIndex = inputs.length; // 动态取当前输入数（TTS 音频可能已占用若干输入）
+    const bgmIndex = inputs.length; // resolved dynamically (TTS audio may have consumed several inputs already)
     inputs.push(`-i "${escapeShellPath(config.output.bgmPath)}"`);
     const vol = config.output.bgmVolume ?? 0.3;
-    // 跳过前奏空白（opt-in，默认 0）：atrim 掉开头若干秒再循环
+    // skip intro silence (opt-in, default 0): atrim drops the first N seconds then loops
     const introSkip = config.output.bgmIntroSkipSec ?? 0;
     const introArg = introSkip > 0 ? `atrim=start=${introSkip},asetpts=PTS-STARTPTS,` : "";
-    // 结尾淡出（默认 3s，落在成片总时长末尾）：避免 aloop 铺满后被 -t/amix 硬切收尾生硬，更像成片
+    // fade out at the end (default 3s, anchored to the final video duration): prevents aloop from being hard-cut by -t/amix, making the ending sound more polished
     const fadeOut = config.output.bgmFadeOutSec ?? 3;
     const fadeArg = fadeOut > 0 ? `,afade=t=out:st=${Math.max(0, accumulated - fadeOut).toFixed(3)}:d=${fadeOut}` : "";
 
     if (currentAudioStream) {
-      // 有片段音频：BGM 循环铺满全片（aloop，避免 BGM 短于视频时尾部没声），压低音量 + 结尾淡出后与旁白混音。
-      // amix 必须 normalize=0：默认 normalize=1 会把每路按 1/inputs 缩放，等于把旁白音量腰斩到 ~50%（带货旁白要听清）。
+      // clip audio present: loop BGM to fill the full video (aloop prevents silence when BGM is shorter than the video),
+      // lower its volume + fade out, then mix with narration.
+      // amix must use normalize=0: the default normalize=1 scales each input by 1/inputs, halving narration volume to ~50% — narration must stay clearly audible.
       filterParts.push(`[${bgmIndex}:a]${introArg}aloop=loop=-1:size=2e9,volume=${vol}${fadeArg}[bgm_vol]`);
       if (config.output.bgmDuck) {
-        // 旁白闪避（sidechaincompress）：旁白一响 BGM 自动压低、停顿时回升 → 旁白更清晰、间隙更饱满。
-        // 旁白既作混音输入又作 sidechain 触发键，故 asplit 复制一份。opt-in，默认不开（零默认影响）。
+        // narration ducking (sidechaincompress): BGM auto-lowers when narration plays and recovers during pauses → clearer narration, fuller gaps.
+        // narration serves as both a mix input and the sidechain trigger key, so asplit makes a copy. opt-in, off by default (zero default impact).
         filterParts.push(`[${currentAudioStream}]asplit=2[nar_mix][nar_key]`);
         filterParts.push(`[bgm_vol][nar_key]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=400[bgm_duck]`);
         filterParts.push(`[nar_mix][bgm_duck]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[audio_final]`);
@@ -403,42 +418,43 @@ export function buildComposeCommand(config: ComposeConfig): string {
       }
       currentAudioStream = "audio_final";
     } else {
-      // 无片段音频：只有 BGM，同样循环铺满 + 结尾淡出（由输出 -t 截到视频时长）
+      // no clip audio: BGM only, also looped to fill + fade out (capped to video duration by the output -t flag)
       filterParts.push(`[${bgmIndex}:a]${introArg}aloop=loop=-1:size=2e9,volume=${vol}${fadeArg}[audio_final]`);
       currentAudioStream = "audio_final";
     }
   }
 
-  // 字幕：① 卡拉OK逐字（libass 烧 ASS，opt-in）；② 否则逐句 drawtext
+  // subtitles: ① karaoke per-character (libass burn-in from ASS, opt-in); ② otherwise per-sentence drawtext
   if (config.subtitle?.karaokeAssPath) {
     const subtitleStream = `sub_out`;
     const fontFile = config.subtitle.fontFile ?? resolveChineseFontFile();
-    // fontsdir 指向中文字体所在目录，确保 Linux 等无 CoreText 环境 libass 也能找到中文字体
+    // fontsdir points to the directory containing the Chinese font so that libass can locate it on Linux (no CoreText)
     const fontsdirArg = fontFile ? `:fontsdir=${escapeSubtitlesPath(dirname(fontFile))}` : "";
     filterParts.push(`[${currentVideoStream}]subtitles=${escapeSubtitlesPath(config.subtitle.karaokeAssPath)}${fontsdirArg}[${subtitleStream}]`);
     currentVideoStream = subtitleStream;
   } else if (config.subtitle?.texts.length) {
     const subtitleStream = `sub_out`;
-    // 字号按画面宽度自适应（约 5%），带货字幕需醒目；可被 config 覆盖
+    // font size adapts to frame width (~5%) so e-commerce subtitles are prominent; can be overridden via config
     const fontSize = config.subtitle.fontSize || Math.round(width * 0.05);
     const fontColor = config.subtitle.color || "white";
     const borderW = config.subtitle.strokeWidth || 3;
-    // 多行安全的纵向锚点：底部按文字块底边定位（向上生长，不会越过画面底边）；居中/顶部含 text_h
-    // bottom 字幕基线抬到平台底部 UI 安全区之上（避免被小黄车/进度条遮挡）。
-    // 有商品卡：被「卡上字下」堆叠钉在 0.17（再高两行字幕会顶到卡）；无卡：抬到 0.22 更清出 2026 UI 区。
+    // multi-line-safe vertical anchor: bottom is pinned by the bottom edge of the text block (grows upward, never overflows);
+    // center/top positions include text_h. bottom baseline is raised above the platform's bottom UI safe zone (avoids
+    // the shopping-cart button / progress bar). with product card: pinned to 0.17 by the "card above, subtitle below" stack
+    // (any higher and two-line subtitles would collide with the card); without card: raised to 0.22 to clear the 2026 UI zone.
     const hasProductCard = !!config.productCard?.imagePath;
     const bottomRatio = hasProductCard ? CAPTION_SAFE_BOTTOM_RATIO : CAPTION_SAFE_BOTTOM_RATIO_NOCARD;
-    const bottomY = (1 - bottomRatio).toFixed(2); // 有卡 0.83 / 无卡 0.78
+    const bottomY = (1 - bottomRatio).toFixed(2); // with card: 0.83 / without card: 0.78
     const yPos = config.subtitle.position === "top" ? "h*0.08" : config.subtitle.position === "center" ? "(h-text_h)/2" : `h*${bottomY}-text_h`;
     const lineSpacing = Math.round(fontSize * 0.28);
-    // 中文字幕必须显式指定中文字体文件，否则渲染为方块
+    // Chinese subtitles must have an explicit font file; otherwise they render as boxes
     const fontFile = config.subtitle.fontFile ?? resolveChineseFontFile();
 
     const drawTexts = config.subtitle.texts
       .map((t) => {
-        // 自动换行避免英文/长文案溢出画面（drawtext 原生支持真实换行符）
+        // auto-wrap to prevent English / long copy from overflowing the frame (drawtext natively supports real newlines)
         const wrapped = wrapCaption(t.text, fontSize, width);
-        // 半透明底框提升可读性（带货短视频常见样式）
+        // semi-transparent background box improves readability (standard e-commerce short-video style)
         return buildDrawtext({
           fontFile: fontFile || undefined,
           text: wrapped,
@@ -458,16 +474,16 @@ export function buildComposeCommand(config: ComposeConfig): string {
     currentVideoStream = subtitleStream;
   }
 
-  // 文字贴片：价格贴/卖点贴/标题贴（叠在画面上方，带货醒目样式）
+  // text overlays: price / selling-point / title tags (placed in the upper frame area, prominent e-commerce style)
   if (config.overlays?.length) {
     const ovFont = config.subtitle?.fontFile ?? resolveChineseFontFile();
-    // 各样式：字号、字色、底框色、纵向位置（画面上方）
+    // per-style parameters: font size, text colour, background box colour, vertical position (upper frame)
     const styleOf = (style: "title" | "highlight" | "price") => {
       if (style === "price")
         return { size: Math.round(width * 0.075), color: "white", box: "red@0.85", y: "h*0.12" };
       if (style === "highlight")
         return { size: Math.round(width * 0.058), color: "#1a1a1a", box: "yellow@0.9", y: "h*0.2" };
-      return { size: Math.round(width * 0.06), color: "white", box: "black@0.5", y: "h*0.06" }; // title
+      return { size: Math.round(width * 0.06), color: "white", box: "black@0.5", y: "h*0.06" }; // title style
     };
     const drawOverlays = config.overlays
       .map((o) => {
@@ -491,31 +507,32 @@ export function buildComposeCommand(config: ComposeConfig): string {
     currentVideoStream = ovStream;
   }
 
-  // 商品卡贴片（opt-in）：左下角统一卡片 = 商品图缩略 + 商品名 + 购买引导，开头 ~5s 展示，营造带货「挂车」感
+  // product card overlay (opt-in): bottom-left card = product thumbnail + name + purchase CTA, shown for ~5s at the start to simulate a "shopping cart link"
   if (config.productCard?.imagePath) {
     const cardIdx = inputs.length;
     inputs.push(`-loop 1 -i "${escapeShellPath(config.productCard.imagePath)}"`);
     const thumb = Math.round(width * 0.16);
-    const mx = Math.round(width * 0.045); // 左边距
-    const pad = Math.round(width * 0.022); // 卡片内边距
+    const mx = Math.round(width * 0.045); // left margin
+    const pad = Math.round(width * 0.022); // card inner padding
     const nm = (config.productCard.name || "").trim().slice(0, 10);
     const nameAreaW = nm ? Math.round(width * 0.4) : 0;
     const cardW = thumb + (nameAreaW ? pad + nameAreaW : 0);
-    // 用数值定位（避免 drawbox 不支持 H、drawtext/overlay 支持 H 的变量差异）：cardY = 画面高 - 缩略图 - 底部留白
-    // 字幕基线已抬到安全区(底距 0.17)，商品卡再上移到字幕之上(底距 0.25)，保持「卡在上、字幕在下」的不重叠堆叠
+    // use numeric positioning (avoids the variable-support inconsistency where drawbox doesn't support H but drawtext/overlay do):
+    // cardY = frame height - thumbnail - bottom margin. subtitle baseline is already at the safe zone (bottom clearance 0.17);
+    // the product card sits above the subtitles (bottom clearance 0.25), maintaining a non-overlapping "card above, subtitle below" stack.
     const cardY = height - thumb - Math.round(height * 0.25);
     const start = 0.4;
     const end = Math.min(5, accumulated);
     const en = `enable='between(t,${start},${end})'`;
     const cardFont = config.subtitle?.fontFile ?? resolveChineseFontFile();
-    // 1) 统一卡片底：半透明深色，把缩略图与文字裹成一张卡
+    // 1) unified card background: semi-transparent dark fill wrapping thumbnail and text into a single card
     filterParts.push(`[${currentVideoStream}]drawbox=x=${mx - pad}:y=${cardY - pad}:w=${cardW + 2 * pad}:h=${thumb + 2 * pad}:color=black@0.5:t=fill:${en}[pcard_bg]`);
     currentVideoStream = "pcard_bg";
-    // 2) 商品图缩略（等比填充裁成正方形）
+    // 2) product image thumbnail (proportionally scaled and cropped to a square)
     filterParts.push(`[${cardIdx}:v]scale=${thumb}:${thumb}:force_original_aspect_ratio=increase,crop=${thumb}:${thumb},setsar=1[pcard]`);
     filterParts.push(`[${currentVideoStream}][pcard]overlay=${mx}:${cardY}:${en}[pcard_v]`);
     currentVideoStream = "pcard_v";
-    // 3) 商品名（白）+ 价格（红，醒目）+ 黄色购买引导，缩略图右侧三行
+    // 3) product name (white) + price (red, prominent) + yellow purchase CTA — three lines to the right of the thumbnail
     if (nm) {
       const tx = mx + thumb + pad;
       const price = (config.productCard.price || "").trim().slice(0, 12);
@@ -529,41 +546,42 @@ export function buildComposeCommand(config: ComposeConfig): string {
     }
   }
 
-  // 响度归一到社媒标准（~-14 LUFS，EBU R128 / loudnorm）：跨视频音量一致，避免忽大忽小被抖音/TikTok 二次压制。
-  // 置于音频链末端、单趟动态归一；无任何音频流则跳过。
+  // loudness normalisation to social-media standard (~-14 LUFS, EBU R128 / loudnorm): consistent volume across videos,
+  // preventing Douyin/TikTok from re-compressing inconsistent levels. applied at the end of the audio chain; skipped if there is no audio stream.
   if (currentAudioStream) {
     filterParts.push(`[${currentAudioStream}]loudnorm=I=-14:TP=-1.5:LRA=11[audio_norm]`);
     currentAudioStream = "audio_norm";
   }
 
-  // 构建完整命令
+  // assemble the full command
   const inputStr = inputs.join(" ");
   const filterStr = filterParts.join(";\n");
 
   let cmd = `"${ffmpegBin()}" -y ${inputStr} -filter_complex "${filterStr}" -map "[${currentVideoStream}]"`;
 
-  // 映射音频输出
+  // map audio output
   if (currentAudioStream) {
     cmd += ` -map "[${currentAudioStream}]"`;
   }
 
-  // 优化的编码参数
-  // 渲染质量预设：分辨率在上方已按 preset 决定，这里用 preset 的编码速度/质量（白名单兜底防注入）
+  // encoding parameters
+  // render quality preset: resolution was already determined by preset above; here preset controls encode speed/quality (allowlist prevents injection)
   const enc = safeEncodeParams(config.output.videoPreset, config.output.crf);
   cmd += ` -c:v libx264 -preset ${enc.videoPreset} -crf ${enc.crf} -profile:v high -level:v 4.2 -pix_fmt yuv420p`;
-  // AIGC 隐式标识（GB 45438-2025）：把「生成合成标签+服务提供者+内容制作编号」写进文件元数据，与画面显式标识互补。
-  // 纯 -metadata，不影响 filter_complex；内容编号用 projectId 派生（确定性、可 ffprobe 断言）。
+  // AIGC implicit labelling (GB 45438-2025): writes "AI-generated label + service provider + content ID" into file metadata,
+  // complementing the on-frame explicit label. pure -metadata flags; does not affect filter_complex.
+  // content ID is derived from projectId (deterministic, assertable via ffprobe).
   const aigcArgs = buildAigcMetadataArgs({ contentId: config.projectId });
-  // 显式限定输出时长为视频真实时间轴(accumulated)：xfade 重叠后视频比朴素累计短，避免尾部音频盖在冻结帧上
+  // explicitly cap output duration to the real video timeline (accumulated): after xfade overlaps the video is shorter than the naive sum; prevents trailing audio playing over a frozen last frame
   cmd += ` -c:a aac -b:a 256k -movflags +faststart ${aigcArgs} -t ${accumulated.toFixed(3)} "${escapeShellPath(outputPath)}"`;
 
   return cmd;
 }
 
-/** 合成的最长时长（毫秒）：超过即杀进程，避免某次渲染卡死无限占用机器 */
+/** maximum composition duration in milliseconds; the process is killed if exceeded to prevent a stuck render monopolising the machine indefinitely */
 export const COMPOSE_TIMEOUT_MS = 10 * 60 * 1000;
 
-/** 把 ffmpeg 合成的底层错误归类成可操作提示（纯函数，可单测）；非已知类返回 null（原样抛） */
+/** Classify low-level ffmpeg composition errors into actionable messages (pure function, unit-testable); returns null for unknown error types (to be rethrown as-is) */
 export function composeErrorMessage(e: { killed?: boolean; signal?: string; stderr?: string; message?: string }): string | null {
   if (e.killed || e.signal === "SIGTERM") return "视频合成超时（已超过 10 分钟）——可能分镜过多或机器繁忙，请减少分镜或降到「快速」画质重试";
   const msg = `${e.stderr || ""} ${e.message || ""}`;
@@ -571,7 +589,7 @@ export function composeErrorMessage(e: { killed?: boolean; signal?: string; stde
   return null;
 }
 
-// 执行合成
+// run the composition
 export async function composeVideo(config: ComposeConfig): Promise<string> {
   const outputDir = join(getDataDir(), "output", config.projectId);
   await mkdir(outputDir, { recursive: true });
@@ -583,7 +601,7 @@ export async function composeVideo(config: ComposeConfig): Promise<string> {
   const execAsync = promisify(exec);
 
   try {
-    // 加超时（超过即 SIGTERM 杀进程）；磁盘满/超时归类成可读错误
+    // apply timeout (sends SIGTERM if exceeded); disk-full / timeout errors are mapped to readable messages
     await execAsync(cmd, { maxBuffer: 50 * 1024 * 1024, timeout: COMPOSE_TIMEOUT_MS });
   } catch (e) {
     const friendly = composeErrorMessage(e as { killed?: boolean; signal?: string; stderr?: string; message?: string });
@@ -591,7 +609,7 @@ export async function composeVideo(config: ComposeConfig): Promise<string> {
     throw e;
   }
 
-  // 从命令中提取输出路径
+  // extract output path from the command string
   const outputMatch = cmd.match(/"([^"]*final_[^"]*\.mp4)"/);
   return outputMatch ? outputMatch[1] : "";
 }

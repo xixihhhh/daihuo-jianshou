@@ -1,9 +1,9 @@
 /**
- * Pixabay 素材源（pixabay.com/api）—— 多源素材引擎里同时覆盖「视频 + 图片」的免费源
+ * Pixabay stock source (pixabay.com/api) — the only free source in the multi-source media engine that covers both video and image.
  *
- * 鉴权：query 参数 ?key=<API_KEY>（图片/视频共用一个 key）。免费 Key：https://pixabay.com/api/docs/
- * 限额：100 请求/60s，强制结果缓存 24h；禁图片永久热链（必须下载缓存，与现有 Pexels 流程一致）。
- * 注意：视频端点无 orientation 参数（竖屏需靠 width/height 自筛）；per_page 下限是 3；tags 是逗号分隔字符串。
+ * Auth: query param ?key=<API_KEY> (shared key for images and videos). Free key: https://pixabay.com/api/docs/
+ * Limits: 100 requests/60s, results must be cached for 24h; hot-linking images is forbidden (must download and cache, consistent with the existing Pexels flow).
+ * Note: the video endpoint has no orientation param (portrait filtering must be done client-side via width/height); per_page minimum is 3; tags are comma-separated strings.
  */
 
 import { type StockCandidate, type StockOrientation, fetchWithTimeout, orientationOf } from "./stock-types";
@@ -11,7 +11,7 @@ import { type StockCandidate, type StockOrientation, fetchWithTimeout, orientati
 const PIXABAY_API = "https://pixabay.com/api";
 const LICENSE = "Pixabay Content License";
 
-// ==================== 原始响应类型 ====================
+// ==================== raw response types ====================
 
 export interface PixabayImageHit {
   id: number;
@@ -38,7 +38,7 @@ export interface PixabayVideoHit {
   id: number;
   pageURL: string;
   tags: string;
-  duration: number; // 秒
+  duration: number; // seconds
   videos: {
     large?: PixabayVideoFile;
     medium?: PixabayVideoFile;
@@ -49,17 +49,17 @@ export interface PixabayVideoHit {
   user_id: number;
 }
 
-// ==================== 纯函数（可单测） ====================
+// ==================== pure functions (unit-testable) ====================
 
-/** 拼作者主页 URL */
+/** Build the author profile URL */
 export function pixabayAuthorUrl(user: string, userId: number): string {
   return `https://pixabay.com/users/${user}-${userId}/`;
 }
 
 /**
- * 从一个 Pixabay 视频的四档清晰度里挑文件：
- * 过滤掉 url 为空/size=0 的档；优先「短边 >= minShortSide 的最小体积」，无达标则取最高分辨率。
- * 纯函数。
+ * Pick a file from the four quality tiers of a Pixabay video:
+ * Filter out entries with an empty url or size=0; prefer the smallest file whose short side >= minShortSide; fall back to the highest resolution if none qualify.
+ * Pure function.
  */
 export function pickPixabayVideoFile(
   videos: PixabayVideoHit["videos"],
@@ -77,14 +77,14 @@ export function pickPixabayVideoFile(
   return pool.reduce((best, f) => (shortSide(f) > shortSide(best) ? f : best));
 }
 
-/** 把一个 Pixabay 视频归一化为候选；挑不出文件则 null */
+/** Normalize a Pixabay video hit into a StockCandidate; returns null if no suitable file can be selected */
 export function toPixabayVideoCandidate(
   hit: PixabayVideoHit,
   opts: { minShortSide?: number } = {}
 ): StockCandidate | null {
   const file = pickPixabayVideoFile(hit.videos, opts);
   if (!file) return null;
-  // 追加 ?download=1 触发下载（Pixabay 文档建议）
+  // append ?download=1 to trigger a download (as recommended by Pixabay docs)
   const dl = file.url.includes("?") ? file.url : `${file.url}?download=1`;
   return {
     source: "pixabay",
@@ -95,7 +95,7 @@ export function toPixabayVideoCandidate(
     author: hit.user || "Pixabay",
     authorUrl: pixabayAuthorUrl(hit.user, hit.user_id),
     license: LICENSE,
-    requiresAttribution: false, // 礼节性署名，非强制
+    requiresAttribution: false, // courtesy attribution, not legally required
     width: file.width,
     height: file.height,
     durationSec: hit.duration,
@@ -103,7 +103,7 @@ export function toPixabayVideoCandidate(
   };
 }
 
-/** 把一个 Pixabay 图片归一化为候选（普通 key 最大可拿 largeImageURL 1280px） */
+/** Normalize a Pixabay image hit into a StockCandidate (free key provides up to largeImageURL at 1280px) */
 export function toPixabayImageCandidate(hit: PixabayImageHit): StockCandidate {
   return {
     source: "pixabay",
@@ -121,14 +121,14 @@ export function toPixabayImageCandidate(hit: PixabayImageHit): StockCandidate {
   };
 }
 
-// ==================== 网络函数 ====================
+// ==================== network functions ====================
 
-/** clamp per_page 到 Pixabay 合法区间 [3,200] */
+/** Clamp per_page to the Pixabay valid range [3, 200] */
 function clampPerPage(n: number): number {
   return Math.max(3, Math.min(200, Math.floor(n)));
 }
 
-/** 搜索 Pixabay 视频（无 orientation 参数，竖屏靠 width/height 过滤） */
+/** Search Pixabay videos (no orientation param; portrait filtering is done via width/height) */
 export async function searchPixabayVideos(
   query: string,
   opts: {
@@ -168,7 +168,7 @@ export async function searchPixabayVideos(
   return candidates;
 }
 
-/** 搜索 Pixabay 图片 */
+/** Search Pixabay images */
 export async function searchPixabayImages(
   query: string,
   opts: { apiKey: string; perPage?: number; orientation?: StockOrientation }

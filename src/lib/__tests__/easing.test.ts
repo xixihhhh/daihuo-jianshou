@@ -28,8 +28,8 @@ describe("interpolate", () => {
 describe("MOTIONS 已用缓动（非匀速）", () => {
   it("zoom_in_slow / ken_burns 用 easeOut，不再硬编码匀速增量", () => {
     const zin = MOTIONS.zoom_in_slow.getFilter(1080, 1920, 3);
-    expect(zin).toContain("1-pow"); // 缓动
-    expect(zin).not.toContain("min(zoom+0.002"); // 旧匀速已替掉
+    expect(zin).toContain("1-pow"); // eased
+    expect(zin).not.toContain("min(zoom+0.002"); // old constant-speed increment replaced
     expect(zin).toContain("zoompan");
     expect(MOTIONS.ken_burns.getFilter(1080, 1920, 3)).toContain("1-pow");
   });

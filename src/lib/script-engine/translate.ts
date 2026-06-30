@@ -1,9 +1,11 @@
 /**
- * 配音译制 —— 把已生成的脚本旁白翻成另一语种，再换语种配音重新合成（出海：同一条片发不同市场）。
+ * Dubbing & localization — translate the voiceover of an already-generated script into another language,
+ * then re-voice and recompose it (for overseas distribution: publish the same clip across different markets).
  *
- * 因为是「给自己生成的视频换语种」，脚本与时间轴本就已知，**无需转写**：
- * 已知旁白 → LLM 翻译 → 换语种 Edge TTS → 重新合成。画面检索词（description/stockKeywords）保持原文，
- * 让译制版沿用同样的画面，只换声音与字幕。纯 prompt/解析可单测，LLM 调用复用脚本生成同一条路径。
+ * Because we are "re-languaging a video we generated ourselves", the script and timeline are already known —
+ * **no transcription needed**: existing voiceover → LLM translation → target-language Edge TTS → recompose.
+ * Visual search fields (description/stockKeywords) are kept as-is so the dubbed version reuses the same footage;
+ * only audio and subtitles change. Pure prompt/parse logic is unit-testable; LLM calls reuse the same path as script generation.
  */
 
 import OpenAI from "openai";
@@ -17,7 +19,7 @@ export interface DubLLMConfig {
   model: string;
 }
 
-/** 目标语种 code → 人类可读名（喂给 LLM 的翻译目标） */
+/** Target language code → human-readable name (used as the translation target passed to the LLM) */
 export const LANG_NAMES: Record<string, string> = {
   en: "English",
   ja: "Japanese",
@@ -39,13 +41,13 @@ export function langName(code: string): string {
   return LANG_NAMES[c] || LANG_NAMES[c.split("-")[0]] || code;
 }
 
-/** 目标语种 → 推荐的免费 Edge 音色（取 FREE_TTS_VOICES 中 lang 前缀匹配的第一个），无则 null。纯函数。 */
+/** Target language → recommended free Edge TTS voice (first entry in FREE_TTS_VOICES whose lang prefix matches); null if none found. Pure function. */
 export function defaultVoiceForLang(code: string): string | null {
   const c = (code || "").toLowerCase().split("-")[0];
   return FREE_TTS_VOICES.find((v) => v.lang.toLowerCase().startsWith(c))?.value ?? null;
 }
 
-/** 构造翻译 prompt：把 N 条旁白逐条翻成目标语种，要求返回等长 JSON 字符串数组。纯函数。 */
+/** Builds the translation prompt: translates N voiceover lines into the target language one-by-one; expects a same-length JSON string array in return. Pure function. */
 export function buildTranslatePrompt(voiceovers: string[], targetLang: string): string {
   const target = langName(targetLang);
   const numbered = voiceovers.map((v, i) => `${i + 1}. ${v}`).join("\n");
@@ -58,7 +60,7 @@ export function buildTranslatePrompt(voiceovers: string[], targetLang: string): 
   ].join("\n");
 }
 
-/** 从 LLM 文本解析出等长译文数组；数量不符/非法则返回 null。纯函数。 */
+/** Parses a same-length translated string array from LLM output; returns null if the count mismatches or the format is invalid. Pure function. */
 export function parseTranslations(text: string, expectedCount: number): string[] | null {
   if (!text) return null;
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -78,11 +80,11 @@ export function parseTranslations(text: string, expectedCount: number): string[]
 }
 
 function createClient(cfg: DubLLMConfig): OpenAI {
-  // 本地/免费端点（Ollama/Pollinations）无需真 Key，缺省给占位符（SDK 要求非空）
+  // Local/free endpoints (Ollama/Pollinations) don't require a real key; fall back to a placeholder (SDK requires a non-empty value)
   return new OpenAI({ baseURL: cfg.baseUrl, apiKey: cfg.apiKey || "no-key" });
 }
 
-/** 调 LLM 把旁白批量翻成目标语种，返回等长译文数组（解析失败抛错）。 */
+/** Calls the LLM to batch-translate voiceovers into the target language; returns a same-length translated array (throws on parse failure). */
 export async function translateVoiceovers(voiceovers: string[], targetLang: string, cfg: DubLLMConfig): Promise<string[]> {
   if (!voiceovers.length) return [];
   const client = createClient(cfg);
@@ -98,8 +100,10 @@ export async function translateVoiceovers(voiceovers: string[], targetLang: stri
 }
 
 /**
- * 把整段脚本翻成目标语种：逐镜替换 voiceover、按译文重估时长；
- * **保留 description/stockKeywords 等画面检索字段不变**，让译制版沿用同样画面、只换声音/字幕。
+ * Translates an entire script into the target language: replaces each shot's voiceover and re-estimates
+ * duration based on the translated text.
+ * **Keeps visual search fields such as description/stockKeywords unchanged** so the dubbed version
+ * reuses the same footage and only swaps audio/subtitles.
  */
 export async function translateShots(shots: Shot[], targetLang: string, cfg: DubLLMConfig): Promise<Shot[]> {
   const voiceovers = shots.map((s) => s.voiceover || "");

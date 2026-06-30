@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import { settings } from "@/lib/i18n/messages/settings";
 
 /**
- * 审计修复回归：settings 页此前硬编码中文厂商名（火山引擎/阿里百炼/硅基流动）和「网络异常」，
- * 英文用户原样看到中文。现改为 i18n 键，这里守卫这些键在 zh/en 都存在且 en 无中文。
+ * Audit-fix regression: the settings page previously hard-coded Chinese provider names
+ * (Volcengine / Alibaba Bailian / SiliconFlow) and "network error" strings, which English
+ * users saw as raw Chinese. These are now i18n keys; this suite guards that the keys exist
+ * in both zh and en, and that the en values contain no Chinese characters.
  */
 describe("settings i18n 厂商名/错误无中文泄漏（审计修复）", () => {
   const en = settings.en as Record<string, string>;

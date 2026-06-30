@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createProvider } from "@/lib/providers";
 import { toRemoteUsableImage } from "@/lib/remote-image";
 
-// AI 生视频
+// AI video generation
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { provider: providerName, model, prompt, imageUrl, mode, apiKey, baseUrl, options } = body;

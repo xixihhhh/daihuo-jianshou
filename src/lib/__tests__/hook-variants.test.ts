@@ -28,13 +28,13 @@ describe("buildHookVariants", () => {
   it("生成 N 条变体，每条带 hookId、机制互不相同，且只有第 1 镜不同", () => {
     const vs = buildHookVariants(base, "beauty", 3);
     expect(vs.length).toBe(3);
-    expect(new Set(vs.map((v) => v.hookId)).size).toBe(3); // 机制不重复
+    expect(new Set(vs.map((v) => v.hookId)).size).toBe(3); // no duplicate mechanisms
     for (const v of vs) {
       expect(v.hookId).toBeTruthy();
       expect(v.script.shots.length).toBe(3);
       expect(v.script.shots[0].type).toBe("hook");
-      expect(v.script.shots[0].voiceover).not.toBe("原钩子文案"); // 第 1 镜口播换了
-      expect(v.script.shots[1].voiceover).toBe("演示"); // 后续原样
+      expect(v.script.shots[0].voiceover).not.toBe("原钩子文案"); // shot 1 voiceover was replaced
+      expect(v.script.shots[1].voiceover).toBe("演示"); // remaining shots unchanged
       expect(v.script.shots[2].voiceover).toBe("下单");
     }
   });

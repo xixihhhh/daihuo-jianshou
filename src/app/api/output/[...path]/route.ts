@@ -4,7 +4,7 @@ import { readFile, stat } from "fs/promises";
 import { join, normalize, sep } from "path";
 import { existsSync } from "fs";
 
-// 合成产物（视频）文件服务 - 提供 data/output 下的成片访问/下载
+// File server for composed output (video) — serves finished clips under data/output for playback and download
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -12,7 +12,7 @@ export async function GET(
   const { path } = await params;
 
   const outputRoot = join(getDataDir(), "output");
-  // 解码并归一化路径，防止 ..%2f 等编码绕过造成路径穿越
+  // Decode and normalize the path to prevent path traversal via encoded sequences like ..%2f
   const decodedSegments = path.map((seg) => decodeURIComponent(seg));
   const filePath = normalize(join(outputRoot, ...decodedSegments));
 
@@ -32,7 +32,7 @@ export async function GET(
     mov: "video/quicktime",
   };
 
-  // 可选下载：?download=1 时提示浏览器下载
+  // Optional download: when ?download=1 is present, instruct the browser to download the file
   const download = req.nextUrl.searchParams.get("download");
   const fileName = filePath.split(sep).pop() ?? "video.mp4";
 

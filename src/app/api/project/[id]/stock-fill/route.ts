@@ -13,12 +13,12 @@ import type { StockSourceId, StockMediaType, StockOrientation } from "@/lib/prov
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
 
 /**
- * POST /api/project/[id]/stock-fill —— 按当前选中脚本的每个分镜，用其检索词自动配一条免费素材落库。
- * 这是「脚本→素材自动配齐」（无商品主题成片）的关键一步，复用多源素材引擎 + 永远有素材兜底。
+ * POST /api/project/[id]/stock-fill —— for each shot in the currently selected script, auto-match one free stock asset and persist it.
+ * This is the key step of "script → assets auto-fill" (non-product-theme video), reusing the multi-source asset engine with a guaranteed fallback.
  *
  * body: { source?, mediaType?, orientation?, apiKeys?, force? }
- *  - source 默认 "all"（聚合，keyless 的 Openverse 始终参与）
- *  - force=true 时即使该分镜已有 stock 素材也重新配
+ *  - source defaults to "all" (aggregated; keyless Openverse always participates)
+ *  - force=true re-fills a shot even if it already has a stock asset
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,11 +30,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     body = await req.json();
   } catch {
-    /* 允许空 body */
+    /* empty body is allowed */
   }
 
   const source = (body.source as StockSourceId | "all") ?? "all";
-  // mediaType="auto"：逐镜「视频优先、配不到再退图片」——拿到动态 B-roll 又保证每镜有画面（全程免 Key）
+  // mediaType="auto": per-shot "video first, fall back to image if unavailable" — gets dynamic B-roll while guaranteeing every shot has a visual (no API key needed throughout)
   const autoMode = body.mediaType === "auto";
   const mediaType: StockMediaType =
     body.mediaType === "image" || body.mediaType === "audio" ? (body.mediaType as StockMediaType) : "video";
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const db = getDb();
 
-  // 取选中脚本（无选中则取最新一条）
+  // Get the selected script (fall back to the most recent one if none is selected)
   const rows = await db.select().from(scriptsTable).where(eq(scriptsTable.projectId, id));
   if (rows.length === 0) {
     return NextResponse.json({ error: "该项目还没有脚本，请先生成脚本" }, { status: 404 });
@@ -56,45 +56,45 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "脚本没有分镜" }, { status: 400 });
   }
 
-  // 已有任意素材的分镜（避免重复配、避免与 AI/商品素材在同一分镜上冲突，除非 force）
+  // Shots that already have any asset (avoids duplicate filling and conflicts with AI/product assets on the same shot, unless force is set)
   const existing = await db
     .select({ shotId: assetsTable.shotId })
     .from(assetsTable)
     .where(eq(assetsTable.projectId, id));
   const already = new Set(existing.map((e) => e.shotId));
 
-  // 本地素材池存在则纳入自动配画面：用户自有 B-roll 与免费素材一同参与择优
+  // If the local material pool exists, include it in auto-fill: user-owned B-roll competes alongside free stock assets
   const materialsDir = join(getDataDir(), "uploads", id, "materials");
   let localDir: string | undefined;
   try {
     await access(materialsDir);
     localDir = materialsDir;
   } catch {
-    /* 无素材池，照常只走网络免费源 */
+    /* no material pool; proceed with network free sources only */
   }
 
   const searchOpts = { apiKeys, mediaType, orientation, perPage: 10, localDir };
   type ShotFillResult = { shotId: number; ok: boolean; query: string; provider?: string; mediaType?: StockMediaType; reason?: string };
 
-  // 逐镜检索本是独立的（各镜结果只依赖自身、写不同 asset 行），有界并发(4)替代串行，整体更快、又不打爆下游 API
+  // Per-shot searches are independent (each result depends only on itself and writes a distinct asset row); bounded concurrency (4) replaces serial execution — faster overall without hammering downstream APIs
   const results = await mapWithConcurrency<Shot, ShotFillResult>(shots, 4, async (shot) => {
     const sid = shot.shotId;
-    if (!force && already.has(sid)) return { shotId: sid, ok: false, query: "", reason: "已有素材，跳过" };
-    // 商品原图分镜不配免费素材：合成时用商品原图（商品保真），免费素材会盖掉商品
-    if (shot.visualSource === "product_image") return { shotId: sid, ok: false, query: "", reason: "商品原图分镜，跳过" };
+    if (!force && already.has(sid)) return { shotId: sid, ok: false, query: "", reason: "already has asset, skipped" };
+    // Product-image shots do not receive free stock: the compose step uses the product image for fidelity, and free stock would overwrite it
+    if (shot.visualSource === "product_image") return { shotId: sid, ok: false, query: "", reason: "product-image shot, skipped" };
     const query = shotQuery(shot);
-    if (!query) return { shotId: sid, ok: false, query: "", reason: "无检索词" };
+    if (!query) return { shotId: sid, ok: false, query: "", reason: "no search query" };
     try {
       let asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts });
       let usedType: StockMediaType = mediaType;
-      // auto 模式下视频没配到 → 退回图片，保证该分镜不空画面
+      // In auto mode, if no video was found → fall back to image to ensure the shot is never empty
       if (!asset && autoMode && mediaType !== "image") {
         asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts: { ...searchOpts, mediaType: "image" } });
         usedType = "image";
       }
       return asset
         ? { shotId: sid, ok: true, query, provider: String(asset.provider), mediaType: usedType }
-        : { shotId: sid, ok: false, query, reason: "未找到素材" };
+        : { shotId: sid, ok: false, query, reason: "no asset found" };
     } catch (e) {
       return { shotId: sid, ok: false, query, reason: e instanceof Error ? e.message : String(e) };
     }

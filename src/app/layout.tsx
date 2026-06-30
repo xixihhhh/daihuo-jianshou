@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  // 标题/描述中英双语，中文在前：国内为主、兼顾海外搜索收录
+  // Title/description are bilingual (Chinese first): prioritize domestic traffic while covering overseas search indexing
   title: "ClipForge — AI 短视频带货创作工具 | AI Short Video Creator",
   description:
     "一句话主题或一张商品图，一键产出抖音 / 快手 / 小红书 / TikTok 竖屏带货短视频：AI 写脚本、自动配画面、免费配音、烧字幕。Turn one sentence or a product photo into a vertical short video — AI script, free stock footage, voiceover & subtitles in one click.",
@@ -37,7 +37,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // 全站默认暗色创作台主题：在 <html> 上固定 dark class
+  // Site-wide default dark studio theme: pin the dark class on <html>
   return (
     <html
       lang="zh-CN"

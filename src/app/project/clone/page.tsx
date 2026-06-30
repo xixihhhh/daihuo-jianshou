@@ -13,7 +13,7 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useT } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 
-/** 分镜卡片数据 */
+/** storyboard card data */
 interface StoryboardCard {
   id: number;
   title: string;
@@ -21,7 +21,7 @@ interface StoryboardCard {
   duration: string;
 }
 
-/** 商品图片数据 */
+/** product image data */
 interface ProductImage {
   id: string;
   file: File;
@@ -33,29 +33,29 @@ export default function ClonePage() {
   const router = useRouter();
   const { llm } = useSettingsStore();
 
-  // 视频链接与分析状态
+  // video URL and analysis state
   const [videoUrl, setVideoUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [storyboards, setStoryboards] = useState<StoryboardCard[]>([]);
 
-  // 商品信息
+  // product information
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [productName, setProductName] = useState("");
   const [productFeatures, setProductFeatures] = useState("");
 
-  // 生成状态
+  // generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState("");
 
-  // 拖拽上传状态
+  // drag-and-drop upload state
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /**
-   * 载入爆款通用结构参考。
-   * 说明：暂不支持解析具体视频画面内容（需视频下载+ASR管线），
-   * 这里展示的是高转化带货视频的通用分镜结构，AI 会在「开始复刻生成」时
-   * 结合该结构与你的商品信息真实生成脚本。
+   * Load the generic viral video structure reference.
+   * Note: parsing specific video content is not yet supported (requires a video download + ASR pipeline).
+   * What is displayed here is the general shot structure of high-converting commerce videos; the AI will
+   * combine this structure with your product information to generate a real script when "Start Cloning" is clicked.
    */
   const handleAnalyze = useCallback(async () => {
     if (!videoUrl.trim()) return;
@@ -73,7 +73,7 @@ export default function ClonePage() {
     setIsAnalyzing(false);
   }, [videoUrl, t]);
 
-  /** 开始复刻生成：创建 clone 项目 + 真实生成脚本，然后跳转 */
+  /** start clone generation: create the clone project + generate a real script, then navigate */
   const handleGenerate = useCallback(async () => {
     if (isGenerating) return;
     if (!llm.apiKey) {
@@ -83,7 +83,7 @@ export default function ClonePage() {
     setGenError("");
     setIsGenerating(true);
     try {
-      // 1) 创建复刻项目（记录来源视频链接）
+      // 1) create the clone project (record the source video URL)
       const projRes = await fetch("/api/project", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,8 +99,8 @@ export default function ClonePage() {
       if (!projRes.ok) throw new Error(t("errorProjectCreate"));
       const project = await projRes.json();
 
-      // 2) 上传用户的商品图（携带 projectId）——修复：此前写死 [] 把用户必传的商品图整体丢弃，
-      //    导致 product_closeup 分镜没有商品画面、合成缺镜或直接「没有可用素材」失败。
+      // 2) upload the user's product images (with projectId) — fix: previously hardcoded [] discarded all product images,
+      //    causing product_closeup shots to have no product visuals and the compose step to fail with "no available asset".
       const formData = new FormData();
       productImages.forEach((img) => formData.append("files", img.file));
       formData.append("projectId", project.id);
@@ -110,14 +110,14 @@ export default function ClonePage() {
         throw new Error(e.error || t("errorCloneFailed"));
       }
       const { paths } = await uploadRes.json();
-      // 2.5) 回写项目的商品图路径
+      // 2.5) write back the product image paths to the project
       await fetch(`/api/project/${project.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productImages: paths }),
       });
 
-      // 3) 生成脚本（参考爆款通用结构 + 商品信息 + 真实上传的商品图）
+      // 3) generate the script (based on the viral video structure + product info + uploaded product images)
       const scriptRes = await fetch("/api/llm/script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -143,7 +143,7 @@ export default function ClonePage() {
         throw new Error(e.error || t("errorScriptGen"));
       }
 
-      // 4) 跳转到脚本页
+      // 4) navigate to the script page
       router.push(`/project/${project.id}/script`);
     } catch (err) {
       setGenError(err instanceof Error ? err.message : t("errorCloneFailed"));
@@ -151,7 +151,7 @@ export default function ClonePage() {
     }
   }, [isGenerating, llm, productName, productFeatures, videoUrl, router, t]);
 
-  /** 处理文件选择/上传 */
+  /** handle file selection / upload */
   const handleFiles = useCallback(
     (files: FileList | null) => {
       if (!files) return;
@@ -173,7 +173,7 @@ export default function ClonePage() {
     [productImages.length]
   );
 
-  /** 移除已上传的图片 */
+  /** remove an uploaded image */
   const removeImage = useCallback((id: string) => {
     setProductImages((prev) => {
       const target = prev.find((img) => img.id === id);
@@ -182,7 +182,7 @@ export default function ClonePage() {
     });
   }, []);
 
-  /** 拖拽事件处理 */
+  /** drag event handlers */
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -202,9 +202,9 @@ export default function ClonePage() {
     [handleFiles]
   );
 
-  /** 是否已完成分析 */
+  /** whether analysis has been completed */
   const hasAnalysis = storyboards.length > 0;
-  /** 是否可以开始生成 */
+  /** whether generation can be started */
   const canGenerate =
     hasAnalysis &&
     productImages.length > 0 &&
@@ -213,11 +213,11 @@ export default function ClonePage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* 顶部导航栏 */}
+      {/* top navigation bar */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            {/* 返回按钮 */}
+            {/* back button */}
             <Link href="/">
               <Button
                 variant="ghost"
@@ -239,7 +239,7 @@ export default function ClonePage() {
                 </svg>
               </Button>
             </Link>
-            {/* Logo */}
+            {/* logo */}
             <div className="flex h-8 w-8 items-center justify-center rounded-lg brand-gradient">
               <svg
                 width="18"
@@ -264,7 +264,7 @@ export default function ClonePage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-10">
-        {/* 页面标题 */}
+        {/* page title */}
         <div className="mb-10 text-center">
           <h1 className="text-3xl font-bold tracking-tight mb-3">
             <span className="brand-gradient-text">{t("heroTitle")}</span>
@@ -274,7 +274,7 @@ export default function ClonePage() {
           </p>
         </div>
 
-        {/* Step 1 - 输入爆款视频 */}
+        {/* Step 1 - enter viral video URL */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full brand-gradient text-sm font-bold text-white">
@@ -285,7 +285,7 @@ export default function ClonePage() {
 
           <Card className="glass-card card-hover">
             <CardContent className="p-6 space-y-5">
-              {/* 视频链接输入 */}
+              {/* video URL input */}
               <div className="space-y-2">
                 <Label htmlFor="video-url">{t("videoUrlLabel")}</Label>
                 <div className="flex gap-3">
@@ -303,7 +303,7 @@ export default function ClonePage() {
                   >
                     {isAnalyzing ? (
                       <span className="flex items-center gap-2">
-                        {/* 加载动画 */}
+                        {/* loading spinner */}
                         <svg
                           className="animate-spin h-4 w-4"
                           viewBox="0 0 24 24"
@@ -335,7 +335,7 @@ export default function ClonePage() {
                 </p>
               </div>
 
-              {/* 分析结果展示区 */}
+              {/* analysis results display area */}
               {hasAnalysis && (
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
@@ -350,7 +350,7 @@ export default function ClonePage() {
                     {t("structureHint")}
                   </p>
 
-                  {/* 分镜卡片列表 */}
+                  {/* storyboard card list */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {storyboards.map((card) => (
                       <div
@@ -380,7 +380,7 @@ export default function ClonePage() {
           </Card>
         </div>
 
-        {/* Step 2 - 上传你的商品 */}
+        {/* Step 2 - upload your product */}
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-5">
             <div
@@ -407,7 +407,7 @@ export default function ClonePage() {
             }`}
           >
             <CardContent className="p-6 space-y-6">
-              {/* 商品图片拖拽上传 */}
+              {/* product image drag-and-drop upload */}
               <div className="space-y-2">
                 <Label>
                   {t("productImageLabel")}{" "}
@@ -436,7 +436,7 @@ export default function ClonePage() {
                   />
 
                   {productImages.length === 0 ? (
-                    // 空状态 - 上传提示
+                    // empty state - upload prompt
                     <div className="flex flex-col items-center justify-center py-10 text-center">
                       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
                         <svg
@@ -470,7 +470,7 @@ export default function ClonePage() {
                       </p>
                     </div>
                   ) : (
-                    // 已上传图片预览
+                    // uploaded image preview
                     <div className="p-4">
                       <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
                         {productImages.map((img) => (
@@ -484,7 +484,7 @@ export default function ClonePage() {
                               alt={t("productImageAlt")}
                               className="h-full w-full object-cover"
                             />
-                            {/* 删除按钮 */}
+                            {/* delete button */}
                             <button
                               type="button"
                               className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -509,7 +509,7 @@ export default function ClonePage() {
                             </button>
                           </div>
                         ))}
-                        {/* 添加更多按钮 */}
+                        {/* add more button */}
                         {productImages.length < 5 && (
                           <div className="aspect-square rounded-lg border border-dashed border-border/60 flex items-center justify-center hover:border-primary/50 transition-colors">
                             <svg
@@ -534,7 +534,7 @@ export default function ClonePage() {
                 </div>
               </div>
 
-              {/* 商品名称 */}
+              {/* product name */}
               <div className="space-y-2">
                 <Label htmlFor="product-name">{t("productNameLabel")}</Label>
                 <Input
@@ -545,7 +545,7 @@ export default function ClonePage() {
                 />
               </div>
 
-              {/* 商品卖点 */}
+              {/* product selling points */}
               <div className="space-y-2">
                 <Label htmlFor="product-features">{t("productFeaturesLabel")}</Label>
                 <Textarea
@@ -560,7 +560,7 @@ export default function ClonePage() {
           </Card>
         </div>
 
-        {/* 底部操作按钮 */}
+        {/* bottom action buttons */}
         <div className="flex flex-col items-center pb-10 gap-3">
           {genError && (
             <p className="text-sm text-destructive">{genError}</p>

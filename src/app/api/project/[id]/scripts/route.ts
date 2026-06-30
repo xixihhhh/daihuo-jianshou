@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { scripts } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
-// 获取某项目的全部脚本方案（脚本页 / 素材页按 projectId 读取真实数据）
+// Fetch all script variants for a project (the script page / assets page reads real data by projectId)
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,7 +18,7 @@ export async function GET(
       .orderBy(desc(scripts.createdAt));
     return NextResponse.json(rows);
   } catch (error) {
-    console.error("获取脚本失败:", error);
+    console.error("Failed to fetch scripts:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "获取脚本失败" },
       { status: 500 }
@@ -26,7 +26,7 @@ export async function GET(
   }
 }
 
-// 更新某条脚本的选中状态（用户在脚本页切换选中的方案）
+// Update the selected state of a script (the user switches the active variant on the script page)
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,7 +39,7 @@ export async function PATCH(
       return NextResponse.json({ error: "缺少 selectedScriptId" }, { status: 400 });
     }
     const db = getDb();
-    // 该项目下所有脚本先取消选中，再选中目标
+    // Deselect all scripts under this project, then select the target
     const rows = await db.select().from(scripts).where(eq(scripts.projectId, id));
     for (const r of rows) {
       await db
@@ -49,7 +49,7 @@ export async function PATCH(
     }
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("更新脚本选中状态失败:", error);
+    console.error("Failed to update script selection:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "更新失败" },
       { status: 500 }

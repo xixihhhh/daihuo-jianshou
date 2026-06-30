@@ -9,7 +9,7 @@ import {
 } from "@/lib/assets-view";
 import type { Shot } from "@/lib/db/schema";
 
-// 造一个最小可用的分镜
+// Create a minimal usable shot
 function shot(partial: Partial<Shot> & { shotId: number }): Shot {
   return {
     shotId: partial.shotId,
@@ -35,7 +35,7 @@ describe("buildAssetRows", () => {
     expect(rows[0].status).toBe("done");
     expect(rows[0].thumbnailUrl).toBe("/api/files/p1/stock/a.jpg");
     expect(rows[0].assetType).toBe("stock_footage");
-    expect(rows[0].isVideo).toBeUndefined(); // 图片素材不是视频
+    expect(rows[0].isVideo).toBeUndefined(); // image assets are not video
   });
 
   it("视频素材（mp4）→ 标记 isVideo，缩略图取静态预览图而非 mp4", () => {
@@ -51,7 +51,7 @@ describe("buildAssetRows", () => {
     ];
     const rows = buildAssetRows(shots, saved, []);
     expect(rows[0].isVideo).toBe(true);
-    expect(rows[0].thumbnailUrl).toBe("https://cdn/preview.jpg"); // 用预览图，不拿 mp4 当 <img>
+    expect(rows[0].thumbnailUrl).toBe("https://cdn/preview.jpg"); // use preview image, not the mp4 itself as <img>
   });
 
   it("视频素材但无预览图 → isVideo 仍为 true，缩略图回退到文件本身", () => {
@@ -104,7 +104,7 @@ describe("pendingShotCount", () => {
       [],
       ["/p.jpg"],
     );
-    // shot1/shot3 pending，shot2 用商品图就绪
+    // shot1/shot3 are pending; shot2 is ready via product image
     expect(pendingShotCount(rows)).toBe(2);
   });
 });
@@ -114,7 +114,7 @@ describe("pendingNonProductShotCount", () => {
     const rows = buildAssetRows(
       [
         shot({ shotId: 1, visualSource: "ai_generate" }), // pending b-roll
-        shot({ shotId: 2, visualSource: "product_image" }), // 商品图就绪
+        shot({ shotId: 2, visualSource: "product_image" }), // ready via product image
         shot({ shotId: 3, visualSource: "ai_generate" }), // pending b-roll
       ],
       [],
@@ -125,7 +125,7 @@ describe("pendingNonProductShotCount", () => {
 });
 
 describe("shouldOfferStockFill", () => {
-  // 两个 ai_generate 分镜、无素材 → 都是待配的非商品 B-roll
+  // two ai_generate shots with no assets → both are pending non-product B-roll
   const brollRows = buildAssetRows([shot({ shotId: 1 }), shot({ shotId: 2 })], [], []);
 
   it("topic 项目 → 始终提供（即便已配生图模型，免费素材是其首选路径）", () => {

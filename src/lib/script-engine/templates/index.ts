@@ -1,5 +1,5 @@
 /**
- * 品类模板统一导出
+ * Unified export for all category templates
  */
 
 import { beautyTemplates, beautyPromptDirective } from "./beauty";
@@ -16,10 +16,10 @@ export { techTemplates, techPromptDirective } from "./tech";
 
 export type { ScriptTemplate } from "./beauty";
 
-/** 品类类型 */
+/** Product category type */
 export type ProductCategory = "beauty" | "food" | "home" | "fashion" | "tech";
 
-/** 品类中文名映射 */
+/** Map of category keys to display names */
 export const categoryNameMap: Record<ProductCategory, string> = {
   beauty: "美妆护肤",
   food: "食品零食",
@@ -28,7 +28,7 @@ export const categoryNameMap: Record<ProductCategory, string> = {
   tech: "数码3C",
 };
 
-/** 品类模板和指令映射表 */
+/** Lookup table mapping each category to its templates and prompt directive */
 const categoryMap = {
   beauty: { templates: beautyTemplates, directive: beautyPromptDirective },
   food: { templates: foodTemplates, directive: foodPromptDirective },
@@ -37,7 +37,7 @@ const categoryMap = {
   tech: { templates: techTemplates, directive: techPromptDirective },
 } as const;
 
-/** 根据品类获取对应模板和 prompt 指令（未知品类回退到 beauty，避免崩溃） */
+/** Returns templates and prompt directive for a given category; falls back to beauty for unknown categories to avoid crashes */
 export function getTemplatesByCategory(category: ProductCategory) {
   return categoryMap[category] ?? categoryMap.beauty;
 }

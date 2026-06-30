@@ -1,6 +1,8 @@
 /**
- * 按分镜自动配素材 —— 用分镜的英文检索词从免费素材库取一条画面，下载落库为 stock_footage。
- * 复用多源素材引擎 + broadenQuery「永远有素材」兜底，是「脚本→素材自动配齐」的核心。
+ * Auto-fill stock footage for each shot — fetch one clip/image from a free stock library
+ * using the shot's English search keywords, then download and persist it as stock_footage.
+ * Reuses the multi-source stock engine + broadenQuery "always-has-results" fallback;
+ * this is the core of the "script → auto-matched assets" pipeline.
  */
 import { mkdir } from "fs/promises";
 import { join, basename } from "path";
@@ -14,17 +16,18 @@ import { assets as assetsTable } from "@/lib/db/schema";
 export interface FillShotInput {
   projectId: string;
   shotId: number;
-  /** 检索词（一般是 shot.stockKeywords 拼接，回退到描述） */
+  /** Search query (typically shot.stockKeywords joined, falls back to description) */
   query: string;
   source: StockSourceId | "all";
   searchOpts: StockSearchOptions;
-  /** 已用过的素材 id（跨分镜去重，避免整片重复同图）；调用方维护并传入 */
+  /** IDs of stock items already used (deduplication across shots to avoid the same image repeating throughout the video); maintained and passed in by the caller */
   usedIds?: Set<string>;
 }
 
 /**
- * 为单个分镜检索 + 下载一条素材并落库。带「永远有素材」回退（原词无果时用更宽泛词重试）。
- * 命中返回落库的 asset 行；始终找不到返回 null。
+ * Search, download, and persist one stock asset for a single shot.
+ * Includes the "always-has-results" fallback (retries with broader queries when the original yields nothing).
+ * Returns the persisted asset row on success, or null if nothing could be found.
  */
 export async function fillShotStock(input: FillShotInput): Promise<Record<string, unknown> | null> {
   const { projectId, shotId, query, source, searchOpts, usedIds } = input;
@@ -36,16 +39,16 @@ export async function fillShotStock(input: FillShotInput): Promise<Record<string
       candidates =
         source === "all" ? (await searchAllStock(q, searchOpts)).candidates : await searchStock(source, q, searchOpts);
     } catch {
-      /* 单个检索词失败则换下一个 */
+      /* individual query failed — try the next one */
     }
     if (candidates.length > 0) break;
   }
   if (candidates.length === 0) return null;
 
-  // 多候选择优：竖屏优先 + 跨分镜去重，替代「取第一条」（旧逻辑易配到横屏 / 整片重复同图）
+  // Pick the best candidate: prefer portrait orientation + deduplicate across shots, instead of just taking the first result (the old logic often produced landscape clips or repeated the same image throughout)
   const scored = candidates.map((cand) => ({
     ...cand,
-    id: String(cand.id), // 统一成 string，便于进 usedIds 去重 Set
+    id: String(cand.id), // normalize to string so it can be stored in the usedIds dedup Set
     orientation: cand.width && cand.height ? orientationOf(cand.width, cand.height) : undefined,
     type: cand.mediaType === "video" ? ("video" as const) : ("image" as const),
   }));

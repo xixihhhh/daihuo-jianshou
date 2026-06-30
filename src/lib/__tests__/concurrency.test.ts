@@ -13,9 +13,9 @@ describe("mapWithConcurrency", () => {
       running--;
       return x * 2;
     });
-    expect(out).toEqual(items.map((x) => x * 2)); // 结果保持输入顺序
-    expect(maxRunning).toBeLessThanOrEqual(3); // 不超过并发上限
-    expect(maxRunning).toBeGreaterThan(1); // 确实并发了（非串行）
+    expect(out).toEqual(items.map((x) => x * 2)); // results preserve input order
+    expect(maxRunning).toBeLessThanOrEqual(3); // does not exceed concurrency limit
+    expect(maxRunning).toBeGreaterThan(1); // actually concurrent (not serial)
   });
 
   it("传入 index", async () => {

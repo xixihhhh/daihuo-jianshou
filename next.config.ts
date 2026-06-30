@@ -1,10 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // standalone 产物：next build 额外输出 .next/standalone（含最小 server.js + nft 追踪的依赖子集），
-  // 供 Electron 主进程 fork 启动，无需在用户机 npm install。不影响 next dev。
+  // standalone output: next build additionally emits .next/standalone (minimal server.js + nft-traced dependency subset),
+  // used by the Electron main process to fork-start the server without requiring npm install on the user's machine. Does not affect next dev.
   output: "standalone",
-  // better-sqlite3 是原生模块，标记为外部（用 require 加载，不让打包器尝试打包它的 .node）
+  // better-sqlite3 is a native module; mark it external (loaded via require, so the bundler won't try to bundle its .node file)
   serverExternalPackages: ["better-sqlite3"],
 };
 

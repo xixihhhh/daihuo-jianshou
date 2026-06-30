@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LuChartNoAxesColumn, LuCheck } from "react-icons/lu";
 import type { StyleInsight, HookInsight } from "@/lib/performance-insights";
 
-// 风格 key → 展示名（聚合返回的是 styleType key）
+// style key → display name (aggregation returns the styleType key)
 const STYLE_LABEL: Record<string, { zh: string; en: string }> = {
   pain_point: { zh: "痛点种草", en: "Pain-point" },
   scene: { zh: "场景安利", en: "Scene" },
@@ -17,7 +17,7 @@ const STYLE_LABEL: Record<string, { zh: string; en: string }> = {
   custom: { zh: "自定义", en: "Custom" },
 };
 
-// 钩子机制 id → 展示名（与 hook-patterns 的 HOOK_PATTERNS 对应）
+// hook mechanism id → display name (corresponds to HOOK_PATTERNS in hook-patterns)
 const HOOK_LABEL: Record<string, { zh: string; en: string }> = {
   visual_shock: { zh: "视觉冲击", en: "Visual shock" },
   suspense_question: { zh: "悬念提问", en: "Suspense" },
@@ -58,7 +58,7 @@ export function PerformanceFeedback({ projectId }: { projectId: string }) {
       setInsights(Array.isArray(j.insights) ? j.insights : []);
       setHookInsights(Array.isArray(j.hookInsights) ? j.hookInsights : []);
     } catch {
-      /* 静默：洞察区为空即可 */
+      /* silent: an empty insights section is acceptable */
     }
   }, []);
   useEffect(() => {
@@ -101,7 +101,7 @@ export function PerformanceFeedback({ projectId }: { projectId: string }) {
             : "发布后回填这条数据 → 学出哪种脚本风格更能卖，反哺后续脚本生成。"}
         </p>
 
-        {/* 录入表单 */}
+        {/* data entry form */}
         <div className="flex flex-wrap items-end gap-2 mb-2">
           <label className="flex flex-col gap-1">
             <span className="text-[11px] text-muted-foreground">{en ? "Platform" : "平台"}</span>
@@ -155,7 +155,7 @@ export function PerformanceFeedback({ projectId }: { projectId: string }) {
           {en ? "Tip: views is required; the script style is captured automatically." : "提示：「播放」必填；脚本风格会自动定格，无需手填。"}
         </p>
 
-        {/* 聚合洞察：哪种风格更能卖 */}
+        {/* aggregated insight: which style sells best */}
         {insights.length > 0 && (
           <div className="border-t border-border/50 pt-3">
             <p className="text-xs font-medium mb-2">
@@ -183,7 +183,7 @@ export function PerformanceFeedback({ projectId }: { projectId: string }) {
           </div>
         )}
 
-        {/* 聚合洞察：哪个钩子机制更能卖 */}
+        {/* aggregated insight: which hook mechanism sells best */}
         {hookInsights.length > 0 && (
           <div className="border-t border-border/50 pt-3 mt-3">
             <p className="text-xs font-medium mb-2">

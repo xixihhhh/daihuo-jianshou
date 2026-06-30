@@ -12,13 +12,14 @@ import { PLATFORM_SPECS } from "@/lib/platform-specs";
 
 const execAsync = promisify(exec);
 
-// 各平台目标尺寸（单一事实来源见 platform-specs.ts，含 TikTok Shop）
+// Target dimensions per platform (single source of truth in platform-specs.ts, including TikTok Shop)
 const PLATFORM_SIZE = PLATFORM_SPECS;
 
 /**
- * 把成片重编码到指定平台比例。
- * 用「模糊填充」：放大裁切的模糊背景 + 等比适配的前景居中叠加，
- * 既不裁掉字幕/贴片，也不留黑边（带货短视频常见处理）。
+ * Re-encode the finished video to the target aspect ratio for a given platform.
+ * Uses "blur-pad": an enlarged-and-cropped blurred background with the proportionally scaled
+ * foreground centered on top — no subtitles/overlays are cropped and no letterboxing is added
+ * (standard treatment for short-form commerce videos).
  */
 export async function POST(
   req: NextRequest,
@@ -35,7 +36,7 @@ export async function POST(
       return NextResponse.json({ error: "不支持的平台" }, { status: 400 });
     }
 
-    // 取最新成片
+    // Fetch the most recent composed video
     const db = getDb();
     const rows = await db
       .select()
@@ -50,12 +51,12 @@ export async function POST(
 
     const { w, h } = target;
     const outFile = join(getDataDir(), "output", id, `${platform}-${Date.now()}.mp4`);
-    // 模糊填充：[bg]放大裁切+模糊；[fg]等比适配；居中叠加
+    // Blur-pad: [bg] scale-up, crop, and blur; [fg] scale to fit proportionally; overlay centered
     const filter =
       `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=24:4[bg];` +
       `[0:v]scale=${w}:${h}:force_original_aspect_ratio=decrease[fg];` +
       `[bg][fg]overlay=(W-w)/2:(H-h)/2`;
-    // -map_metadata 0 显式保留源片元数据（关键：把 AIGC 隐式合规标识带到平台导出片——用户真正上传的是这条）
+    // -map_metadata 0 explicitly carries source metadata into the output (important: this propagates the implicit AIGC compliance markers to the platform export — this is what the user actually uploads)
     const cmd =
       `"${ffmpegBin()}" -y -i "${src}" -filter_complex "${filter}" ` +
       `-map_metadata 0 -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -movflags +faststart ` +

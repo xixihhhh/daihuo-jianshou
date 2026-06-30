@@ -1,6 +1,8 @@
 /**
- * 免费背景音乐 —— 从 Openverse（keyless CC 音频）取一条可商用音乐下载到本地，供合成时混入。
- * 失败不阻塞合成（返回 null）。CC BY 等需署名：返回 author/license/sourceUrl，由调用方告知用户在成片署名。
+ * Free background music — fetches one commercially-usable CC track from Openverse (keyless CC audio)
+ * and downloads it locally for mixing into the final video.
+ * Failures do not block composition (returns null). Tracks requiring attribution (CC BY, etc.) return
+ * author/license/sourceUrl so the caller can prompt the user to credit them in the finished video.
  */
 import { mkdir } from "fs/promises";
 import { join } from "path";
@@ -9,14 +11,14 @@ import { searchWikimediaAudio } from "@/lib/providers/wikimedia";
 import { downloadStockFile } from "@/lib/providers/stock-types";
 
 export interface FreeBgmResult {
-  /** 下载到本地的绝对路径（直接作为 composer 的 bgmPath） */
+  /** Absolute local path of the downloaded file (passed directly as the composer's bgmPath) */
   localPath: string;
   author: string;
   license: string;
   sourceUrl: string;
 }
 
-// 品类 → 配乐情绪检索词：让美妆/美食/数码等各取贴合的免费 CC 音乐，而非全都同一条 ambient。
+// Category → BGM mood query: lets beauty/food/tech etc. each pick fitting free CC music instead of all defaulting to the same ambient track.
 const CATEGORY_BGM_MOOD: Record<string, string> = {
   beauty: "upbeat fashion pop instrumental",
   food: "warm cozy acoustic background",
@@ -27,13 +29,13 @@ const CATEGORY_BGM_MOOD: Record<string, string> = {
   other: "ambient background music",
 };
 
-/** 由商品品类得到配乐情绪检索词；未知/空回退通用 ambient。纯函数可单测。 */
+/** Returns the BGM mood query string for a product category; falls back to generic ambient for unknown/empty values. Pure function, unit-testable. */
 export function moodQueryForCategory(category?: string | null): string {
   const key = (category || "").toLowerCase().trim();
   return CATEGORY_BGM_MOOD[key] || "ambient background music";
 }
 
-// 用户在视频页显式选的配乐情绪（none/upbeat/chill/energetic/emotional）→ 检索词。
+// BGM mood explicitly selected by the user on the video page (none/upbeat/chill/energetic/emotional) → search query.
 const MOOD_BGM_QUERY: Record<string, string> = {
   upbeat: "upbeat pop instrumental background",
   chill: "chill lofi calm background",
@@ -41,24 +43,27 @@ const MOOD_BGM_QUERY: Record<string, string> = {
   emotional: "emotional cinematic piano background",
 };
 
-/** 由用户显式选择的配乐情绪得到检索词；未知/空（含 none）回退通用 ambient。纯函数可单测。 */
+/** Returns the BGM search query for an explicitly user-selected mood; falls back to generic ambient for unknown/empty (including "none"). Pure function, unit-testable. */
 export function moodQueryForMood(mood?: string | null): string {
   const key = (mood || "").toLowerCase().trim();
   return MOOD_BGM_QUERY[key] || "ambient background music";
 }
 
 /**
- * 为项目取一条免费 CC 背景音乐并下载到 uploads/<project>/bgm/。
- * 偏好时长 ≥ 8s 的曲目（太短循环噪点大）。任何失败都吞掉返回 null，绝不阻塞合成。
+ * Fetches one free CC background music track for the project and downloads it to uploads/<project>/bgm/.
+ * Prefers tracks with duration >= 8 s (shorter tracks produce noticeable loop artifacts).
+ * Any failure is silently swallowed and returns null — never blocks composition.
  */
 export async function fetchFreeBgm(
   projectId: string,
   query = "ambient background music"
 ): Promise<FreeBgmResult | null> {
   try {
-    // 用 Wikimedia Commons 音频：CC/PD、upload.wikimedia.org 直链可下（Openverse 音频多走 Freesound 需鉴权会 401）。
+    // Use Wikimedia Commons audio: CC/PD, direct download links from upload.wikimedia.org work without auth
+    // (Openverse audio often routes through Freesound, which requires authentication and returns 401).
     const candidates = await searchWikimediaAudio(query, { perPage: 10 });
-    // 偏好 ≥8s 的曲目（太短循环噪点大）；逐条尝试下载，跳过失败的，取第一条能下到的。
+    // Prefer tracks >= 8 s (shorter ones produce noticeable loop artifacts); try downloading each in order,
+    // skip any that fail, and use the first one that succeeds.
     const longEnough = candidates.filter((c) => (c.durationSec ?? 0) >= 8);
     const pool = (longEnough.length ? longEnough : candidates).filter((c) => c.downloadUrl);
     if (pool.length === 0) {
@@ -72,7 +77,7 @@ export async function fetchFreeBgm(
         const { filePath } = await downloadStockFile(pick.downloadUrl, bgmDir, `bgm_${Date.now()}`, "audio");
         return { localPath: filePath, author: pick.author, license: pick.license, sourceUrl: pick.pageUrl };
       } catch {
-        // 该曲目下载失败（如需鉴权 401）→ 试下一条
+        // This track failed to download (e.g. auth required, 401) → try the next one
       }
     }
     console.warn(`[bgm] 所有候选都下载失败（query=${query}, ${pool.length} 条）`);

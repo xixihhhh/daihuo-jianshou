@@ -6,7 +6,7 @@ import { publishMetrics, projects, scripts as scriptsTable } from "@/lib/db/sche
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
 const num = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
 
-/** GET /api/project/[id]/metrics —— 列出该项目录入的投放数据（新→旧） */
+/** GET /api/project/[id]/metrics —— list the publish metrics recorded for this project (newest → oldest) */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return NextResponse.json({ error: "无效的项目ID" }, { status: 400 });
@@ -20,8 +20,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 /**
- * POST /api/project/[id]/metrics —— 录入一条发布后的投放数据。
- * style/category 在此定格（优先取传入，否则取项目最新脚本风格 / 项目品类），便于后续按风格聚合不被改动污染。
+ * POST /api/project/[id]/metrics —— record one post-publish metrics entry.
+ * style/category are frozen here (prefer the passed-in values; fall back to the project's latest script style / product category),
+ * so future style-based aggregation is not contaminated by later edits.
  * body: { style?, category?, platform?, views?, likes?, comments?, shares?, orders?, note?, publishedAt? }
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     body = await req.json();
   } catch {
-    /* 允许空 body */
+    /* empty body is allowed */
   }
 
   const db = getDb();

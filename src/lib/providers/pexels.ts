@@ -1,9 +1,9 @@
 /**
- * Pexels 素材源 —— 免费可商用版权视频/图片的检索（多源素材引擎的源之一）
+ * Pexels media source — search for free, commercially-licensed videos/images (one source in the multi-provider media engine)
  *
- * 通用类型/下载/工具已抽到 ./stock-types，本文件只放 Pexels 特有的检索与清晰度挑选。
- * 鉴权：HTTP 头 `Authorization: <API_KEY>`（无 Bearer 前缀）。免费 Key：https://www.pexels.com/api/
- * 合规：每个候选保留 pageUrl/author/authorUrl，落库到 assets 表，导出时生成 credits。检索词建议英文。
+ * Shared types/download helpers/utilities have been extracted to ./stock-types; this file contains only Pexels-specific search and resolution selection.
+ * Auth: HTTP header `Authorization: <API_KEY>` (no Bearer prefix). Free key: https://www.pexels.com/api/
+ * Compliance: each candidate retains pageUrl/author/authorUrl, stored in the assets table, and used to generate credits on export. English search terms are recommended.
  */
 
 import {
@@ -14,7 +14,7 @@ import {
   orientationOf,
 } from "./stock-types";
 
-// 向后兼容：早期从 ./pexels 引入这些符号的模块（route/test）继续可用
+// backward compatibility: modules that used to import these symbols from ./pexels (route/test) continue to work
 export {
   downloadStockFile,
   filterByDuration,
@@ -25,9 +25,9 @@ export type { StockCandidate, StockOrientation, DownloadResult } from "./stock-t
 
 const PEXELS_API = "https://api.pexels.com";
 
-// ==================== Pexels 原始响应类型 ====================
+// ==================== Pexels raw response types ====================
 
-/** Pexels 视频的单个清晰度文件 */
+/** A single resolution file for a Pexels video */
 export interface PexelsVideoFile {
   id: number;
   quality: string | null; // "hd" | "sd" | null
@@ -36,27 +36,27 @@ export interface PexelsVideoFile {
   height: number;
   fps: number;
   link: string;
-  size: number; // 字节
+  size: number; // bytes
 }
 
-/** Pexels 视频条目 */
+/** Pexels video item */
 export interface PexelsVideo {
   id: number;
   width: number;
   height: number;
-  duration: number; // 秒
-  url: string; // 视频详情页（归属链接）
-  image: string; // 预览图
+  duration: number; // seconds
+  url: string; // video detail page (attribution link)
+  image: string; // preview thumbnail
   user: { id: number; name: string; url: string };
   video_files: PexelsVideoFile[];
 }
 
-/** Pexels 图片条目 */
+/** Pexels photo item */
 export interface PexelsPhoto {
   id: number;
   width: number;
   height: number;
-  url: string; // 图片详情页（归属链接）
+  url: string; // photo detail page (attribution link)
   photographer: string;
   photographer_url: string;
   alt: string;
@@ -71,12 +71,12 @@ export interface PexelsPhoto {
   };
 }
 
-// ==================== 纯函数（可单测） ====================
+// ==================== pure functions (unit-testable) ====================
 
 /**
- * 从一个 Pexels 视频的多个清晰度里挑「最合适」的文件：
- * 1. 只要 mp4；2. 优先目标方向；3. 在满足方向的里挑「短边 >= minShortSide 的最小体积」；
- * 4. 若无达标者，取分辨率最高的一条。纯函数。
+ * Pick the "best" file from the multiple resolutions of a Pexels video:
+ * 1. mp4 only; 2. prefer the target orientation; 3. among orientation-matched files pick the smallest by size with short side >= minShortSide;
+ * 4. if none qualify, pick the highest-resolution file. Pure function.
  */
 export function pickBestVideoFile(
   files: PexelsVideoFile[],
@@ -98,7 +98,7 @@ export function pickBestVideoFile(
   return pool.reduce((best, f) => (shortSide(f) > shortSide(best) ? f : best));
 }
 
-/** 把一个 Pexels 视频归一化为候选；挑不出文件则返回 null */
+/** Normalize a Pexels video into a candidate; returns null if no suitable file can be selected */
 export function toVideoCandidate(
   video: PexelsVideo,
   opts: { orientation?: StockOrientation; minShortSide?: number } = {}
@@ -121,14 +121,14 @@ export function toVideoCandidate(
   };
 }
 
-/** 按目标方向挑图片的最佳尺寸链接 */
+/** Pick the best-sized image URL for the target orientation */
 export function pickPhotoSrc(photo: PexelsPhoto, orientation: StockOrientation): string {
   if (orientation === "portrait") return photo.src.portrait || photo.src.large2x || photo.src.original;
   if (orientation === "landscape") return photo.src.landscape || photo.src.large2x || photo.src.original;
   return photo.src.large2x || photo.src.original;
 }
 
-/** 把一个 Pexels 图片归一化为候选 */
+/** Normalize a Pexels photo into a candidate */
 export function toPhotoCandidate(photo: PexelsPhoto, orientation: StockOrientation = "portrait"): StockCandidate {
   return {
     source: "pexels",
@@ -145,9 +145,9 @@ export function toPhotoCandidate(photo: PexelsPhoto, orientation: StockOrientati
   };
 }
 
-// ==================== 网络函数 ====================
+// ==================== network functions ====================
 
-/** 搜索 Pexels 视频 */
+/** Search Pexels videos */
 export async function searchPexelsVideos(
   query: string,
   opts: {
@@ -178,7 +178,7 @@ export async function searchPexelsVideos(
   return filterByDuration(candidates, { minSec, maxSec });
 }
 
-/** 搜索 Pexels 图片 */
+/** Search Pexels photos */
 export async function searchPexelsPhotos(
   query: string,
   opts: { apiKey: string; perPage?: number; orientation?: StockOrientation }

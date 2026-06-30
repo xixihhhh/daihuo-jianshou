@@ -1,20 +1,20 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-// 商品条目
+// product entry
 export interface ProductItem {
   id: string;
   name: string;
   category: "beauty" | "food" | "home" | "fashion" | "tech" | "other";
   description?: string;
-  images: string[]; // 本地 blob URL 或服务器 URL
+  images: string[]; // local blob URLs or server URLs
   price?: string;
   targetAudience?: string;
   videoCount: number;
   createdAt: Date;
 }
 
-// 商品库状态
+// product library state
 interface ProductLibraryState {
   products: ProductItem[];
   addProduct: (product: ProductItem) => void;
@@ -28,11 +28,11 @@ export const useProductLibraryStore = create<ProductLibraryState>()(
     (set) => ({
       products: [],
 
-      // 添加商品
+      // add a product
       addProduct: (product) =>
         set((state) => ({ products: [...state.products, product] })),
 
-      // 更新商品
+      // update a product
       updateProduct: (id, updates) =>
         set((state) => ({
           products: state.products.map((p) =>
@@ -40,13 +40,13 @@ export const useProductLibraryStore = create<ProductLibraryState>()(
           ),
         })),
 
-      // 删除商品
+      // remove a product
       removeProduct: (id) =>
         set((state) => ({
           products: state.products.filter((p) => p.id !== id),
         })),
 
-      // 递增视频生成计数
+      // increment video generation count
       incrementVideoCount: (id) =>
         set((state) => ({
           products: state.products.map((p) =>
@@ -56,7 +56,7 @@ export const useProductLibraryStore = create<ProductLibraryState>()(
     }),
     {
       name: "daihuo-jianshou-products",
-      // JSON 序列化会将 Date 转为字符串，读取时需要还原
+      // JSON serialization converts Date to string; restore it when reading back
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name);

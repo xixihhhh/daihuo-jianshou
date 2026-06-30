@@ -1,7 +1,7 @@
 /**
- * 阿里百炼 Provider 实现
- * 支持万相（Wan）视频生成和通义千问（Qwen）图片生成等模型
- * 文档参考: https://help.aliyun.com/zh/model-studio/
+ * Alibaba Bailian Provider implementation
+ * Supports Wan (Wanxiang) video generation and Qwen image generation models
+ * Docs: https://help.aliyun.com/zh/model-studio/
  */
 
 import { BaseProvider, ProviderError } from './base'
@@ -17,7 +17,7 @@ import type {
   MediaType,
 } from './types'
 
-// ==================== 阿里百炼 API 响应类型 ====================
+// ==================== Alibaba Bailian API response types ====================
 
 interface AliResponse<T = unknown> {
   request_id: string
@@ -51,7 +51,7 @@ interface AliTaskOutput {
   end_time?: string
 }
 
-// ==================== Provider 实现 ====================
+// ==================== Provider implementation ====================
 
 export class AlibabaProvider extends BaseProvider {
   readonly name = 'alibaba'
@@ -65,7 +65,7 @@ export class AlibabaProvider extends BaseProvider {
   }
 
   /**
-   * 获取认证头 - 阿里百炼使用 API-Key 认证
+   * Get authentication headers - Alibaba Bailian uses API-Key auth
    */
   protected getAuthHeaders(): Record<string, string> {
     return {
@@ -74,7 +74,7 @@ export class AlibabaProvider extends BaseProvider {
   }
 
   /**
-   * 生成图片
+   * Generate an image
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
     const body = {
@@ -98,7 +98,7 @@ export class AlibabaProvider extends BaseProvider {
       },
     }
 
-    // 使用异步任务接口
+    // use the async task API
     const response = await this.request<AliResponse<AliAsyncOutput>>(
       '/services/aigc/text2image/image-synthesis',
       {
@@ -110,26 +110,26 @@ export class AlibabaProvider extends BaseProvider {
       }
     )
 
-    // 守卫：异步提交偶发 200 但 output/task_id 缺失，直接取 .task_id 会崩 TypeError
+    // guard: async submission occasionally returns 200 but without output/task_id; accessing .task_id would throw TypeError
     if (!response.output?.task_id) {
       throw new ProviderError('未返回任务ID', 'NO_TASK_ID', this.name)
     }
     const taskId = response.output.task_id
 
-    // 轮询等待结果
+    // poll until result is ready
     const finalStatus = await this.pollTaskStatus(taskId)
 
-    // 状态接口不回显 model，用调用方的 modelId 回填
+    // the status API does not echo back the model; backfill using the caller's modelId
     const result = this.requireResult(finalStatus.result) as ImageResult
     result.modelId = options.modelId
     return result
   }
 
   /**
-   * 生成视频
+   * Generate a video
    */
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
-    // 支持音频的模型将配音融入 prompt
+    // models that support audio embed the voiceover into the prompt
     let prompt = options.prompt
     if (options.audioEnabled && options.voiceover) {
       prompt = `${options.prompt}. 旁白: "${options.voiceover}"`
@@ -156,7 +156,7 @@ export class AlibabaProvider extends BaseProvider {
         motion_strength: options.motionStrength,
         guidance_scale: options.guidanceScale,
         seed: options.seed,
-        // 音频参数透传
+        // pass through audio parameters
         ...(options.audioEnabled && {
           enable_audio: true,
           ...(options.audioPrompt && { audio_prompt: options.audioPrompt }),
@@ -165,7 +165,7 @@ export class AlibabaProvider extends BaseProvider {
       },
     }
 
-    // 视频生成使用异步接口
+    // video generation uses the async API
     const response = await this.request<AliResponse<AliAsyncOutput>>(
       '/services/aigc/video-generation/generation',
       {
@@ -177,25 +177,25 @@ export class AlibabaProvider extends BaseProvider {
       }
     )
 
-    // 守卫：异步提交偶发 200 但 output/task_id 缺失，直接取 .task_id 会崩 TypeError
+    // guard: async submission occasionally returns 200 but without output/task_id; accessing .task_id would throw TypeError
     if (!response.output?.task_id) {
       throw new ProviderError('未返回任务ID', 'NO_TASK_ID', this.name)
     }
     const taskId = response.output.task_id
 
-    // 轮询等待结果（视频生成间隔较长）
+    // poll with a longer interval since video generation takes more time
     const finalStatus = await this.pollTaskStatus(taskId, {
       interval: 5000,
     })
 
-    // 状态接口不回显 model，用调用方的 modelId 回填
+    // the status API does not echo back the model; backfill using the caller's modelId
     const result = this.requireResult(finalStatus.result) as VideoResult
     result.modelId = options.modelId
     return result
   }
 
   /**
-   * 查询任务状态
+   * Query task status
    */
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
     const response = await this.request<AliResponse<AliTaskOutput>>(
@@ -212,14 +212,14 @@ export class AlibabaProvider extends BaseProvider {
       updatedAt: data.end_time,
     }
 
-    // 计算进度
+    // calculate progress
     if (data.task_metrics) {
       const total = data.task_metrics.TOTAL ?? 1
       const succeeded = data.task_metrics.SUCCEEDED ?? 0
       taskStatus.progress = Math.round((succeeded / total) * 100)
     }
 
-    // 解析图片结果
+    // parse image result
     if (status === 'completed' && data.results && data.results.length > 0) {
       const validResults = data.results.filter((r) => r.url)
       if (validResults.length > 0) {
@@ -231,7 +231,7 @@ export class AlibabaProvider extends BaseProvider {
       }
     }
 
-    // 解析视频结果
+    // parse video result
     if (status === 'completed' && data.video_url) {
       taskStatus.result = {
         taskId: data.task_id,
@@ -241,7 +241,7 @@ export class AlibabaProvider extends BaseProvider {
       }
     }
 
-    // 失败信息
+    // failure info
     if (status === 'failed') {
       taskStatus.error = data.error_message
       taskStatus.errorCode = data.error_code
@@ -251,14 +251,14 @@ export class AlibabaProvider extends BaseProvider {
   }
 
   /**
-   * 获取可用模型列表
+   * List available models
    */
   async listModels(mediaType?: MediaType): Promise<Model[]> {
-    // 基于阿里百炼官方文档确认的模型列表（2026-03）
-    // 文档：https://help.aliyun.com/zh/model-studio/image-to-video-api-reference/
+    // model list confirmed from official Alibaba Bailian docs (2026-03)
+    // docs: https://help.aliyun.com/zh/model-studio/image-to-video-api-reference/
     const models: Model[] = [
-      // ==================== 视频生成（万相系列） ====================
-      // --- wan2.6 系列（最新） ---
+      // ==================== Video generation (Wan series) ====================
+      // --- wan2.6 series (latest) ---
       {
         id: 'wan2.6-i2v-flash',
         name: '万相 2.6 Flash (图生视频)',
@@ -275,7 +275,7 @@ export class AlibabaProvider extends BaseProvider {
         mediaType: 'video',
         provider: this.name,
       },
-      // --- wan2.5 系列 ---
+      // --- wan2.5 series ---
       {
         id: 'wan2.5-i2v-preview',
         name: '万相 2.5 Preview (图生视频)',
@@ -284,7 +284,7 @@ export class AlibabaProvider extends BaseProvider {
         mediaType: 'video',
         provider: this.name,
       },
-      // --- wan2.2 系列 ---
+      // --- wan2.2 series ---
       {
         id: 'wan2.2-i2v-plus',
         name: '万相 2.2 Plus (图生视频)',
@@ -293,7 +293,7 @@ export class AlibabaProvider extends BaseProvider {
         mediaType: 'video',
         provider: this.name,
       },
-      // --- wanx2.1 系列（旧版保留） ---
+      // --- wanx2.1 series (legacy, kept for compatibility) ---
       {
         id: 'wanx2.1-i2v-turbo',
         name: '万相 2.1 Turbo (图生视频)',
@@ -310,7 +310,7 @@ export class AlibabaProvider extends BaseProvider {
         mediaType: 'video',
         provider: this.name,
       },
-      // ==================== 图片生成 ====================
+      // ==================== Image generation ====================
       {
         id: 'wanx-v1',
         name: '通义万相 (文生图)',
@@ -336,9 +336,9 @@ export class AlibabaProvider extends BaseProvider {
     return models
   }
 
-  // ==================== 私有方法 ====================
+  // ==================== Private methods ====================
 
-  /** 映射阿里百炼任务状态 */
+  /** Map Alibaba Bailian task status to unified status */
   private mapStatus(aliStatus: string): TaskStatusEnum {
     const statusMap: Record<string, TaskStatusEnum> = {
       PENDING: 'pending',

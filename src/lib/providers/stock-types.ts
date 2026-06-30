@@ -1,66 +1,66 @@
 /**
- * 多源素材引擎 —— 跨素材源的统一类型、归一化候选与共享工具
+ * Multi-source media engine — shared types, normalized candidates, and utility functions across all stock sources
  *
- * 设计：素材源是"检索 + 下载"模型（不同于 AIProvider 的异步 task 轮询）。
- * 各源（Pexels/Pixabay/Openverse…）把自家响应归一化为同一个 StockCandidate，
- * 然后统一下载到 data/uploads 落 assets 表，被 composer 当普通 video/image/audio 片段消费。
+ * Design: stock sources follow a "search + download" model (unlike the AIProvider's async task-polling model).
+ * Each source (Pexels/Pixabay/Openverse…) normalizes its own response into a common StockCandidate,
+ * which is then downloaded to data/uploads, recorded in the assets table, and consumed by the composer as an ordinary video/image/audio segment.
  */
 
-/** 已接入的素材源 id（local = 项目自带本地 B-roll 池；nasa/archive = 公共领域档案影像，显式选用） */
+/** IDs of integrated stock sources (local = project-bundled B-roll pool; nasa/archive = public-domain archive footage, must be selected explicitly) */
 export type StockSourceId = "pexels" | "pixabay" | "openverse" | "wikimedia" | "local" | "nasa" | "archive";
 
 export type StockMediaType = "video" | "image" | "audio";
 export type StockOrientation = "portrait" | "landscape" | "square";
 
-/** 统一的素材候选（各源都归一到这个结构） */
+/** Unified media candidate (all sources normalize into this structure) */
 export interface StockCandidate {
   source: StockSourceId;
   mediaType: StockMediaType;
-  /** 源内 id（Openverse 等用字符串 id，故放宽为 string|number） */
+  /** Source-internal id (Openverse and others use string ids, so the type is widened to string|number) */
   id: string | number;
-  /** 选中清晰度的直链（下载用） */
+  /** Direct URL for the selected quality tier (used for downloading) */
   downloadUrl: string;
-  /** 来源详情页 URL（合规归属） */
+  /** Source detail page URL (for compliance attribution) */
   pageUrl: string;
-  /** 作者名（署名） */
+  /** Author name (for attribution) */
   author: string;
-  /** 作者主页 */
+  /** Author profile URL */
   authorUrl: string;
-  /** 授权类型（各源不同，故为字符串，如 "Pexels"/"Pixabay Content License"/"cc-by-2.0"） */
+  /** License type (varies by source; e.g. "Pexels" / "Pixabay Content License" / "cc-by-2.0") */
   license: string;
-  /** 授权说明链接（CC 源有） */
+  /** Link to the license description (available for CC sources) */
   licenseUrl?: string;
-  /** 现成署名文本（Openverse 等提供，直接用于导出 credits） */
+  /** Ready-to-use attribution text (provided by Openverse and others; used directly when exporting credits) */
   attributionText?: string;
-  /** 是否强制署名（CC BY/BY-SA 等为 true） */
+  /** Whether attribution is legally required (true for CC BY, BY-SA, etc.) */
   requiresAttribution?: boolean;
-  /** 像素宽高（音频无） */
+  /** Pixel dimensions (absent for audio) */
   width?: number;
   height?: number;
-  /** 视频/音频时长（秒）；图片为 undefined */
+  /** Duration in seconds for video/audio; undefined for images */
   durationSec?: number;
-  /** 预览图 */
+  /** Preview image URL */
   previewImage?: string;
 }
 
-/** 素材源元信息（供前端展示可用源、是否需 Key） */
+/** Stock source metadata (used by the frontend to display available sources and whether a key is required) */
 export interface StockSourceMeta {
   id: StockSourceId;
   label: string;
-  /** 是否完全免 Key 可用（对新手零配置极重要） */
+  /** Whether the source is fully usable without an API key (critical for zero-config onboarding) */
   keyless: boolean;
   mediaTypes: StockMediaType[];
-  /** 免费 Key 申请页 */
+  /** URL to sign up for a free API key */
   signupUrl?: string;
-  /** 服务端读取 Key 的环境变量名 */
+  /** Environment variable name the server reads the key from */
   envKey?: string;
-  /** 一句话说明 */
+  /** One-line description */
   note?: string;
-  /** 是否参与默认聚合检索（source="all"）；默认 true。档案源（两步取材、题材偏纪录/科学）设 false，仅显式选用以免拖慢自动配画面 */
+  /** Whether this source participates in default aggregate searches (source="all"); defaults to true. Archive sources (two-step retrieval, documentary/scientific content) are set to false and must be selected explicitly to avoid slowing down automatic footage matching */
   aggregate?: boolean;
 }
 
-/** 已接入素材源注册表（前端据此渲染源选择，keyless 排前） */
+/** Registry of integrated stock sources (used by the frontend to render source selection; keyless sources appear first) */
 export const STOCK_SOURCES: StockSourceMeta[] = [
   {
     id: "openverse",
@@ -122,21 +122,21 @@ export const STOCK_SOURCES: StockSourceMeta[] = [
   },
 ];
 
-/** 单次下载体积上限（80MB） */
+/** Maximum download size per file (80 MB) */
 export const MAX_DOWNLOAD_BYTES = 80 * 1024 * 1024;
-/** 网络请求超时（毫秒） */
+/** Network request timeout (milliseconds) */
 export const REQUEST_TIMEOUT_MS = 30_000;
 
-// ==================== 共享纯函数 ====================
+// ==================== shared pure functions ====================
 
-/** 判断方向 */
+/** Determine orientation */
 export function orientationOf(width: number, height: number): StockOrientation {
   if (height > width) return "portrait";
   if (width > height) return "landscape";
   return "square";
 }
 
-/** 按时长过滤候选（图片不过滤） */
+/** Filter candidates by duration (images are not filtered) */
 export function filterByDuration(
   candidates: StockCandidate[],
   opts: { minSec?: number; maxSec?: number } = {}
@@ -150,7 +150,7 @@ export function filterByDuration(
   });
 }
 
-/** 从直链/响应推断文件扩展名；都识别不出时按媒体类型给默认（避免图片/音频被错存成 .mp4） */
+/** Infer file extension from the URL or response headers; fall back to media-type defaults when nothing can be detected (avoids images/audio being saved as .mp4) */
 export function inferExtension(url: string, contentType?: string | null, mediaType?: StockMediaType): string {
   const ctMap: Record<string, string> = {
     "video/mp4": "mp4",
@@ -173,9 +173,9 @@ export function inferExtension(url: string, contentType?: string | null, mediaTy
   return "mp4";
 }
 
-// ==================== 共享网络函数 ====================
+// ==================== shared network functions ====================
 
-/** 带超时的 fetch */
+/** fetch with timeout */
 export async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -186,15 +186,15 @@ export async function fetchWithTimeout(url: string, init: RequestInit = {}): Pro
   }
 }
 
-/** 下载结果 */
+/** Download result */
 export interface DownloadResult {
   filePath: string;
   bytes: number;
 }
 
 /**
- * 下载一个直链到指定目录，返回保存信息。
- * 带超时与体积上限；调用方负责传入已 mkdir 的目录与文件名前缀。
+ * Download a direct URL to the specified directory and return save info.
+ * Enforces timeout and size limit; the caller is responsible for providing an already-created directory and a file name prefix.
  */
 export async function downloadStockFile(
   url: string,
@@ -207,8 +207,8 @@ export async function downloadStockFile(
 
   const safeBaseName = fileBaseName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "file";
 
-  // 本地素材分支：url 是本地绝对路径 / file://（仅由 scanLocalMaterials 从项目素材池 readdir 构造，非用户输入），
-  // 直接复制而非走网络 fetch（fetch 不支持文件路径）。带体积上限，与网络下载一致。
+  // local media branch: url is an absolute local path or file:// (constructed exclusively by scanLocalMaterials via readdir from the project pool, never user input);
+  // copy directly instead of using network fetch (fetch does not support file paths). Size limit is still enforced, consistent with network downloads.
   if (url.startsWith("/") || url.startsWith("file://")) {
     const srcPath = url.startsWith("file://") ? new URL(url).pathname : url;
     const st = await stat(srcPath);
@@ -234,7 +234,7 @@ export async function downloadStockFile(
   }
 
   const ext = inferExtension(url, contentType, mediaType);
-  // safeBaseName 已在函数顶部净化（去路径分隔符/特殊字符，防目录穿越）
+  // safeBaseName is sanitized at the top of the function (path separators and special characters removed to prevent directory traversal)
   const filePath = join(destDir, `${safeBaseName}.${ext}`);
   await writeFile(filePath, buffer);
   return { filePath, bytes: buffer.byteLength };

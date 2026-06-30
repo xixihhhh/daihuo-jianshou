@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-// 允许通过 PATCH 更新的字段白名单（禁止透传 id/createdAt 等，防止字段注入/主键破坏）
+// Allowlist of fields that may be updated via PATCH (id/createdAt etc. are blocked to prevent field injection / primary-key corruption)
 const PATCHABLE_FIELDS = [
   "name",
   "productName",
@@ -21,7 +21,7 @@ const PATCHABLE_FIELDS = [
   "status",
 ] as const;
 
-// status 字段的合法枚举值（SQLite 不强制 enum，需手动校验）
+// Valid enum values for the status field (SQLite does not enforce enums, so we validate manually)
 const VALID_STATUS = new Set([
   "draft",
   "scripting",
@@ -31,7 +31,7 @@ const VALID_STATUS = new Set([
   "done",
 ]);
 
-// 获取单个项目
+// Fetch a single project
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -47,7 +47,7 @@ export async function GET(
 
     return NextResponse.json(result[0]);
   } catch (error) {
-    console.error("获取项目失败:", error);
+    console.error("Failed to fetch project:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "获取项目失败" },
       { status: 500 }
@@ -55,7 +55,7 @@ export async function GET(
   }
 }
 
-// 更新项目
+// Update a project
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,7 +65,7 @@ export async function PATCH(
     const body = await req.json();
     const db = getDb();
 
-    // 只取白名单字段，丢弃 id/createdAt 等危险字段
+    // Only pick allowlisted fields; discard dangerous fields such as id/createdAt
     const updates: Record<string, unknown> = {};
     for (const field of PATCHABLE_FIELDS) {
       if (field in body) {
@@ -73,7 +73,7 @@ export async function PATCH(
       }
     }
 
-    // 校验 status 枚举合法性
+    // Validate that the status value is a legal enum member
     if ("status" in updates && !VALID_STATUS.has(String(updates.status))) {
       return NextResponse.json({ error: "非法的项目状态值" }, { status: 400 });
     }
@@ -94,7 +94,7 @@ export async function PATCH(
 
     return NextResponse.json(result[0]);
   } catch (error) {
-    console.error("更新项目失败:", error);
+    console.error("Failed to update project:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "更新项目失败" },
       { status: 500 }
@@ -102,7 +102,7 @@ export async function PATCH(
   }
 }
 
-// 删除项目
+// Delete a project
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -113,7 +113,7 @@ export async function DELETE(
     await db.delete(projects).where(eq(projects.id, id));
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("删除项目失败:", error);
+    console.error("Failed to delete project:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "删除项目失败" },
       { status: 500 }

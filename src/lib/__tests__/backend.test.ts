@@ -4,7 +4,7 @@ import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
 import { extractJSON, parseScriptResponse } from "@/lib/script-engine/generator";
 import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, composeErrorMessage, buildDrawtext, type ComposeConfig } from "@/lib/video-composer/composer";
 
-// ==================== Prompt 构建测试 ====================
+// ==================== Prompt build tests ====================
 
 describe("buildUserPrompt", () => {
   const baseInput: ScriptGenerationInput = {
@@ -18,7 +18,7 @@ describe("buildUserPrompt", () => {
     const withRef = buildBatchPrompt({ ...baseInput, referenceStructure: "1. [hook] 3s 口播参考：「你还在...」" }, 3);
     expect(withRef).toContain("参考爆款结构");
     expect(withRef).toContain("你还在...");
-    // 未传模板时不应出现该块
+    // should not appear when no template is provided
     const noRef = buildBatchPrompt(baseInput, 3);
     expect(noRef).not.toContain("参考爆款结构");
   });
@@ -47,7 +47,7 @@ describe("buildUserPrompt", () => {
     expect(prompt).toContain("三段式");
     expect(prompt).toContain("四范式");
     expect(prompt).toContain("橱窗");
-    // 非 tiktok 平台不应混入 TikTok Shop 的四范式块
+    // non-tiktok platforms should not include the TikTok Shop four-pattern block
     expect(buildUserPrompt({ ...baseInput, platforms: "douyin" })).not.toContain("四范式");
   });
 
@@ -85,7 +85,7 @@ describe("buildUserPrompt", () => {
 
   it("无人物时不包含人物部分", () => {
     const prompt = buildUserPrompt(baseInput);
-    // 不应包含专门的人物描述 section（注意：OUTPUT_FORMAT_PROMPT 模板中会出现 characterId 字段说明，这属于格式定义不是人物注入）
+    // should not contain a dedicated character description section (note: OUTPUT_FORMAT_PROMPT template may include a characterId field description, which is a format definition, not a character injection)
     expect(prompt).not.toContain("【出镜人物】");
     expect(prompt).not.toContain("人物名称");
     expect(prompt).not.toContain("外貌特征");
@@ -93,7 +93,7 @@ describe("buildUserPrompt", () => {
 
   it("包含风格指令", () => {
     const prompt = buildUserPrompt(baseInput);
-    // pain_point 风格应包含"痛点种草"
+    // pain_point style should contain "痛点种草"
     expect(prompt).toContain("痛点种草");
   });
 
@@ -122,7 +122,7 @@ describe("buildUserPrompt", () => {
   });
 });
 
-// ==================== FFmpeg 命令生成测试 ====================
+// ==================== FFmpeg command generation tests ====================
 
 describe("buildComposeCommand", () => {
   const baseConfig: ComposeConfig = {
@@ -159,11 +159,11 @@ describe("buildComposeCommand", () => {
 
   it("字幕底距随商品卡自适应：无卡抬到 h*0.78（清出 2026 平台底部 UI 区）、有卡维持 h*0.83 紧贴卡下", () => {
     const sub = { texts: [{ text: "测试字幕", startTime: 0, endTime: 3 }], position: "bottom" as const };
-    // 无商品卡 → 不被「卡上字下」堆叠约束，字幕底边抬到 h*0.78
+    // no product card → not constrained by card-above-text stacking, caption bottom edge raised to h*0.78
     const noCard = buildComposeCommand({ ...baseConfig, subtitle: sub });
     expect(noCard).toContain("h*0.78-text_h");
     expect(noCard).not.toContain("h*0.83-text_h");
-    // 有商品卡 → 被钉在 h*0.83（再高会顶到底距 0.25 的商品卡）
+    // with product card → pinned to h*0.83 (going higher would collide with the product card at bottom offset 0.25)
     const withCard = buildComposeCommand({ ...baseConfig, subtitle: sub, productCard: { imagePath: "/data/prod.jpg", name: "测试", price: "¥9.9" } });
     expect(withCard).toContain("h*0.83-text_h");
     expect(withCard).not.toContain("h*0.78-text_h");
@@ -178,12 +178,12 @@ describe("buildComposeCommand", () => {
       ...baseConfig,
       subtitle: { texts: [{ text: "测试", startTime: 0, endTime: 3 }], fontFile: "C:\\fonts\\f.ttf", position: "bottom" },
     });
-    expect(cmd).toContain("fontfile='C\\:/fonts/f.ttf'"); // escapeSubtitlesPath：\\→/ 且 :→\:
+    expect(cmd).toContain("fontfile='C\\:/fonts/f.ttf'"); // escapeSubtitlesPath: \\ → / and : → \:
   });
 
   it("图片片段精确补齐到 clip.duration（zoompan+tpad+trim 防累计漂移）", () => {
     const cmd = buildComposeCommand(baseConfig);
-    // 图片段(img1, duration 3)：zoompan 运镜 + tpad 克隆末帧补足 + trim 到精确 3s
+    // image clip (img1, duration 3): zoompan camera motion + tpad clone last frame + trim to exact 3s
     expect(cmd).toContain("zoompan");
     expect(cmd).toContain("tpad=stop_mode=clone:stop_duration=3");
     expect(cmd).toContain("trim=duration=3");
@@ -192,7 +192,7 @@ describe("buildComposeCommand", () => {
   it("有 BGM + 旁白时正确混音（normalize=0 不腰斩旁白、aloop 铺满）", () => {
     const config: ComposeConfig = {
       ...baseConfig,
-      // 带 audioPath 触发旁白音轨，走 amix（旁白+BGM）路径
+      // audioPath triggers the voiceover audio track, goes through amix (voiceover+BGM) path
       clips: [
         { type: "image", filePath: "/data/img1.jpg", duration: 3, transition: "direct_concat", motion: "static", audioPath: "/data/tts1.mp3" },
         { type: "video", filePath: "/data/clip2.mp4", duration: 5, transition: "ffmpeg_fade" },
@@ -204,12 +204,12 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("volume=0.5");
     expect(cmd).toContain("audio_final");
     expect(cmd).toContain("amix=inputs=2");
-    expect(cmd).toContain("normalize=0"); // 不把旁白腰斩到 ~50%
-    expect(cmd).toContain("aloop=loop=-1"); // BGM 循环铺满全片
-    // BGM 结尾淡出 3s，落在成片总时长(3 + 5 - 0.5 = 7.5)末尾 → st=4.500
+    expect(cmd).toContain("normalize=0"); // don't cut voiceover volume to ~50%
+    expect(cmd).toContain("aloop=loop=-1"); // BGM loops to fill the full video
+    // BGM fade-out 3s at end, lands at total duration (3 + 5 - 0.5 = 7.5) tail → st=4.500
     expect(cmd).toContain("afade=t=out");
     expect(cmd).toContain("st=4.500");
-    expect(cmd).not.toContain("atrim=start="); // 默认不跳前奏
+    expect(cmd).not.toContain("atrim=start="); // intro skip is opt-in by default
   });
 
   it("BGM 前奏跳过为 opt-in（bgmIntroSkipSec 设了才出现 atrim=start）", () => {
@@ -230,7 +230,7 @@ describe("buildComposeCommand", () => {
     const cmd = buildComposeCommand(config);
     expect(cmd).toContain("sidechaincompress");
     expect(cmd).toContain("asplit=2[nar_mix][nar_key]");
-    expect(cmd).toContain("normalize=0"); // 混音核心仍 normalize=0（不腰斩旁白）
+    expect(cmd).toContain("normalize=0"); // mix core still normalize=0 (don't cut voiceover volume)
   });
 
   it("默认不开旁白闪避（无 sidechaincompress）", () => {
@@ -260,9 +260,9 @@ describe("buildComposeCommand", () => {
       ],
     };
     const cmd = buildComposeCommand(config);
-    // 第一个片段有原生音频，应提取并按时长对齐
+    // first clip has native audio, should be extracted and aligned to its duration
     expect(cmd).toContain("[0:a]aresample=44100,apad,atrim=duration=3,asetpts=PTS-STARTPTS[a0]");
-    // 第二个片段无音频，应生成静音
+    // second clip has no audio, should generate silence
     expect(cmd).toContain("anullsrc");
   });
 
@@ -275,10 +275,10 @@ describe("buildComposeCommand", () => {
       ],
     };
     const cmd = buildComposeCommand(config);
-    // TTS 音频作为额外输入（索引 2，排在两个图片输入之后），apad/atrim 对齐到 4s
+    // TTS audio as extra input (index 2, after the two image inputs), apad/atrim aligned to 4s
     expect(cmd).toContain('-i "/data/tts1.mp3"');
     expect(cmd).toContain("apad,atrim=duration=4");
-    // 第二个无配音片段生成静音
+    // second clip without voiceover generates silence
     expect(cmd).toContain("anullsrc");
   });
 
@@ -299,9 +299,9 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("drawtext");
     expect(cmd).toContain("fontsize=40");
     expect(cmd).toContain("fontcolor=yellow");
-    expect(cmd).toContain("h*0.78-text_h"); // 此 config 无商品卡 → 字幕抬到 0.22 底距(h*0.78)更清出 2026 平台底部 UI 区，按文字块底边向上生长
-    expect(cmd).toContain("line_spacing="); // 多行行距
-    expect(cmd).toContain("box=1:boxcolor=black@0.45"); // 字幕底框
+    expect(cmd).toContain("h*0.78-text_h"); // this config has no product card → caption raised to 0.22 bottom margin (h*0.78) to clear 2026 platform bottom UI area, measured from text block bottom edge upward
+    expect(cmd).toContain("line_spacing="); // multi-line line spacing
+    expect(cmd).toContain("box=1:boxcolor=black@0.45"); // caption background box
   });
 
   it("字幕/贴片含百分号：用 expansion=none + 字面 %（不转义成 \\%，否则 ffmpeg 8.0 Stray % 致整条空白）", () => {
@@ -311,12 +311,12 @@ describe("buildComposeCommand", () => {
       overlays: [{ text: "全场5折 直降30%", style: "price", startTime: 0, endTime: 3 }],
     };
     const cmd = buildComposeCommand(config);
-    // 所有 drawtext 必须带 expansion=none（关闭 % 展开）
+    // all drawtext entries must include expansion=none (disable % expansion)
     const drawCount = (cmd.match(/drawtext=/g) || []).length;
     const expCount = (cmd.match(/expansion=none/g) || []).length;
     expect(drawCount).toBeGreaterThan(0);
     expect(expCount).toBe(drawCount);
-    // 文本里是字面 50% / 30%，不能被转义成 50\% / 30\%
+    // text contains literal 50% / 30%, must not be escaped to 50\% / 30\%
     expect(cmd).toContain("50%");
     expect(cmd).toContain("30%");
     expect(cmd).not.toContain("50\\%");
@@ -332,7 +332,7 @@ describe("buildComposeCommand", () => {
       ],
     };
     const cmd = buildComposeCommand(config);
-    // 双引号和 $ 应被转义
+    // double quotes and $ should be escaped
     expect(cmd).not.toContain('my "video"');
     expect(cmd).toContain('\\"');
     expect(cmd).toContain("\\$");
@@ -344,12 +344,12 @@ describe("buildComposeCommand", () => {
       productCard: { imagePath: "/data/prod.jpg", name: "云柔抽纸", price: "¥39.9" },
     };
     const cmd = buildComposeCommand(config);
-    expect(cmd).toContain("/data/prod.jpg"); // 商品图作为输入
-    expect(cmd).toContain("[pcard]"); // 缩略图缩放流
-    expect(cmd).toContain("overlay="); // 叠加
-    expect(cmd).toContain("云柔抽纸"); // 商品名 drawtext
-    expect(cmd).toContain("¥39.9"); // 价格 drawtext
-    // 不传 productCard 时不应出现
+    expect(cmd).toContain("/data/prod.jpg"); // product image as input
+    expect(cmd).toContain("[pcard]"); // thumbnail scale stream
+    expect(cmd).toContain("overlay="); // overlay
+    expect(cmd).toContain("云柔抽纸"); // product name drawtext
+    expect(cmd).toContain("¥39.9"); // price drawtext
+    // should not appear when productCard is not provided
     expect(buildComposeCommand(baseConfig)).not.toContain("[pcard]");
   });
 
@@ -369,20 +369,20 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("-metadata comment=");
     expect(cmd).toContain("AIGC=1");
     expect(cmd).toContain("ClipForge");
-    expect(cmd).toContain(baseConfig.projectId); // 内容制作编号=projectId
-    // -metadata 在 -movflags 之后、且在最终输出文件之前
+    expect(cmd).toContain(baseConfig.projectId); // content production id = projectId
+    // -metadata appears after -movflags and before the final output file
     expect(cmd.indexOf("-metadata")).toBeGreaterThan(cmd.indexOf("-movflags"));
     expect(cmd.lastIndexOf("-metadata")).toBeLessThan(cmd.lastIndexOf(".mp4"));
-    // filter_complex 仍完整（未被元数据污染）
+    // filter_complex is still intact (not corrupted by metadata)
     expect(cmd).toContain("-filter_complex");
   });
 
   it("xfade 转场正确设置 offset", () => {
     const cmd = buildComposeCommand(baseConfig);
-    // ffmpeg_fade 转场应包含 xfade
+    // ffmpeg_fade transition should include xfade
     expect(cmd).toContain("xfade=transition=fade");
     expect(cmd).toContain("duration=0.5");
-    // offset = 前一个片段时长 - fadeDuration = 3 - 0.5 = 2.5
+    // offset = previous clip duration - fadeDuration = 3 - 0.5 = 2.5
     expect(cmd).toContain("offset=2.5");
   });
 
@@ -397,11 +397,11 @@ describe("buildComposeCommand", () => {
       ],
     };
     const cmd = buildComposeCommand(config);
-    // 第一个 xfade（i=1）：offset = 累计3 - 0.5 = 2.5
+    // first xfade (i=1): offset = cumulative 3 - 0.5 = 2.5
     expect(cmd).toContain("offset=2.5");
-    // 第二个 xfade（i=3）：累计 = 3 +4-0.5(fade) +4(concat) = 10.5 → offset = 10.5 - 0.5 = 10
+    // second xfade (i=3): cumulative = 3 + 4-0.5(fade) + 4(concat) = 10.5 → offset = 10.5 - 0.5 = 10
     expect(cmd).toContain("offset=10");
-    // 绝不能再用「上一个片段时长 - 0.5 = 2.5」那种错误算法导致第二个 fade 也 offset=2.5
+    // must never use the wrong algorithm of "previous clip duration - 0.5 = 2.5" causing second fade offset=2.5 again
     expect(cmd).not.toContain("offset=2.5:");
   });
 
@@ -415,11 +415,11 @@ describe("buildComposeCommand", () => {
       ],
     };
     const cmd = buildComposeCommand(config);
-    // 短视频补帧：先 tpad 克隆末帧再 trim，保证视频段恒等于分镜时长（免费素材长度不一不留黑尾）
+    // short video frame-padding: tpad clones last frame then trim, ensuring video clip equals scene duration (free footage varies in length, no black tail)
     expect(cmd).toContain("tpad=stop_mode=clone:stop_duration=4");
-    // 音轨镜像视频 xfade：ffmpeg_fade 边界用 acrossfade（而非朴素 concat），与视频同步缩短 0.5s/转场
+    // audio track mirrors video xfade: ffmpeg_fade boundaries use acrossfade (not plain concat), synchronized with video to shorten by 0.5s per transition
     expect(cmd).toContain("acrossfade=d=0.5");
-    // 输出限定为视频真实时间轴 accumulated = 4 + (4-0.5) + (3-0.5) = 10.0，避免尾部音频盖冻结帧
+    // output capped to video real timeline accumulated = 4 + (4-0.5) + (3-0.5) = 10.0, avoiding tail audio covering frozen frame
     expect(cmd).toContain("-t 10.000");
   });
 
@@ -431,7 +431,7 @@ describe("buildComposeCommand", () => {
 
   it("每个视频片段归一化像素格式/SAR/帧率/时基（避免混用真实素材时 xfade/concat 崩溃）", () => {
     const cmd = buildComposeCommand(baseConfig);
-    // 两个片段（图片 + 视频）都应带统一归一化后缀，否则不同像素格式素材会让 ffmpeg 报错
+    // both clips (image + video) should have unified normalization suffix, otherwise mixed pixel format footage causes ffmpeg errors
     expect(cmd).toContain("format=yuv420p,setsar=1,fps=30,settb=AVTB[v0]");
     expect(cmd).toContain("format=yuv420p,setsar=1,fps=30,settb=AVTB[v1]");
   });
@@ -459,14 +459,14 @@ describe("buildComposeCommand", () => {
   });
 });
 
-// ==================== 脚本生成器 JSON 解析测试 ====================
+// ==================== Script generator JSON parsing tests ====================
 
 describe("extractJSON", () => {
   it("正常 JSON 可以解析", () => {
     const input = '{"title":"测试脚本","shots":[]}';
     const result = extractJSON(input);
     expect(result).toBe('{"title":"测试脚本","shots":[]}');
-    // 确认可以被 JSON.parse 正确解析
+    // confirm it can be correctly parsed by JSON.parse
     expect(() => JSON.parse(result)).not.toThrow();
   });
 
@@ -542,7 +542,7 @@ describe("parseScriptResponse", () => {
   it("批量里只有 title、缺 shots 的残缺条目被丢弃，只保留有分镜的", () => {
     const content = JSON.stringify({
       scripts: [
-        { title: "残缺" }, // 缺 shots → 应被丢弃
+        { title: "残缺" }, // missing shots → should be discarded
         { title: "完整", totalDuration: 6, shots: [{ shotId: 1, type: "hook", duration: 3, description: "a", camera: "b", visualSource: "ai_generate", transition: "direct_concat", voiceover: "c" }] },
       ],
     });
@@ -567,7 +567,7 @@ describe("parseScriptResponse", () => {
     });
     const scripts = parseScriptResponse(content, "scene");
     expect(scripts[0].shots[0].stockKeywords).toEqual(["coffee morning", "cozy cafe", "extra"]);
-    expect(scripts[0].shots[1].stockKeywords).toBeUndefined(); // 无则不带该字段
+    expect(scripts[0].shots[1].stockKeywords).toBeUndefined(); // absent if not present
   });
 
   it("Shot 字段缺失时自动填充默认值", () => {
@@ -579,13 +579,13 @@ describe("parseScriptResponse", () => {
     });
     const scripts = parseScriptResponse(content, "pain_point");
     const shot = scripts[0].shots[0];
-    // 无效的 type 应该回退到 "demo"
+    // invalid type should fall back to "demo"
     expect(shot.type).toBe("demo");
-    // 无效的 duration 应该回退到 3
+    // invalid duration should fall back to 3
     expect(shot.duration).toBe(3);
-    // 无效的 visualSource 应该回退到 "ai_generate"
+    // invalid visualSource should fall back to "ai_generate"
     expect(shot.visualSource).toBe("ai_generate");
-    // 无效的 transition 应该回退到 "ai_start_end"（与 schema 默认及 UI 默认一致）
+    // invalid transition should fall back to "ai_start_end" (consistent with schema default and UI default)
     expect(shot.transition).toBe("ai_start_end");
   });
 
@@ -618,8 +618,8 @@ describe("parseScriptResponse", () => {
 
 describe("内置全 CJK 字幕字体", () => {
   it("打包的 public/fonts/subtitle.otf(Noto CJK)被选中，卡拉OK族名为 Noto Sans CJK SC（韩/日字幕渲染前提）", () => {
-    // 内置字体在仓库里(public/fonts/subtitle.otf)，应优先于系统字体被选中；
-    // 卡拉OK 走 libass 按族名匹配，必须回字体真实族名才能用上内置字体（否则系统 PingFang 缺谚文→豆腐块）
+    // bundled font is in the repo (public/fonts/subtitle.otf) and should take priority over system fonts;
+    // karaoke uses libass matching by family name, must resolve to the font's real family name to use the bundled font (otherwise system PingFang lacks Hangul → tofu blocks)
     expect(resolveChineseFontFamily()).toBe("Noto Sans CJK SC");
   });
 });
@@ -630,10 +630,10 @@ describe("字幕换行宽度估算（多语言）", () => {
     const maxWidth = frameWidth * 0.86; // 619
     const ko = "정말 부드럽습니다 너무 좋아요 진짜 최고예요 강력 추천합니다";
     const lines = wrapCaption(ko, fontSize, frameWidth).split("\n");
-    // 用「谚文/汉字=fontSize，其余=0.55*fontSize」复算每行实际宽——若 isCJK 漏了谚文，wrapCaption 会塞太多字致此处超宽
+    // recompute each line's actual width using "Hangul/CJK=fontSize, others=0.55*fontSize" — if isCJK misses Hangul, wrapCaption stuffs too many chars causing overflow here
     const w = (s: string) => [...s].reduce((acc, c) => acc + (/[가-힣一-鿿]/.test(c) ? fontSize : fontSize * 0.55), 0);
     for (const l of lines) expect(w(l)).toBeLessThanOrEqual(maxWidth + 1);
-    expect(lines.length).toBeGreaterThan(1); // 该长句确实换了行
+    expect(lines.length).toBeGreaterThan(1); // this long sentence should actually wrap
   });
 });
 
@@ -656,9 +656,9 @@ describe("buildDrawtext（drawtext 构建器：强制转义 + 字段顺序）", 
   it("text 走 escapeDrawText、fontFile 走 escapeSubtitlesPath，% 字面保留", () => {
     const d = buildDrawtext({ fontFile: "C:\\fonts\\f.ttf", text: "立省50%", fontSize: 48, fontColor: "white", x: "(w-text_w)/2", y: "h*0.8" });
     expect(d.startsWith("drawtext=")).toBe(true);
-    expect(d).toContain("fontfile='C\\:/fonts/f.ttf'"); // 路径转义器：\\→/ 且 :→\:
+    expect(d).toContain("fontfile='C\\:/fonts/f.ttf'"); // path escaper: \\ → / and : → \:
     expect(d).toContain("expansion=none");
-    expect(d).toContain("立省50%"); // % 不被转义（expansion=none 下字面）
+    expect(d).toContain("立省50%"); // % is not escaped (literal under expansion=none)
     expect(d).toContain("fontsize=48");
     expect(d).toContain("x=(w-text_w)/2");
   });

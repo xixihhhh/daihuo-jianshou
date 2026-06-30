@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * 服务端测试 LLM 连接。
- * 必须走服务端：浏览器直连厂商 API 会被 CORS 拦截，导致即便 Key 正确也误报"连接失败"。
+ * Server-side LLM connection test.
+ * Must run server-side: direct browser requests to provider APIs are blocked by CORS, causing a false "connection failed" error even when the API key is valid.
  */
 export async function POST(req: NextRequest) {
   try {
