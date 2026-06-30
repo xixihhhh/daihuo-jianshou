@@ -268,6 +268,18 @@ async function cmdImport(flags) {
   return { ok: true, projectId, ...res };
 }
 
+// 配音译制：把当前脚本翻成目标语种存为译制版，再用推荐音色 compose 即得换语种配音版（出海）
+async function cmdDub(flags) {
+  requireLlm();
+  const projectId = String(flags.project || "").trim();
+  if (!projectId) throw new Error("--project 不能为空");
+  const lang = String(flags.lang || "").trim();
+  if (!lang) throw new Error('--lang 不能为空（如 --lang en）');
+  const res = await api(`/api/project/${projectId}/dub`, { method: "POST", body: { targetLang: lang, llmConfig: LLM } });
+  step(`已生成 ${lang} 译制脚本（${res.shots} 镜）。下一步：clipforge compose --project ${projectId} --voice ${res.recommendedVoice || "<目标语种音色>"}`);
+  return { ok: true, projectId, ...res };
+}
+
 const HELP = `ClipForge CLI · 命令行一句话出片
 
 用法：
@@ -275,6 +287,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
                    [--footage auto|image|video] [--voice <id>] [--aspect 9:16|16:9|1:1]
                    [--quality fast|standard|hd] [--bgm] [--bgm-mood upbeat] [--karaoke] [--cta "..."] [--json]
   clipforge import --project <id> (--file <路径> | --text "你的脚本") [--title "..."]   自带脚本出片
+  clipforge dub --project <id> --lang en                                              配音译制(换语种,出海)
   clipforge compose --project <id> [同款成片选项] [--no-fill]
   clipforge list                列出项目
   clipforge voices              列出免费 Edge TTS 音色
@@ -288,7 +301,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, import: cmdImport, compose: cmdCompose, list: cmdList, voices: cmdVoices, get: cmdGet };
+const COMMANDS = { create: cmdCreate, import: cmdImport, dub: cmdDub, compose: cmdCompose, list: cmdList, voices: cmdVoices, get: cmdGet };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));
