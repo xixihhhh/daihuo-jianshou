@@ -18,20 +18,30 @@ export interface CardVfOpts {
   fontColor?: string;
 }
 
-/** Build the -vf drawtext filter for one card: wrap the text to the card width, centered. Pure; reuses wrapCaption + buildDrawtext. */
+/**
+ * Build the -vf drawtext filter for one card: wrap the text to the card width and render each line as
+ * its own horizontally-centered drawtext, stacking the lines as a vertically-centered block.
+ * (A single multi-line drawtext is left-aligned; per-line drawtexts give true centering for a polished card.)
+ * Pure; reuses wrapCaption + buildDrawtext escaping.
+ */
 export function buildCardVf(o: CardVfOpts): string {
   const fontSize = o.fontSize ?? Math.round(o.width * 0.055);
-  const wrapped = wrapCaption(o.text, fontSize, o.width); // multi-line text with embedded newlines
-  return buildDrawtext({
-    fontFile: o.fontFile,
-    text: wrapped,
-    fontSize,
-    fontColor: o.fontColor ?? "white",
-    borderW: Math.max(2, Math.round(o.width * 0.004)),
-    lineSpacing: Math.round(fontSize * 0.4),
-    x: "(w-text_w)/2",
-    y: "(h-text_h)/2",
-  });
+  const lines = wrapCaption(o.text, fontSize, o.width).split("\n");
+  const lineH = Math.round(fontSize * 1.5);
+  const blockH = lines.length * lineH;
+  return lines
+    .map((line, i) =>
+      buildDrawtext({
+        fontFile: o.fontFile,
+        text: line || " ",
+        fontSize,
+        fontColor: o.fontColor ?? "white",
+        borderW: Math.max(2, Math.round(o.width * 0.004)),
+        x: "(w-text_w)/2",
+        y: `(h-${blockH})/2+${i * lineH}`,
+      }),
+    )
+    .join(",");
 }
 
 /** Render a single card: gradient background (lavfi) + drawtext overlay → PNG at outPath. */
