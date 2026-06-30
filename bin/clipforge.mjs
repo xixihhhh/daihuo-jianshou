@@ -245,6 +245,16 @@ async function cmdVoices() {
   return { ok: true, default: res.default, voices: res.voices ?? [] };
 }
 
+// 热点选题：拉某地区每日热搜，建议该做什么主题（再 create --topic 出片）
+async function cmdTrends(flags) {
+  const geo = typeof flags.geo === "string" ? flags.geo : "US";
+  const res = await api(`/api/trends?geo=${encodeURIComponent(geo)}`);
+  const topics = res.topics || [];
+  step(`${res.geo} 热搜选题 ${topics.length} 条：`);
+  topics.forEach((t, i) => process.stderr.write(`  ${i + 1}. ${t.title}${t.traffic ? ` (${t.traffic})` : ""}\n`));
+  return { ok: true, geo: res.geo, count: topics.length, topics };
+}
+
 async function cmdGet(flags) {
   const projectId = String(flags.project || "").trim();
   if (!projectId) throw new Error("--project 不能为空");
@@ -289,6 +299,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge import --project <id> (--file <路径> | --text "你的脚本") [--title "..."]   自带脚本出片
   clipforge dub --project <id> --lang en                                              配音译制(换语种,出海)
   clipforge compose --project <id> [同款成片选项] [--no-fill]
+  clipforge trends [--geo US]   拉热搜选题(不知道做什么时)
   clipforge list                列出项目
   clipforge voices              列出免费 Edge TTS 音色
   clipforge get --project <id>  查最新成片地址
@@ -301,7 +312,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, import: cmdImport, dub: cmdDub, compose: cmdCompose, list: cmdList, voices: cmdVoices, get: cmdGet };
+const COMMANDS = { create: cmdCreate, import: cmdImport, dub: cmdDub, compose: cmdCompose, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));
