@@ -444,6 +444,7 @@ pnpm dist       # 出 .dmg 安装包
 - [x] **命令行 CLI**（`clipforge create --topic …` 一句话出片）+ **字幕导出 SRT/WebVTT** + **Ollama/Pollinations 免 Key LLM 预设**
 - [x] **自带脚本成片**（导入写好的稿子 → 切分镜 → 自动配画面 + 配音 + 合成；CLI `clipforge import`）
 - [x] **配音译制成片**（出海：脚本翻译 → 换语种免费配音 → 重合成，免转写；CLI `clipforge dub --lang`）+ **NASA/Internet Archive 公共领域素材源** + **agent Skill**
+- [x] **可选动效元素**（[remotion/](remotion/README.md)：Remotion 渲染动画片头标题卡 / 逐字动态字幕，FFmpeg 做不出的平滑动效；opt-in 不进基础安装，`npm run render:element`。自动合进出片为后续）
 
 **进行中（通用化 + 桌面分发）**
 - [x] **品牌升级 ClipForge + 多语言 UI**（零依赖前端国际化，中文默认 / English 一键切换，全站页面国际化；面向全球任意主题，不止带货）
