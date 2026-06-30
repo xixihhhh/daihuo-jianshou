@@ -33,7 +33,7 @@
 - **真·免费、零 Key**：免费素材（Openverse 图 + **Wikimedia 实拍视频**）+ 免费微软 Edge TTS 配音（中 / 英 / 日 / 韩 / 西多语言，出海直接配外文原生发音）+ 免费背景音乐 + 本地 FFmpeg 合成——**没有任何 AI Key 也能出整片**。
 - **无水印 · 本地隐私**：自部署、开源（AGPL-3.0），商品图 / 项目 / Key 全在你自己机器，不上传任何云。
 - **想要更高画质再加 Key**：一个接口聚合 **7 大**生图/生视频平台、30+ 模型（GPT Image 2 / Seedance 2.0 / Kling 3.0 …）。
-- **能被 AI Agent 调用 / 命令行出片**：内置 **MCP Server**（Claude / Cursor 里一句话出片）+ **命令行 CLI**（`clipforge create --topic "…"` 一句话出片）；中英双语界面。
+- **能被 AI Agent 调用 / 命令行出片**：内置 **MCP Server**（Claude / Cursor 里一句话出片）+ **命令行 CLI**（`clipforge create --topic "…"` 一句话出片）+ **agent Skill**（[skills/clipforge](skills/clipforge/SKILL.md)，把整条出片流水线教给编程助手）；中英双语界面。
 
 ## 🎬 两种玩法（带货为主，也能做任意题材）
 
