@@ -357,6 +357,20 @@ const TOOLS = [
       required: ["projectId"],
     },
   },
+  {
+    name: "clipforge_carousel",
+    description:
+      "把某项目脚本渲成小红书图文卡片（标题卡 + 逐条要点卡，渐变底，默认 3:4），返回各卡片图地址。视频之外的图文输出。不需要 LLM。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "项目 ID" },
+        width: { type: "number", description: "卡片宽 px，默认 1080" },
+        height: { type: "number", description: "卡片高 px，默认 1440（3:4）" },
+      },
+      required: ["projectId"],
+    },
+  },
 ];
 
 // ---- Tool handlers ----
@@ -605,6 +619,17 @@ async function handleExportSubtitle(args) {
   return ok({ ok: true, projectId, format, subtitle });
 }
 
+// Image-card carousel from the script (Xiaohongshu 图文)
+async function handleCarousel(args) {
+  const projectId = String(args.projectId || "").trim();
+  if (!projectId) throw new Error("projectId 不能为空");
+  const body = {};
+  if (Number.isFinite(args.width)) body.width = args.width;
+  if (Number.isFinite(args.height)) body.height = args.height;
+  const res = await api(`/api/project/${projectId}/carousel`, { method: "POST", body });
+  return ok({ ok: true, projectId, count: res.count, cards: (res.cards || []).map((c) => `${BASE_URL}${c}`) });
+}
+
 const HANDLERS = {
   clipforge_create_video: handleCreateVideo,
   clipforge_ingest_product: handleIngestProduct,
@@ -620,6 +645,7 @@ const HANDLERS = {
   clipforge_cover: handleCover,
   clipforge_preview_gif: handlePreviewGif,
   clipforge_export_subtitle: handleExportSubtitle,
+  clipforge_carousel: handleCarousel,
 };
 
 // ---- Start MCP server ----
