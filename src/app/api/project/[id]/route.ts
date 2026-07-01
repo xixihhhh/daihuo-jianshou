@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rm } from "fs/promises";
+import { join } from "path";
 import { getDb } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
+import { getUploadsDir, getOutputDir } from "@/lib/paths";
 import { eq } from "drizzle-orm";
+
+// Project ids are UUIDs; validate before using one in a filesystem path (guards the rm below against traversal)
+const SAFE_ID = /^[a-zA-Z0-9-]+$/;
 
 // Allowlist of fields that may be updated via PATCH (id/createdAt etc. are blocked to prevent field injection / primary-key corruption)
 const PATCHABLE_FIELDS = [
@@ -109,8 +115,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    if (!id || !SAFE_ID.test(id)) {
+      return NextResponse.json({ error: "无效的项目ID" }, { status: 400 });
+    }
     const db = getDb();
+    // DB rows cascade (scripts/assets/compositions via onDelete:"cascade" + foreign_keys=ON),
+    // but the project's on-disk files do not — remove them too so deletes don't leak orphaned
+    // uploads/output directories. force:true ignores missing dirs; failures never block the delete.
     await db.delete(projects).where(eq(projects.id, id));
+    await Promise.all([
+      rm(join(getUploadsDir(), id), { recursive: true, force: true }).catch(() => {}),
+      rm(join(getOutputDir(), id), { recursive: true, force: true }).catch(() => {}),
+    ]);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete project:", error);
