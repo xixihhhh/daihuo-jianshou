@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildUserPrompt, buildBatchPrompt } from "@/lib/script-engine/prompts";
 import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
-import { extractJSON, parseScriptResponse, reasoningParams } from "@/lib/script-engine/generator";
+import { extractJSON, parseScriptResponse, reasoningParams, batchCountFor } from "@/lib/script-engine/generator";
 import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, composeErrorMessage, buildDrawtext, type ComposeConfig } from "@/lib/video-composer/composer";
 
 // ==================== Prompt build tests ====================
@@ -485,6 +485,18 @@ describe("reasoningParams（仅对 Pollinations 推理模型注入 reasoning_eff
     expect(reasoningParams("https://api.openai.com/v1")).toEqual({});
     expect(reasoningParams("http://localhost:11434/v1")).toEqual({});
     expect(reasoningParams("")).toEqual({});
+  });
+});
+
+describe("batchCountFor（Pollinations 低输出上限 → 只生成1套,避免多套截断）", () => {
+  it("Pollinations → 1（3套约7500字符会超输出上限被截断成非法JSON）", () => {
+    expect(batchCountFor("https://text.pollinations.ai/openai")).toBe(1);
+    expect(batchCountFor("https://text.pollinations.ai/openai", 5)).toBe(1); // 无视请求数,强制1
+  });
+  it("其它端点 → 保持请求的套数（默认3）", () => {
+    expect(batchCountFor("https://api.openai.com/v1")).toBe(3);
+    expect(batchCountFor("http://localhost:11434/v1", 5)).toBe(5);
+    expect(batchCountFor("")).toBe(3);
   });
 });
 

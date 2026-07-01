@@ -115,6 +115,17 @@ export function reasoningParams(baseUrl: string): { reasoning_effort?: "low" } {
 }
 
 /**
+ * How many script variants to request in one batch call.
+ * Pollinations' anonymous tier caps output tokens low: 3 full commerce scripts (~7500 chars) overflow
+ * that cap and truncate to invalid JSON, so keyless generation would fail entirely. Request a single
+ * complete script instead — one valid script beats three truncated ones, and the user can regenerate
+ * for more variants. Other endpoints keep the requested batch size. Scoped to Pollinations by baseUrl.
+ */
+export function batchCountFor(baseUrl: string, requested = 3): number {
+  return /pollinations\.ai/i.test(baseUrl || "") ? 1 : requested;
+}
+
+/**
  * Extract JSON from LLM output text.
  * Handles both raw JSON output and JSON wrapped in a markdown code block.
  */
@@ -212,7 +223,7 @@ function validateScript(raw: Record<string, unknown>, fallbackStyleType: string)
  */
 export async function generateScript(input: ScriptInput): Promise<GeneratedScript[]> {
   const client = createClient(input.llmConfig);
-  const userPrompt = buildBatchPrompt(input, 3);
+  const userPrompt = buildBatchPrompt(input, batchCountFor(input.llmConfig.baseUrl));
 
   // Call the LLM to generate the script
   let response;
@@ -254,7 +265,7 @@ export interface TopicScriptGenInput extends TopicScriptInput {
  */
 export async function generateTopicScript(input: TopicScriptGenInput): Promise<GeneratedScript[]> {
   const client = createClient(input.llmConfig);
-  const userPrompt = buildTopicBatchPrompt(input, input.count ?? 3);
+  const userPrompt = buildTopicBatchPrompt(input, batchCountFor(input.llmConfig.baseUrl, input.count ?? 3));
 
   let response;
   try {
