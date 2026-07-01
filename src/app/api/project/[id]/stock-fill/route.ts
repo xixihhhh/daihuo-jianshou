@@ -86,14 +86,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!query) return { shotId: sid, ok: false, query: "", reason: "no search query" };
     try {
       let asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts });
-      let usedType: StockMediaType = mediaType;
       // In auto mode, if no video was found → fall back to image to ensure the shot is never empty
       if (!asset && autoMode && mediaType !== "image") {
         asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts: { ...searchOpts, mediaType: "image" } });
-        usedType = "image";
       }
+      // Report the ACTUAL downloaded media type (from the chosen candidate), not the requested one:
+      // keyless "video" requests routinely fall back to Openverse images (its only video-less keyless
+      // source), so reporting the requested "video" would mislabel an image asset as a video.
+      const actualType = (asset?.mediaType as StockMediaType) ?? mediaType;
       return asset
-        ? { shotId: sid, ok: true, query, provider: String(asset.provider), mediaType: usedType }
+        ? { shotId: sid, ok: true, query, provider: String(asset.provider), mediaType: actualType }
         : { shotId: sid, ok: false, query, reason: "no asset found" };
     } catch (e) {
       return { shotId: sid, ok: false, query, reason: e instanceof Error ? e.message : String(e) };
