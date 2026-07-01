@@ -7,9 +7,17 @@ describe("toAssTime", () => {
     expect(toAssTime(1.5)).toBe("0:00:01.50");
     expect(toAssTime(65.25)).toBe("0:01:05.25");
   });
-  it("负数夹到 0、厘秒进位不越界", () => {
+  it("负数夹到 0", () => {
     expect(toAssTime(-3)).toBe("0:00:00.00");
-    expect(toAssTime(2.999)).toBe("0:00:02.99");
+  });
+  it("厘秒进位正确跨秒/分/时（不再截断成 .99）", () => {
+    // 2.999s 四舍五入到 3.00（旧实现错误地截断成 2.99）
+    expect(toAssTime(2.999)).toBe("0:00:03.00");
+    // 边界进位：秒→分、分→时都要正确进位
+    expect(toAssTime(59.996)).toBe("0:01:00.00");
+    expect(toAssTime(3599.996)).toBe("1:00:00.00");
+    // 不到进位阈值的正常四舍五入不受影响
+    expect(toAssTime(2.994)).toBe("0:00:02.99");
   });
 });
 

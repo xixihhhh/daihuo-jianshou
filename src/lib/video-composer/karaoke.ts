@@ -48,12 +48,13 @@ const DEFAULTS = {
 
 /** seconds → ASS timestamp H:MM:SS.cc (centiseconds) */
 export function toAssTime(sec: number): string {
-  const s = Math.max(0, sec);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const ss = Math.floor(s % 60);
-  const cs = Math.round((s - Math.floor(s)) * 100);
-  const cc = cs === 100 ? 99 : cs; // prevent carry overflow
+  // Round once to total centiseconds, then split — this carries correctly across the
+  // second/minute/hour boundaries (e.g. 59.996s → 0:01:00.00, not the old clamped 0:00:59.99).
+  const cs = Math.round(Math.max(0, sec) * 100);
+  const h = Math.floor(cs / 360000);
+  const m = Math.floor((cs % 360000) / 6000);
+  const ss = Math.floor((cs % 6000) / 100);
+  const cc = cs % 100;
   return `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}.${String(cc).padStart(2, "0")}`;
 }
 

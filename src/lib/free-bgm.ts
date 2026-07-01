@@ -65,7 +65,12 @@ export async function fetchFreeBgm(
     // Prefer tracks >= 8 s (shorter ones produce noticeable loop artifacts); try downloading each in order,
     // skip any that fail, and use the first one that succeeds.
     const longEnough = candidates.filter((c) => (c.durationSec ?? 0) >= 8);
-    const pool = (longEnough.length ? longEnough : candidates).filter((c) => c.downloadUrl);
+    // Fallback still avoids obviously short tracks (2-3s loop audibly): keep unknown-length or >= 6s,
+    // and only if that leaves nothing do we accept anything downloadable.
+    const notTooShort = candidates.filter((c) => c.durationSec == null || c.durationSec >= 6);
+    const pool = (longEnough.length ? longEnough : notTooShort.length ? notTooShort : candidates).filter(
+      (c) => c.downloadUrl
+    );
     if (pool.length === 0) {
       console.warn(`[bgm] 未检索到可用免费音乐（query=${query}）`);
       return null;

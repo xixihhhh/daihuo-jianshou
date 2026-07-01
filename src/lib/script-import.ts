@@ -47,7 +47,8 @@ export function splitNarration(text: string): string[] {
     // Overly long sentence: accumulate sub-clauses up to the limit, then split; keep as-is if a single sub-clause still exceeds the limit (edge case)
     let buf = "";
     for (const sub of sent.split(SUBCLAUSE_DELIM).map((s) => s.trim()).filter(Boolean)) {
-      if (buf && (buf.length + sub.length) > MAX_CHARS_PER_SHOT) {
+      // +1 accounts for the "，" that joins buf and sub below, so the combined piece never exceeds the limit
+      if (buf && (buf.length + 1 + sub.length) > MAX_CHARS_PER_SHOT) {
         pieces.push(buf);
         buf = sub;
       } else {

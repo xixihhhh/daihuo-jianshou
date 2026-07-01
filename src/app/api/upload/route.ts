@@ -23,7 +23,12 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 // Upload product images
 export async function POST(req: NextRequest) {
-  const formData = await req.formData();
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "无效的表单数据，请检查上传的文件" }, { status: 400 });
+  }
   const files = formData.getAll("files") as File[];
   const projectId = formData.get("projectId") as string;
 

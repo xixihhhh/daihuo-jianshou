@@ -48,7 +48,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return NextResponse.json({ error: "无效的项目ID" }, { status: 400 });
 
-  const formData = await req.formData();
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "无效的表单数据，请检查上传的文件" }, { status: 400 });
+  }
   const files = formData.getAll("files") as File[];
   if (!files.length) return NextResponse.json({ error: "请上传至少一个视频或图片文件" }, { status: 400 });
 

@@ -92,6 +92,9 @@ async function audioToBuffer(input: string): Promise<Buffer> {
   }
   if (s.startsWith("data:")) {
     const comma = s.indexOf(",");
+    // A well-formed data URI always has a comma before the payload; without it, slice(0) would
+    // feed the "data:...;base64" header into the base64 decoder and yield garbage/empty audio.
+    if (comma === -1) throw new Error("音频 data URI 格式错误（缺少逗号分隔符）");
     return Buffer.from(s.slice(comma + 1), "base64");
   }
   // Pure hex (only 0-9a-f and even length): decode as hex; otherwise decode as base64
@@ -173,7 +176,12 @@ async function generateSpeechAtlas(text: string, config: TTSConfig): Promise<Buf
       continue;
     }
     if (!pr.ok) continue;
-    const raw = (await pr.json()) as AtlasPrediction;
+    let raw: AtlasPrediction;
+    try {
+      raw = (await pr.json()) as AtlasPrediction;
+    } catch {
+      continue; // malformed JSON on a 200 → skip this poll and retry, don't crash the whole generation
+    }
     const p: AtlasPrediction = raw.data ?? raw;
     const status = (p.status || "").toLowerCase();
     if (status === "completed" || status === "succeeded") {
@@ -221,10 +229,12 @@ async function generateSpeechMiniMax(text: string, config: TTSConfig): Promise<B
     const t = await resp.text().catch(() => "");
     throw new Error(`MiniMax TTS 请求失败: ${resp.status} - ${clipErr(t)}`);
   }
-  const j = (await resp.json()) as {
-    data?: { audio?: string };
-    base_resp?: { status_code?: number; status_msg?: string };
-  };
+  let j: { data?: { audio?: string }; base_resp?: { status_code?: number; status_msg?: string } };
+  try {
+    j = await resp.json();
+  } catch (e) {
+    throw new Error(`MiniMax TTS 响应解析失败（非合法 JSON）: ${e instanceof Error ? e.message : String(e)}`);
+  }
   const code = j?.base_resp?.status_code;
   if (code != null && code !== 0) {
     throw new Error(`MiniMax TTS 失败: ${j?.base_resp?.status_msg || "未知错误"} (code=${code})`);
@@ -268,12 +278,19 @@ async function generateSpeechFal(text: string, config: TTSConfig): Promise<Buffe
 
   for (let i = 0; i < 60; i++) {
     await sleep(1000);
-    const st = await fetch(statusUrl, { headers });
-    if (!st.ok) continue;
-    const sjson = (await st.json()) as { status?: string };
-    const status = (sjson.status || "").toUpperCase();
+    // Network jitter or a malformed status/result response must not crash the whole generation —
+    // skip this poll and retry next round (mirrors the Atlas polling loop's resilience).
+    let status: string;
+    try {
+      const st = await fetch(statusUrl, { headers, signal: AbortSignal.timeout(10000) });
+      if (!st.ok) continue;
+      const sjson = (await st.json()) as { status?: string };
+      status = (sjson.status || "").toUpperCase();
+    } catch {
+      continue;
+    }
     if (status === "COMPLETED") {
-      const rr = await fetch(resultUrl, { headers });
+      const rr = await fetch(resultUrl, { headers, signal: AbortSignal.timeout(10000) });
       if (!rr.ok) throw new Error(`fal TTS 取结果失败: ${rr.status}`);
       const result = (await rr.json()) as { audio?: { url?: string } };
       const audioUrl = result?.audio?.url;

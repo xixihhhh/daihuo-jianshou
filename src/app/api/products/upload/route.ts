@@ -24,7 +24,12 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024;
 // Upload product-library images: not tied to a project; written to disk at data/uploads/products/<productId>/ by productId.
 // The returned /api/files/products/... path is served by the existing static-file route and stays valid across page reloads and navigation (replacing short-lived blob: URLs).
 export async function POST(req: NextRequest) {
-  const formData = await req.formData();
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "无效的表单数据，请检查上传的文件" }, { status: 400 });
+  }
   const files = formData.getAll("files") as File[];
   const productId = formData.get("productId") as string;
 

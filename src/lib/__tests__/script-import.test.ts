@@ -10,6 +10,13 @@ describe("splitNarration", () => {
     const pieces = splitNarration(long);
     expect(pieces.length).toBeGreaterThan(1);
   });
+  it("每段不超过每镜上限（拼接逗号也计入长度，不越界）", () => {
+    // 许多刚好凑到边界的子句，验证累积拼接（含「，」）后每段 ≤ 100 字
+    const long = Array.from({ length: 20 }, () => "十个字的子句内容啊啊").join("，") + "。";
+    for (const p of splitNarration(long)) {
+      expect(Array.from(p).length).toBeLessThanOrEqual(100);
+    }
+  });
   it("空白 → 空数组", () => {
     expect(splitNarration("  \n  ")).toEqual([]);
   });
