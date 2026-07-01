@@ -102,6 +102,19 @@ function createClient(config: LLMConfig): OpenAI {
 }
 
 /**
+ * Extra request params for reasoning-model endpoints.
+ * Pollinations' only keyless (anonymous-tier) model is now a reasoning model (GPT-OSS 20B) with a small
+ * output-token cap: on our large generation prompts it exhausts the entire budget on its reasoning trace
+ * and returns EMPTY content (finish_reason "length"), so keyless generation would always fail. Passing
+ * reasoning_effort:"low" makes it think minimally and actually emit the JSON.
+ * Scoped to Pollinations by baseUrl on purpose — real OpenAI rejects reasoning_effort for non-reasoning
+ * models (400 unsupported_parameter), so it must NOT be sent globally.
+ */
+export function reasoningParams(baseUrl: string): { reasoning_effort?: "low" } {
+  return /pollinations\.ai/i.test(baseUrl || "") ? { reasoning_effort: "low" } : {};
+}
+
+/**
  * Extract JSON from LLM output text.
  * Handles both raw JSON output and JSON wrapped in a markdown code block.
  */
@@ -212,6 +225,7 @@ export async function generateScript(input: ScriptInput): Promise<GeneratedScrip
       ],
       temperature: 0.8,
       max_tokens: 16000,
+      ...reasoningParams(input.llmConfig.baseUrl),
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -252,6 +266,7 @@ export async function generateTopicScript(input: TopicScriptGenInput): Promise<G
       ],
       temperature: 0.85,
       max_tokens: 16000,
+      ...reasoningParams(input.llmConfig.baseUrl),
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -283,6 +298,7 @@ export async function generateSingleScript(input: ScriptInput): Promise<Generate
       { role: "user", content: userPrompt },
     ],
     temperature: 0.8,
+    ...reasoningParams(input.llmConfig.baseUrl),
   });
 
   const content = response.choices[0]?.message?.content;
@@ -328,6 +344,7 @@ export function generateScriptStream(
         ],
         temperature: 0.8,
         stream: true,
+        ...reasoningParams(input.llmConfig.baseUrl),
       }, {
         signal: abortController.signal,
       });
@@ -377,6 +394,7 @@ export function createScriptStream(input: ScriptInput): ReadableStream<Uint8Arra
           ],
           temperature: 0.8,
           stream: true,
+          ...reasoningParams(input.llmConfig.baseUrl),
         });
 
         for await (const chunk of stream) {

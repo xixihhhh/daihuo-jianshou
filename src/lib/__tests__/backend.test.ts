@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildUserPrompt, buildBatchPrompt } from "@/lib/script-engine/prompts";
 import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
-import { extractJSON, parseScriptResponse } from "@/lib/script-engine/generator";
+import { extractJSON, parseScriptResponse, reasoningParams } from "@/lib/script-engine/generator";
 import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, composeErrorMessage, buildDrawtext, type ComposeConfig } from "@/lib/video-composer/composer";
 
 // ==================== Prompt build tests ====================
@@ -475,6 +475,18 @@ describe("buildComposeCommand", () => {
 });
 
 // ==================== Script generator JSON parsing tests ====================
+
+describe("reasoningParams（仅对 Pollinations 推理模型注入 reasoning_effort=low）", () => {
+  it("Pollinations 端点 → 注入 reasoning_effort:low（否则推理模型耗尽输出预算、content 返空）", () => {
+    expect(reasoningParams("https://text.pollinations.ai/openai")).toEqual({ reasoning_effort: "low" });
+    expect(reasoningParams("https://TEXT.POLLINATIONS.AI/openai")).toEqual({ reasoning_effort: "low" });
+  });
+  it("其它端点（真 OpenAI/本地）→ 不注入（OpenAI 对非推理模型会 400 拒绝该参数）", () => {
+    expect(reasoningParams("https://api.openai.com/v1")).toEqual({});
+    expect(reasoningParams("http://localhost:11434/v1")).toEqual({});
+    expect(reasoningParams("")).toEqual({});
+  });
+});
 
 describe("extractJSON", () => {
   it("正常 JSON 可以解析", () => {

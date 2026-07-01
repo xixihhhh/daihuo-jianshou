@@ -11,6 +11,7 @@
 import OpenAI from "openai";
 import { FREE_TTS_VOICES } from "@/lib/edge-tts";
 import { estimateDurationSec } from "@/lib/script-import";
+import { reasoningParams } from "@/lib/script-engine/generator";
 import type { Shot } from "@/lib/db/schema";
 
 export interface DubLLMConfig {
@@ -92,6 +93,7 @@ export async function translateVoiceovers(voiceovers: string[], targetLang: stri
     model: cfg.model,
     messages: [{ role: "user", content: buildTranslatePrompt(voiceovers, targetLang) }],
     temperature: 0.3,
+    ...reasoningParams(cfg.baseUrl),
   });
   const text = res.choices?.[0]?.message?.content ?? "";
   const out = parseTranslations(text, voiceovers.length);
