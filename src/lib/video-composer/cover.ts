@@ -7,7 +7,7 @@
 import { dirname } from "path";
 import { mkdir } from "fs/promises";
 import { ffmpegBin, ffprobeBin } from "@/lib/ffmpeg-path";
-import { buildDrawtext, resolveChineseFontFile } from "./composer";
+import { buildDrawtext, wrapCaption, resolveChineseFontFile } from "./composer";
 
 export interface CoverVfOpts {
   title: string;
@@ -18,20 +18,39 @@ export interface CoverVfOpts {
   position?: "center" | "lower" | "upper";
 }
 
-/** Build the -vf drawtext filter that overlays a big, boxed, centered title. Pure; reuses buildDrawtext's escaping. */
+/**
+ * Build the -vf drawtext filter that overlays a big, boxed, centered title.
+ * Long titles (common for e-commerce hooks) are wrapped to the frame width and rendered as
+ * per-line horizontally-centered boxed drawtexts, stacked as a positioned block — a single
+ * drawtext would overflow the frame edges and get clipped at this large cover font size.
+ * Pure; reuses wrapCaption + buildDrawtext escaping.
+ */
 export function buildCoverVf(o: CoverVfOpts): string {
   const fontSize = Math.round(o.width * 0.09);
-  const y = o.position === "lower" ? "h*0.7" : o.position === "upper" ? "h*0.12" : "(h-text_h)/2";
-  return buildDrawtext({
-    fontFile: o.fontFile,
-    text: o.title,
-    fontSize,
-    fontColor: "white",
-    borderW: Math.max(2, Math.round(o.width * 0.006)),
-    box: { color: "black@0.5", borderW: Math.round(o.width * 0.03) },
-    x: "(w-text_w)/2",
-    y,
-  });
+  const lines = wrapCaption(o.title, fontSize, o.width).split("\n");
+  const lineH = Math.round(fontSize * 1.5);
+  const blockH = lines.length * lineH;
+  // Block top: center by default; upper/lower anchor the block around ~20% / ~78% of frame height.
+  const base =
+    o.position === "lower"
+      ? `h*0.78-${Math.round(blockH / 2)}`
+      : o.position === "upper"
+        ? `h*0.2-${Math.round(blockH / 2)}`
+        : `(h-${blockH})/2`;
+  return lines
+    .map((line, i) =>
+      buildDrawtext({
+        fontFile: o.fontFile,
+        text: line || " ",
+        fontSize,
+        fontColor: "white",
+        borderW: Math.max(2, Math.round(o.width * 0.006)),
+        box: { color: "black@0.5", borderW: Math.round(o.width * 0.015) },
+        x: "(w-text_w)/2",
+        y: `${base}+${i * lineH}`,
+      }),
+    )
+    .join(",");
 }
 
 /** Probe the video's pixel width via ffprobe (falls back to 1080 on failure). */
