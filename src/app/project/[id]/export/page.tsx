@@ -19,6 +19,8 @@ const platformConfigs = [
   { id: "kuaishou", nameKey: "platformKuaishou", ratio: "9:16", resolution: "1080p", subtitle: "贴边框", color: "from-orange-500 to-amber-500" },
   { id: "xiaohongshu", nameKey: "platformXiaohongshu", ratio: "3:4", resolution: "1440p", subtitle: "手写字体", color: "from-red-500 to-rose-500" },
   { id: "tiktok", nameKey: "platformTiktok", ratio: "9:16", resolution: "1080p", subtitle: "居中+描边", color: "from-slate-700 to-slate-900" },
+  { id: "reels", nameKey: "platformReels", ratio: "9:16", resolution: "1080p", subtitle: "居中+描边", color: "from-fuchsia-500 to-purple-600" },
+  { id: "shorts", nameKey: "platformShorts", ratio: "9:16", resolution: "1080p", subtitle: "居中+描边", color: "from-red-600 to-red-700" },
 ];
 
 // A/B variant presets: re-render one video per preset using existing params (subtitle style + BGM mood) to compare which converts better in ads (no key required throughout)

@@ -2,12 +2,17 @@ import { describe, it, expect } from "vitest";
 import { PLATFORM_SPECS, getPlatformSpec } from "@/lib/platform-specs";
 
 describe("platform-specs（多平台导出规格）", () => {
-  it("含四个带货平台（补齐 TikTok Shop）", () => {
-    expect(Object.keys(PLATFORM_SPECS).sort()).toEqual(["douyin", "kuaishou", "tiktok", "xiaohongshu"]);
+  it("含国内外六个带货平台（含 TikTok / Instagram Reels / YouTube Shorts）", () => {
+    expect(Object.keys(PLATFORM_SPECS).sort()).toEqual(["douyin", "kuaishou", "reels", "shorts", "tiktok", "xiaohongshu"]);
   });
 
   it("TikTok Shop = 1080x1920 竖屏 9:16", () => {
     expect(getPlatformSpec("tiktok")).toEqual({ name: "TikTok Shop", w: 1080, h: 1920, ratio: "9:16" });
+  });
+
+  it("Reels / Shorts 与 TikTok 同为 9:16 1080×1920（跨发同一条竖屏片，按平台命名导出）", () => {
+    expect(getPlatformSpec("reels")).toEqual({ name: "Instagram Reels", w: 1080, h: 1920, ratio: "9:16" });
+    expect(getPlatformSpec("shorts")).toEqual({ name: "YouTube Shorts", w: 1080, h: 1920, ratio: "9:16" });
   });
 
   it("抖音/快手 9:16，小红书 3:4", () => {
